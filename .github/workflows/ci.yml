@@ -1,0 +1,98 @@
+name: Python Engineering Lab CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+
+  # =============================
+  # PRICE CALCULATOR - UNIT
+  # =============================
+  price-unit:
+    runs-on: ubuntu-latest
+    if: contains(github.event.head_commit.message, '') || github.event_name == 'pull_request'
+
+    defaults:
+      run:
+        working-directory: price-calculator
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -e .
+
+      - name: Run unit tests
+        run: pytest tests/test_price.py --cov=calculator --cov-fail-under=90
+
+
+  # =============================
+  # PRICE CALCULATOR - BDD
+  # =============================
+  price-bdd:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    defaults:
+      run:
+        working-directory: price-calculator
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -e .
+
+      - name: Run BDD tests
+        run: pytest tests/test_price_bdd.py
+
+
+  # =============================
+  # COMPLIANCE GUARD - UNIT
+  # =============================
+  compliance-unit:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: pr-compliance-guard
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -e .
+
+      - name: Run unit tests
+        run: pytest tests/test_engine.py --cov=compliance --cov-fail-under=90
+
+
+  # =============================
+  # COMPLIANCE GUARD - BDD
+  # =============================
+  compliance-bdd:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    defaults:
+      run:
+        working-directory: pr-compliance-guard
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -e .
+
+      - name: Run BDD tests
+        run: pytest tests/test_compliance_bdd.py
