@@ -1,0 +1,10 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "price-calculator"
+version = "0.1.0"
+description = "Simple price calculator"
+authors = [{name="Tomas Nemeth"}]
+dependencies = []
