@@ -1,0 +1,13 @@
+#pr-compliance-guard/config/default.yaml
+
+branch:
+  pattern: "^feature/COM-\\d+-.*"
+
+commit:
+  forbidden_words:
+    - WIP
+    - fixup
+
+pr:
+  require_jira: true
+  jira_pattern: "COM-\\d+"

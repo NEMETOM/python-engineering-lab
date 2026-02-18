@@ -1,0 +1,9 @@
+branch:
+  pattern: "^.*"
+
+commit:
+  forbidden_words: []
+
+pr:
+  require_jira: false
+  jira_pattern: "COM-\\d+"
