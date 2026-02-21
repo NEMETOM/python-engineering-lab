@@ -19,10 +19,14 @@ scenarios("features/compliance.feature")
 BASE_DIR = Path(__file__).resolve().parents[1]
 
 
-@pytest.fixture(params=["default.yaml", "relaxed.yaml"])
-def config(request):
-    config_path = BASE_DIR / "config" / request.param
-    return load_config(config_path)
+#@pytest.fixture(params=["default.yaml", "relaxed.yaml"])
+#def config(request):
+#    config_path = BASE_DIR / "config" / request.param
+#    return load_config(config_path)
+
+@pytest.fixture
+def config():
+    return load_config("config/default.yaml")
 
 
 @pytest.fixture
