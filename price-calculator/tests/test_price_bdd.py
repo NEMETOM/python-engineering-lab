@@ -1,3 +1,5 @@
+#price-calculator/tests/test_price_bdd.py
+
 import pytest
 from pytest_bdd import scenarios, given, when, then, parsers
 from calculator.price import apply_discount, add_vat

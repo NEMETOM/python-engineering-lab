@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pr-compliance-guard"
+version = "0.1.0"
+dependencies = ["pyyaml"]
+
+[project.scripts]
+pr-guard = "compliance.cli:main"
+
+[tool.setuptools]
+packages = ["compliance", "config"]
+
+[tool.coverage.run]
+omit = [
+    "compliance/cli.py",
+    "compliance/logger.py",
+    "compliance/github_context.py",
+    "compliance/__main__.py"
+]

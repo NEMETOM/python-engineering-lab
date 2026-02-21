@@ -1,0 +1,12 @@
+branch:
+  pattern: "^feature/|^bugfix/"
+
+commit:
+  forbidden_words:
+    - WIP
+    - temp
+    - fix later
+
+pr:
+  require_jira: true
+  jira_pattern: "[A-Z]{2,5}-[0-9]+"

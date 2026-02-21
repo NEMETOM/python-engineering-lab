@@ -1,0 +1,4 @@
+pytest
+pytest-bdd
+pyyaml
+pytest-cov
