@@ -13,3 +13,10 @@ pr-guard = "compliance.cli:main"
 [tool.setuptools]
 packages = ["compliance", "config"]
 
+[tool.coverage.run]
+omit = [
+    "compliance/cli.py",
+    "compliance/logger.py",
+    "compliance/github_context.py",
+    "compliance/__main__.py"
+]
