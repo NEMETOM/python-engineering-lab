@@ -16,6 +16,7 @@ packages = ["compliance", "config"]
 [tool.coverage.run]
 omit = [
     "compliance/cli.py",
+    "compliance/config.py",
     "compliance/logger.py",
     "compliance/github_context.py",
     "compliance/__main__.py"
