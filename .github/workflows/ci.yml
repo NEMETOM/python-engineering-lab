@@ -144,3 +144,68 @@ jobs:
 
       - name: Run BDD tests
         run: pytest tests/test_compliance_bdd.py -v
+
+
+  # =============================
+  # RISK - UNIT
+  # =============================
+
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: event_stream_risk_detector
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -e .
+
+      - name: Run unit tests with coverage
+        run: |
+          pytest tests/unit \
+            --cov=src \
+            --cov-report=xml \
+            --cov-fail-under=85
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: event_stream_risk_detector/coverage.xml     
+
+
+
+  # =============================
+  # RISK - BDD
+  # =============================
+
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: event_stream_risk_detector
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -e .
+
+      - name: Run BDD tests
+        run: pytest tests/bdd -v
