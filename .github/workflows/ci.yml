@@ -149,7 +149,8 @@ jobs:
   # =============================
   # RISK - UNIT
   # =============================
-
+  
+  risk-unit:
     runs-on: ubuntu-latest
 
     defaults:
@@ -187,7 +188,8 @@ jobs:
   # =============================
   # RISK - BDD
   # =============================
-
+  
+  risk-bdd:
     runs-on: ubuntu-latest
 
     defaults:
