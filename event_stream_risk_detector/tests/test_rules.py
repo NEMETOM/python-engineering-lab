@@ -1,6 +1,6 @@
 # tests/test_rules.py
 import pytest
-from src.event_stream_risk_detector.rules import high_value_risk
+from event_stream_risk_detector.rules import high_value_risk
 
 
 @pytest.mark.parametrize(
