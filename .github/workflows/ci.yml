@@ -172,7 +172,7 @@ jobs:
 
       - name: Run unit tests with coverage
         run: |
-          pytest tests/unit \
+          pytest tests/test_rules.py \
             --cov=src \
             --cov-report=xml \
             --cov-fail-under=85
@@ -210,4 +210,4 @@ jobs:
           pip install -e .
 
       - name: Run BDD tests
-        run: pytest tests/bdd -v
+        run: pytest tests/test_customer_bdd.py -v
