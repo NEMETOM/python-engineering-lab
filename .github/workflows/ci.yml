@@ -94,7 +94,7 @@ jobs:
           pip install -e .
       - name: Run unit tests
         run: |
-          pytest tests/test_engine.py \
+          pytest tests/test_engine_from_json.py \
             --cov=compliance \
             --cov-report=term-missing \
             --cov-fail-under=90
@@ -117,7 +117,7 @@ jobs:
       - name: Run unit tests with coverage
         run: |
           pytest tests/test_rules.py \
-            --cov=src \
+            --cov=event_stream_risk_detector \
             --cov-report=xml \
             --cov-fail-under=85
       - name: Upload coverage artifact
