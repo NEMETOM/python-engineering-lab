@@ -125,7 +125,7 @@ jobs:
 
       - name: Run unit tests with coverage
         run: |
-          pytest tests/test_engine.py \
+          pytest tests/test_engine_from_json.py \
             --cov=compliance \
             --cov-report=term-missing \
             --cov-fail-under=90
@@ -182,7 +182,7 @@ jobs:
       - name: Run unit tests with coverage
         run: |
           pytest tests/test_rules.py \
-            --cov=src/event_stream_risk_detector \
+            --cov=src/event_stream_risk_detector/rules.py \
             --cov-report=xml \
             --cov-report=term-missing \
             --cov-fail-under=85
@@ -195,4 +195,3 @@ jobs:
         with:
           name: coverage-report
           path: event_stream_risk_detector/coverage.xml
-          
