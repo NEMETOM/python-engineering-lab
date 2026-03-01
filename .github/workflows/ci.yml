@@ -176,13 +176,13 @@ jobs:
           pip install -r requirements.txt
           pip install -e .
 
-      - name: Set PYTHONPATH
+      - name: Set PYTHONPATH (optional)
         run: echo "PYTHONPATH=$PYTHONPATH:$(pwd)/src" >> $GITHUB_ENV
 
       - name: Run unit tests with coverage
         run: |
           pytest tests/test_rules.py \
-            --cov=src/event_stream_risk_detector/rules.py \
+            --cov=event_stream_risk_detector \
             --cov-report=xml \
             --cov-report=term-missing \
             --cov-fail-under=85
@@ -194,4 +194,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
-          path: event_stream_risk_detector/coverage.xml
+          path: coverage.xml
