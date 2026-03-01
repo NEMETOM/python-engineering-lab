@@ -117,7 +117,7 @@ jobs:
       - name: Run unit tests with coverage
         run: |
           pytest tests/test_rules.py \
-            --cov=event_stream_risk_detector \
+            --cov=src/event_stream_risk_detector \
             --cov-report=xml \
             --cov-fail-under=85
       - name: Upload coverage artifact
