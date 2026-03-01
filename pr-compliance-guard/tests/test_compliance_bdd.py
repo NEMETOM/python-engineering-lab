@@ -7,6 +7,7 @@ from pytest_bdd import scenarios, given, when, then, parsers
 from compliance.engine import ComplianceEngine
 from compliance.config import load_config
 
+pytestmark = pytest.mark.bdd
 
 # Load feature file
 scenarios("features/compliance.feature")

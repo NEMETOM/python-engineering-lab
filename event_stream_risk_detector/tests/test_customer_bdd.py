@@ -4,6 +4,8 @@ import pytest
 from pytest_bdd import scenarios, given, when, then, parsers
 from event_stream_risk_detector.rules import high_value_risk
 
+pytestmark = pytest.mark.bdd
+
 # Link the feature file
 scenarios("features/risk.feature")
 

@@ -4,6 +4,8 @@ import pytest
 from pytest_bdd import scenarios, given, when, then, parsers
 from calculator.price import apply_discount, add_vat
 
+pytestmark = pytest.mark.bdd
+
 scenarios("features/price.feature")
 
 
