@@ -55,6 +55,9 @@ jobs:
       - name: Check formatting with Black
         run: black --check .
 
+      - name: Sort imports with isort
+        run: isort .        
+
       - name: Check imports with Isort
         run: isort --check-only .
 
