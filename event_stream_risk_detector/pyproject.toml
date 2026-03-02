@@ -48,7 +48,8 @@ addopts = "-v --strict-markers"
 # ===========================
 [tool.ruff]
 line-length = 88
-target-version = ["py310"]
+#target-version = ["py310"]
+target-version = "py310"
 exclude = ["build", "dist", ".venv", "__pycache__"]
 
 # ===========================
