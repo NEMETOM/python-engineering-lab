@@ -47,16 +47,16 @@ jobs:
           pip install ruff black isort mypy
 
       - name: Run Ruff
-        run: ruff check src tests
+        run: ruff check .
 
       - name: Check formatting with Black
-        run: black --check src tests
+        run: black --check .
 
       - name: Check imports with Isort
-        run: isort --check-only src tests
+        run: isort --check-only .
 
       - name: Type checking with MyPy
-        run: mypy src
+        run: mypy .
 
 
   # ==================================================
