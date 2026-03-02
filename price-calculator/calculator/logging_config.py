@@ -32,6 +32,7 @@ def configure_logging():
         formatter = logging.Formatter(
             "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
         )
+    handler.setFormatter(formatter)
 
     logger.handlers.clear()
     logger.addHandler(handler)
