@@ -181,11 +181,12 @@ jobs:
 
       - name: Run unit tests with coverage
         run: |
-          pytest tests/test_rules.py \
-            --cov=event_stream_risk_detector/rules.py \
+          pytest -v \
+            --cov=event_stream_risk_detector \
             --cov-report=xml \
             --cov-report=term-missing \
-            --cov-fail-under=75
+            --cov-fail-under=75 \
+            tests/test_rules.py
 
       - name: Run BDD tests
         run: pytest tests/test_customer_bdd.py -v
