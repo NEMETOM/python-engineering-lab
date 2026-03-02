@@ -1,4 +1,4 @@
-# .github/workflows/ci.yml
+#.github\workflows\ci.yml
 
 name: Python Engineering Lab CI
 
@@ -11,41 +11,51 @@ on:
     - cron: "0 6 * * 1"  # Every Monday 06:00 UTC
 
 jobs:
+
   # ==================================================
-  # LINT + FORMAT + TYPE CHECKS
+  # LINT + FORMAT + TYPE CHECKS (ALL PROJECTS)
   # ==================================================
   lint:
     runs-on: ubuntu-latest
 
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ["3.12"]
+        project:
+          - price-calculator
+          - pr-compliance-guard
+          - event_stream_risk_detector
+
+    defaults:
+      run:
+        working-directory: ${{ matrix.project }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.12"
           cache: pip
 
-      - name: Install dev dependencies
+      - name: Install dependencies (with dev tools)
         run: |
           pip install -r requirements.txt
           pip install -e .[dev]
 
-      - name: Run ruff lint
+      - name: Run Ruff
         run: ruff check src tests
 
-      - name: Check formatting with black
+      - name: Check formatting with Black
         run: black --check src tests
 
-      - name: Check imports with isort
+      - name: Check imports with Isort
         run: isort --check-only src tests
 
-      - name: Type checking with mypy
-        run: mypy src tests
+      - name: Type checking with MyPy
+        run: mypy src
+
 
   # ==================================================
   # PRICE CALCULATOR
@@ -100,6 +110,7 @@ jobs:
       - name: Run BDD tests
         run: pytest tests/test_price_bdd.py -v
 
+
   # ==================================================
   # COMPLIANCE GUARD
   # ==================================================
@@ -153,6 +164,7 @@ jobs:
       - name: Run BDD tests
         run: pytest tests/test_compliance_bdd.py -v
 
+
   # ==================================================
   # EVENT STREAM RISK DETECTOR
   # ==================================================
@@ -176,17 +188,16 @@ jobs:
           pip install -r requirements.txt
           pip install -e .
 
-      - name: Set PYTHONPATH (optional)
+      - name: Set PYTHONPATH
         run: echo "PYTHONPATH=$PYTHONPATH:$(pwd)/src" >> $GITHUB_ENV
 
       - name: Run unit tests with coverage
         run: |
-          pytest -v \
+          pytest tests/test_rules.py \
             --cov=event_stream_risk_detector \
             --cov-report=xml \
             --cov-report=term-missing \
-            --cov-fail-under=75 \
-            tests/test_rules.py
+            --cov-fail-under=75
 
       - name: Run BDD tests
         run: pytest tests/test_customer_bdd.py -v
@@ -194,5 +205,5 @@ jobs:
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-report
+          name: risk-coverage-report
           path: coverage.xml
