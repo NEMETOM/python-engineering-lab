@@ -77,8 +77,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
-          pip install -e .[dev]
+          pip install -r requirements.txt
+          pip install -e .
 
       - name: Run unit tests with coverage
         run: |
@@ -102,11 +102,10 @@ jobs:
           python-version: "3.11"
           cache: pip
 
-        #pip install -r requirements.txt
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
-          pip install -e .[dev]
+          pip install -r requirements.txt
+          pip install -e .
 
       - name: Run BDD tests
         run: pytest tests/test_price_bdd.py -v
@@ -132,8 +131,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
-          pip install -e .[dev]
+          pip install -r requirements.txt
+          pip install -e .
 
       - name: Run unit tests with coverage
         run: |
@@ -159,8 +158,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
-          pip install -e .[dev]
+          pip install -r requirements.txt
+          pip install -e .
 
       - name: Run BDD tests
         run: pytest tests/test_compliance_bdd.py -v
@@ -186,8 +185,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
-          pip install -e .[dev]
+          pip install -r requirements.txt
+          pip install -e .
 
       - name: Set PYTHONPATH
         run: echo "PYTHONPATH=$PYTHONPATH:$(pwd)/src" >> $GITHUB_ENV
