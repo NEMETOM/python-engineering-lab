@@ -39,10 +39,12 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Install project with dev dependencies
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install lint tools
         run: |
-          pip install --upgrade pip
-          pip install -e .[dev]
+          pip install ruff black isort mypy
 
       - name: Run Ruff
         run: ruff check .
@@ -50,7 +52,7 @@ jobs:
       - name: Check formatting with Black
         run: black --check .
 
-      - name: Check imports with isort
+      - name: Check imports with Isort
         run: isort --check-only .
 
       - name: Type checking with MyPy
