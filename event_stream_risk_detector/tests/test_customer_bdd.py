@@ -43,4 +43,3 @@ def check_high_value(context, expected):
     high_value = context["result"]
     expected_bool = expected.lower() == "true"
     assert high_value == expected_bool
-    

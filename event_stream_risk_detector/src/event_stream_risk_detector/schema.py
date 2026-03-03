@@ -1,4 +1,4 @@
-#src/event_stream_risk_detector/schema.py
+# src/event_stream_risk_detector/schema.py
 
 # Simple example schema
 RISK_EVENT_SCHEMA = {
@@ -6,5 +6,5 @@ RISK_EVENT_SCHEMA = {
     "user_id": str,
     "amount": float,
     "country": str,
-    "timestamp": str
+    "timestamp": str,
 }

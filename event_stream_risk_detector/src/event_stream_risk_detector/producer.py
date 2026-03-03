@@ -4,7 +4,10 @@ import json
 from kafka import KafkaProducer
 from kafka.errors import KafkaError
 
-from event_stream_risk_detector.logging_config import get_logger, generate_correlation_id
+from event_stream_risk_detector.logging_config import (
+    get_logger,
+    generate_correlation_id,
+)
 
 logger = get_logger(__name__)
 
@@ -21,7 +24,9 @@ class TransactionProducer:
         )
         logger.info(
             "Kafka producer initialized",
-            extra={"extra_data": {"bootstrap_servers": bootstrap_servers, "topic": topic}},
+            extra={
+                "extra_data": {"bootstrap_servers": bootstrap_servers, "topic": topic}
+            },
         )
 
     def send_transaction(self, transaction: dict) -> None:

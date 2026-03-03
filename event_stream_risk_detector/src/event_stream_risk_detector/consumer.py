@@ -33,4 +33,3 @@ def run_consumer():
             "Risk evaluation completed",
             extra={"extra_data": result},
         )
-            

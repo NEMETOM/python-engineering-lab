@@ -5,17 +5,23 @@ import pytest
 from compliance.engine import ComplianceEngine
 from compliance.config import load_config
 
+
 @pytest.fixture
 def default_config():
     """Load the default config once for all tests."""
     return load_config("config/default.yaml")
+
 
 @pytest.mark.parametrize(
     "json_file, override_config, expected",
     [
         ("tests/data/valid_pr.json", None, True),  # normal PR
         ("tests/data/invalid_pr.json", None, False),  # invalid branch/commit
-        ("tests/data/no_jira_pr.json", {"pr": {"require_jira": False}}, True),  # exercise else branch
+        (
+            "tests/data/no_jira_pr.json",
+            {"pr": {"require_jira": False}},
+            True,
+        ),  # exercise else branch
     ],
 )
 def test_engine_with_json_inputs(default_config, json_file, override_config, expected):
@@ -32,10 +38,7 @@ def test_engine_with_json_inputs(default_config, json_file, override_config, exp
     engine = ComplianceEngine(config)
 
     result = engine.evaluate(
-        branch=data["branch"],
-        commit=data["commit"],
-        title=data["title"]
+        branch=data["branch"], commit=data["commit"], title=data["title"]
     )
 
     assert result["compliant"] is expected
-    
