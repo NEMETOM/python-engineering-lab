@@ -1,7 +1,8 @@
 # tests/test_customer_bdd.py
 
 import pytest
-from pytest_bdd import scenarios, given, when, then, parsers
+from pytest_bdd import given, parsers, scenarios, then, when
+
 from event_stream_risk_detector.rules import high_value_risk
 
 pytestmark = pytest.mark.bdd

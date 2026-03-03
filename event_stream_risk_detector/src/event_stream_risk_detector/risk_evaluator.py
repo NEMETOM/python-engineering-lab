@@ -1,7 +1,5 @@
-from event_stream_risk_detector.logging_config import (
-    get_logger,
-    generate_correlation_id,
-)
+from event_stream_risk_detector.logging_config import (generate_correlation_id,
+                                                       get_logger)
 
 logger = get_logger(__name__)
 

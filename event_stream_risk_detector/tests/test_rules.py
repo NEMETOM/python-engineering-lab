@@ -1,5 +1,6 @@
 # tests/test_rules.py
 import pytest
+
 from event_stream_risk_detector.rules import high_value_risk
 
 

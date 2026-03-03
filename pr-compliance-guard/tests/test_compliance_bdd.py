@@ -1,11 +1,11 @@
 # pr-compliance-guard/tests/test_compliance_bdd.py
 
-import pytest
 from pathlib import Path
-from pytest_bdd import scenarios, given, when, then, parsers
 
-from compliance.engine import ComplianceEngine
+import pytest
 from compliance.config import load_config
+from compliance.engine import ComplianceEngine
+from pytest_bdd import given, parsers, scenarios, then, when
 
 pytestmark = pytest.mark.bdd
 

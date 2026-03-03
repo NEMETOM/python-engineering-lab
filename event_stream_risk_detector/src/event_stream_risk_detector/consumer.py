@@ -1,8 +1,9 @@
 import json
+
 from kafka import KafkaConsumer
 
-from event_stream_risk_detector.risk_evaluator import evaluate_transaction
 from event_stream_risk_detector.logging_config import get_logger
+from event_stream_risk_detector.risk_evaluator import evaluate_transaction
 
 logger = get_logger(__name__)
 

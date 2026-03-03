@@ -1,8 +1,8 @@
 # price-calculator/tests/test_price_bdd.py
 
 import pytest
-from pytest_bdd import scenarios, given, when, then, parsers
-from calculator.price import apply_discount, add_vat
+from calculator.price import add_vat, apply_discount
+from pytest_bdd import given, parsers, scenarios, then, when
 
 pytestmark = pytest.mark.bdd
 

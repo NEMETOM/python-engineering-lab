@@ -1,8 +1,8 @@
 # src/event_stream_risk_detector/logger.py
 
+import json
 import logging
 import sys
-import json
 
 
 def setup_logger(name: str = "event_stream_risk_detector", level=logging.INFO):

@@ -49,8 +49,14 @@ jobs:
       - name: Run Ruff
         run: ruff check .
 
+      - name: Format code with Black
+        run: black .
+
       - name: Check formatting with Black
         run: black --check .
+
+      - name: Sort imports with isort
+        run: isort .        
 
       - name: Check imports with Isort
         run: isort --check-only .

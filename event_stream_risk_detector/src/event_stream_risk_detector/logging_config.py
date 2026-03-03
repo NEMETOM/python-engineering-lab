@@ -1,7 +1,7 @@
 # event_stream_risk_detector/src/event_stream_risk_detector/logging_config.py
 
-import logging
 import json
+import logging
 import os
 import uuid
 from datetime import datetime

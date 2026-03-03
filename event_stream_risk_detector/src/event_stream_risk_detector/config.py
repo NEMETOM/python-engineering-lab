@@ -1,7 +1,8 @@
 # src/event_stream_risk_detector/config.py
 
-import yaml
 from pathlib import Path
+
+import yaml
 
 
 def load_config(path: str = "config.yaml") -> dict:

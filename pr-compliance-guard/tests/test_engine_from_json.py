@@ -1,9 +1,10 @@
 # tests/test_engine_from_json.py
 
 import json
+
 import pytest
-from compliance.engine import ComplianceEngine
 from compliance.config import load_config
+from compliance.engine import ComplianceEngine
 
 
 @pytest.fixture

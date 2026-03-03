@@ -1,4 +1,5 @@
 import logging
+
 from .logging_config import generate_correlation_id
 
 logger = logging.getLogger(__name__)

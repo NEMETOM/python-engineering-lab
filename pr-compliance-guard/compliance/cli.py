@@ -1,7 +1,8 @@
 import argparse
 import json
-from compliance.engine import ComplianceEngine
+
 from compliance.config import load_config
+from compliance.engine import ComplianceEngine
 
 
 def main():

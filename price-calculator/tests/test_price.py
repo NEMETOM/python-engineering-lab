@@ -1,5 +1,5 @@
 import pytest
-from calculator.price import apply_discount, add_vat
+from calculator.price import add_vat, apply_discount
 
 
 def test_apply_discount_correct():
