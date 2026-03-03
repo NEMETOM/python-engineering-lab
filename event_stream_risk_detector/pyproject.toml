@@ -28,6 +28,7 @@ dev = [
     "black>=23.3",
     "isort>=6.0",
     "mypy>=1.5",
+    "types-PyYAML>=6.0",
 ]
 
 [project.scripts]
