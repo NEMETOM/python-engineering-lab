@@ -1,21 +1,14 @@
-[build-system]
-requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.build_meta"
+# pyproject.toml (event_stream_risk_detector)
 
 [project]
-name = "event-stream-risk-detector"
+name = "event_stream_risk_detector"
 version = "0.1.0"
-description = "Kafka-based streaming risk detection microservice (mid-level engineering lab project)"
+description = "Detect risk events in streaming data"
 readme = "README.md"
-requires-python = ">=3.10"
-license = {text = "MIT"}
-authors = [
-    { name = "Your Name" }
-]
-
+requires-python = ">=3.12"
 dependencies = [
-    "kafka-python>=2.0.2",
-    "pyyaml>=6.0",
+    "PyYAML>=6.0",
+    # Add other runtime dependencies here
 ]
 
 [project.optional-dependencies]
@@ -23,7 +16,6 @@ dev = [
     "pytest>=8.0",
     "pytest-bdd>=8.0",
     "pytest-cov>=4.0",
-    "pytest-html>=4.0",
     "ruff>=0.0.300",
     "black>=23.3",
     "isort>=6.0",
@@ -31,61 +23,51 @@ dev = [
     "types-PyYAML>=6.0",
 ]
 
-[project.scripts]
-risk-consumer = "event_stream_risk_detector.consumer:run_consumer"
-
-[tool.setuptools]
-package-dir = {"" = "src"}
-
-[tool.setuptools.packages.find]
-where = ["src"]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-addopts = "-v --strict-markers"
-
-# ===========================
-# Linting with ruff
-# ===========================
+# ==================================================
+# Ruff configuration
+# ==================================================
 [tool.ruff]
 line-length = 88
-#target-version = ["py310"]
-target-version = "py310"
-exclude = ["build", "dist", ".venv", "__pycache__"]
+select = ["F", "E", "W", "B", "C", "Q"]  # common categories
+exclude = ["__pycache__", ".git", "build", "dist"]
+target-version = "py312"
 
-# ===========================
-# Formatting with black
-# ===========================
+# ==================================================
+# Black configuration
+# ==================================================
 [tool.black]
 line-length = 88
-target-version = ["py310"]
+target-version = ['py312']
 include = '\.pyi?$'
 exclude = '''
 /(
-    \.venv
+    \.git
+  | \.mypy_cache
+  | \.pytest_cache
   | build
   | dist
-  | __pycache__
 )/
 '''
 
-# ===========================
-# Import sorting with isort
-# ===========================
+# ==================================================
+# Isort configuration
+# ==================================================
 [tool.isort]
 profile = "black"
 line_length = 88
 known_first_party = ["event_stream_risk_detector"]
-default_section = "THIRDPARTY"
 multi_line_output = 3
 include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+default_section = "THIRDPARTY"
 
-# ===========================
-# Type checking with mypy
-# ===========================
+# ==================================================
+# Mypy configuration
+# ==================================================
 [tool.mypy]
 python_version = 3.12
-files = "src,tests"
+files = ["src", "tests"]
 ignore_missing_imports = true
 strict = true
-show_error_codes = true

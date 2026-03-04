@@ -8,3 +8,15 @@ version = "0.1.0"
 description = "Simple price calculator"
 authors = [{name="Tomas Nemeth"}]
 dependencies = []
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = false
+strict_optional = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_return_any = true
+
+[[tool.mypy.overrides]]
+module = "yaml"
+ignore_missing_imports = true
