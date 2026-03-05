@@ -9,6 +9,13 @@ description = "Simple price calculator"
 authors = [{name="Tomas Nemeth"}]
 dependencies = []
 
+[tool.isort]
+profile = "black"
+line_length = 88
+known_first_party = "calculator"
+default_section = "THIRDPARTY"
+combine_as_imports = true
+
 [tool.mypy]
 python_version = "3.11"
 ignore_missing_imports = false

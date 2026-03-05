@@ -1,6 +1,5 @@
 # src/event_stream_risk_detector/logger.py
 
-import json
 import logging
 import sys
 
