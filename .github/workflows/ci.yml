@@ -35,23 +35,24 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: Install project dependencies
+      - name: Install project dependencies and dev tools
         run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -e .[dev]
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install -e .[dev]
+          python -m pip install ruff black isort mypy types-PyYAML pre-commit
 
       - name: Run Ruff (lint)
-        run: ruff check .
+        run: python -m ruff check .
 
       - name: Check formatting with Black
-        run: black --check .
+        run: python -m black --check .
 
       - name: Check imports with Isort
-        run: isort --check-only .
+        run: python -m isort --check-only .
 
       - name: Type checking with MyPy
-        run: mypy .
+        run: python -m mypy .
 
   # ==================================================
   # UNIT + BDD TESTS FOR EACH PROJECT
@@ -72,9 +73,9 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -e .[dev]
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install -e .[dev]
       - name: Run unit tests with coverage
         run: |
           pytest tests/test_price.py \
@@ -99,9 +100,9 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -e .[dev]
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install -e .[dev]
       - name: Run unit tests with coverage
         run: |
           pytest tests/test_engine_from_json.py \
@@ -126,9 +127,9 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -e .[dev]
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install -e .[dev]
       - name: Set PYTHONPATH
         run: echo "PYTHONPATH=$PYTHONPATH:$(pwd)/src" >> $GITHUB_ENV
       - name: Run unit tests with coverage
@@ -145,4 +146,3 @@ jobs:
         with:
           name: risk-coverage-report
           path: coverage.xml
-          
