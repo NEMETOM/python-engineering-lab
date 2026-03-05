@@ -1,4 +1,5 @@
 import pytest
+
 from calculator.price import add_vat, apply_discount
 
 
