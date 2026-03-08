@@ -77,3 +77,9 @@ show_error_codes = true
 [[tool.mypy.overrides]]
 module = ["test_*", "tests.*"]
 disallow_untyped_defs = false
+
+[tool.coverage.report]
+omit = [
+    "*/producer.py",
+    "*/consumer.py",
+]

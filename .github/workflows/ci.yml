@@ -139,6 +139,7 @@ jobs:
             --cov-report=xml \
             --cov-report=term-missing \
             --cov-fail-under=75
+            --cov-config=pyproject.toml
       - name: Run BDD tests
         run: pytest tests/test_customer_bdd.py -v
       - name: Upload coverage artifact

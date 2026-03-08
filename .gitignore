@@ -1,2 +1,33 @@
 C:/Dev/python-engineering-lab/Archive
 C:/Dev/python-engineering-lab/MISC-python-scripts
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Build / packaging metadata
+*.egg-info/
+.eggs/
+
+# Distribution builds
+build/
+dist/
+
+# Coverage reports
+.coverage
+coverage.xml
+htmlcov/
+
+# Pytest cache
+.pytest_cache/
+
+# MyPy cache
+.mypy_cache/
+
+# Ruff cache
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
