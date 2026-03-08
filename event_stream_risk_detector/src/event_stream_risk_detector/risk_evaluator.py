@@ -1,3 +1,7 @@
+# event_stream_risk_detector/src/event_stream_risk_detector/risk_evaluator.py
+
+from typing import Any, Dict
+
 from event_stream_risk_detector.logging_config import (
     generate_correlation_id,
     get_logger,
@@ -6,7 +10,7 @@ from event_stream_risk_detector.logging_config import (
 logger = get_logger(__name__)
 
 
-def evaluate_transaction(transaction: dict) -> dict:
+def evaluate_transaction(transaction: Dict[str, Any]) -> Dict[str, Any]:
     correlation_id = generate_correlation_id()
 
     amount = transaction.get("amount", 0)

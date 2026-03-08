@@ -1,4 +1,7 @@
+# event_stream_risk_detector/src/event_stream_risk_detector/consumer.py
+
 import json
+from typing import Any, Dict
 
 from kafka import KafkaConsumer
 
@@ -8,8 +11,8 @@ from event_stream_risk_detector.risk_evaluator import evaluate_transaction
 logger = get_logger(__name__)
 
 
-def run_consumer():
-    consumer = KafkaConsumer(
+def run_consumer() -> None:
+    consumer: KafkaConsumer = KafkaConsumer(
         "transactions",
         bootstrap_servers="localhost:9092",
         auto_offset_reset="earliest",
@@ -21,14 +24,14 @@ def run_consumer():
     logger.info("Consumer started")
 
     for message in consumer:
-        transaction = message.value
+        transaction: Dict[str, Any] = message.value
 
         logger.info(
             "Received transaction",
             extra={"extra_data": transaction},
         )
 
-        result = evaluate_transaction(transaction)
+        result: Dict[str, Any] = evaluate_transaction(transaction)
 
         logger.info(
             "Risk evaluation completed",

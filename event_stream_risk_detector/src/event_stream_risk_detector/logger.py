@@ -4,7 +4,10 @@ import logging
 import sys
 
 
-def setup_logger(name: str = "event_stream_risk_detector", level=logging.INFO):
+def setup_logger(
+    name: str = "event_stream_risk_detector",
+    level: int = logging.INFO,
+) -> logging.Logger:
     logger = logging.getLogger(name)
     logger.setLevel(level)
 
@@ -13,8 +16,9 @@ def setup_logger(name: str = "event_stream_risk_detector", level=logging.INFO):
         '{"time": "%(asctime)s", "level": "%(levelname)s", "message": "%(message)s"}'
     )
     handler.setFormatter(formatter)
+
     logger.addHandler(handler)
     return logger
 
 
-logger = setup_logger()
+logger: logging.Logger = setup_logger()

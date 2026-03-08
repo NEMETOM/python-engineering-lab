@@ -1,6 +1,7 @@
 # event_stream_risk_detector/src/event_stream_risk_detector/producer.py
 
 import json
+from typing import Any, Dict
 
 from kafka import KafkaProducer
 from kafka.errors import KafkaError
@@ -16,22 +17,27 @@ logger = get_logger(__name__)
 class TransactionProducer:
     """Kafka producer wrapper for sending transactions."""
 
-    def __init__(self, bootstrap_servers: str, topic: str):
-        self.topic = topic
-        self.producer = KafkaProducer(
+    def __init__(self, bootstrap_servers: str, topic: str) -> None:
+        self.topic: str = topic
+        self.producer: KafkaProducer = KafkaProducer(
             bootstrap_servers=bootstrap_servers,
             value_serializer=lambda v: json.dumps(v).encode("utf-8"),
             retries=3,
         )
+
         logger.info(
             "Kafka producer initialized",
             extra={
-                "extra_data": {"bootstrap_servers": bootstrap_servers, "topic": topic}
+                "extra_data": {
+                    "bootstrap_servers": bootstrap_servers,
+                    "topic": topic,
+                }
             },
         )
 
-    def send_transaction(self, transaction: dict) -> None:
+    def send_transaction(self, transaction: Dict[str, Any]) -> None:
         correlation_id = generate_correlation_id()
+
         try:
             future = self.producer.send(self.topic, transaction)
             record_metadata = future.get(timeout=10)
@@ -59,7 +65,7 @@ class TransactionProducer:
             )
             raise
 
-    def close(self):
+    def close(self) -> None:
         self.producer.flush()
         self.producer.close()
         logger.info("Kafka producer closed")
@@ -68,14 +74,13 @@ class TransactionProducer:
 # ------------------------
 # CLI ENTRYPOINT
 # ------------------------
-def main():
+def main() -> None:
     producer = TransactionProducer(
         bootstrap_servers="localhost:9092",
         topic="transactions",
     )
 
-    # Example transaction
-    transaction = {
+    transaction: Dict[str, Any] = {
         "transaction_id": "tx-123",
         "user_id": "user-42",
         "amount": 2500,
