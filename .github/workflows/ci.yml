@@ -134,7 +134,7 @@ jobs:
         run: echo "PYTHONPATH=$PYTHONPATH:$(pwd)/src" >> $GITHUB_ENV
       - name: Run unit tests with coverage
         run: |
-          pytest tests/test_rules.py \
+          pytest \
             --cov=event_stream_risk_detector \
             --cov-report=xml \
             --cov-report=term-missing \
