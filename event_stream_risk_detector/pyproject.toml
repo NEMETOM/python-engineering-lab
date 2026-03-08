@@ -71,7 +71,9 @@ python_version = 3.12
 files = ["src", "tests"]
 ignore_missing_imports = true
 strict = true
+pretty = true
+show_error_codes = true
 
 [[tool.mypy.overrides]]
-module = "tests.*"
+module = ["test_*", "tests.*"]
 disallow_untyped_defs = false
