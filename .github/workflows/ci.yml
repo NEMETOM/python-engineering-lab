@@ -52,7 +52,7 @@ jobs:
         run: python -m isort --check-only .
 
       - name: Type checking with MyPy
-        run: python -m mypy .
+        run: python -m mypy . --pretty --show-error-codes
 
   # ==================================================
   # UNIT + BDD TESTS FOR EACH PROJECT
