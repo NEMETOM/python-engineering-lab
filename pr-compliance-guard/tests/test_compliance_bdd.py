@@ -1,12 +1,13 @@
 # pr-compliance-guard/tests/test_compliance_bdd.py
 
-import pytest
 from pathlib import Path
-from pytest_bdd import scenarios, given, when, then, parsers
 
-from compliance.engine import ComplianceEngine
+import pytest
 from compliance.config import load_config
+from compliance.engine import ComplianceEngine
+from pytest_bdd import given, parsers, scenarios, then, when
 
+pytestmark = pytest.mark.bdd
 
 # Load feature file
 scenarios("features/compliance.feature")
@@ -19,10 +20,11 @@ scenarios("features/compliance.feature")
 BASE_DIR = Path(__file__).resolve().parents[1]
 
 
-#@pytest.fixture(params=["default.yaml", "relaxed.yaml"])
-#def config(request):
+# @pytest.fixture(params=["default.yaml", "relaxed.yaml"])
+# def config(request):
 #    config_path = BASE_DIR / "config" / request.param
 #    return load_config(config_path)
+
 
 @pytest.fixture
 def config():
@@ -43,6 +45,7 @@ def pr_context():
 # GIVEN steps
 # -------------------------
 
+
 @given(parsers.parse('branch "{branch_name}"'))
 def given_branch(pr_context, branch_name):
     pr_context["branch"] = branch_name
@@ -62,6 +65,7 @@ def given_pr_title(pr_context, title):
 # WHEN step
 # -------------------------
 
+
 @when("compliance is evaluated")
 def when_compliance_is_evaluated(pr_context, engine):
     result = engine.evaluate(
@@ -75,6 +79,7 @@ def when_compliance_is_evaluated(pr_context, engine):
 # -------------------------
 # THEN steps
 # -------------------------
+
 
 @then("result should be compliant")
 def then_result_should_be_compliant(pr_context):

@@ -1,4 +1,4 @@
-#.github\workflows\ci.yml
+# .github/workflows/ci.yml
 
 name: Python Engineering Lab CI
 
@@ -11,136 +11,139 @@ on:
     - cron: "0 6 * * 1"  # Every Monday 06:00 UTC
 
 jobs:
-
   # ==================================================
-  # Shared Python Setup (reused via YAML anchor)
+  # LINT + FORMAT + TYPE CHECKS (Independent Projects)
   # ==================================================
-
-  # =============================
-  # PRICE CALCULATOR - UNIT
-  # =============================
-  price-unit:
+  lint:
     runs-on: ubuntu-latest
-
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ["3.11"]
-
+        project: 
+          - price-calculator
+          - pr-compliance-guard
+          - event_stream_risk_detector
     defaults:
       run:
-        working-directory: price-calculator
-
+        working-directory: ${{ matrix.project }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
-          cache: "pip"
+          python-version: "3.12"
+          cache: pip
 
+      - name: Install project dependencies and dev tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install -e .[dev]
+          python -m pip install ruff black isort mypy types-PyYAML pre-commit
+
+      - name: Run Ruff (lint)
+        run: python -m ruff check .
+
+      - name: Check formatting with Black
+        run: python -m black --check .
+
+      - name: Check imports with Isort
+        run: python -m isort --check-only .
+
+      - name: Type checking with MyPy
+        run: python -m mypy . --pretty --show-error-codes
+
+  # ==================================================
+  # UNIT + BDD TESTS FOR EACH PROJECT
+  # ==================================================
+
+  # --- PRICE CALCULATOR ---
+  price-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: price-calculator
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
-          pip install -e .
-
-      - name: Run unit tests
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install -e .[dev]
+      - name: Run unit tests with coverage
         run: |
           pytest tests/test_price.py \
             --cov=calculator \
             --cov-report=term-missing \
             --cov-fail-under=90
-
-
-  # =============================
-  # PRICE CALCULATOR - BDD
-  # =============================
-  price-bdd:
-    runs-on: ubuntu-latest
-    if: github.event_name != 'schedule'   # optional: skip BDD on cron
-
-    defaults:
-      run:
-        working-directory: price-calculator
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: "pip"
-
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install -e .
-
       - name: Run BDD tests
         run: pytest tests/test_price_bdd.py -v
 
-
-  # =============================
-  # COMPLIANCE GUARD - UNIT
-  # =============================
-  compliance-unit:
+  # --- COMPLIANCE GUARD ---
+  compliance-tests:
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        python-version: ["3.11"]
-
     defaults:
       run:
         working-directory: pr-compliance-guard
-
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-          cache: "pip"
-
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install -e .
-
-      - name: Run unit tests
-        run: |
-          pytest tests/test_engine.py \
-            --cov=compliance \
-            --cov-report=term-missing \
-            --cov-fail-under=90
-
-
-  # =============================
-  # COMPLIANCE GUARD - BDD
-  # =============================
-  compliance-bdd:
-    runs-on: ubuntu-latest
-    if: github.event_name != 'schedule'
-
-    defaults:
-      run:
-        working-directory: pr-compliance-guard
-
-    steps:
-      - uses: actions/checkout@v4
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: "pip"
-
+          cache: pip
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
-          pip install -e .
-
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install -e .[dev]
+      - name: Run unit tests with coverage
+        run: |
+          pytest tests/test_engine_from_json.py \
+            --cov=compliance \
+            --cov-report=term-missing \
+            --cov-fail-under=90
       - name: Run BDD tests
         run: pytest tests/test_compliance_bdd.py -v
+
+  # --- EVENT STREAM RISK DETECTOR ---
+  risk-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: event_stream_risk_detector
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install -e .[dev]
+      - name: Set PYTHONPATH
+        run: echo "PYTHONPATH=$PYTHONPATH:$(pwd)/src" >> $GITHUB_ENV
+      - name: Run unit tests with coverage
+        run: |
+          pytest \
+            --cov=event_stream_risk_detector \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --cov-fail-under=75 \
+            --cov-config=pyproject.toml
+      - name: Run BDD tests
+        run: pytest tests/test_customer_bdd.py -v
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: risk-coverage-report
+          path: coverage.xml

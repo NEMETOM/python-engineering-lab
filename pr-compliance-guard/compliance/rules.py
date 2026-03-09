@@ -1,5 +1,6 @@
 import re
 
+
 def branch_is_valid(branch_name: str, pattern: str) -> bool:
     return bool(re.match(pattern, branch_name))
 

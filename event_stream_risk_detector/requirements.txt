@@ -1,0 +1,6 @@
+pytest
+pytest-bdd
+pytest-cov
+pytest-html
+pyyaml
+kafka-python

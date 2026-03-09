@@ -1,4 +1,5 @@
 import logging
+
 from .logging_config import generate_correlation_id
 
 logger = logging.getLogger(__name__)
@@ -9,15 +10,21 @@ def apply_discount(price: float, discount_percent: float) -> float:
     logger.info("Applying discount", extra={"correlation_id": correlation_id})
 
     if price < 0:
-        logger.error("Negative price detected", extra={"correlation_id": correlation_id})
+        logger.error(
+            "Negative price detected", extra={"correlation_id": correlation_id}
+        )
         raise ValueError("Price cannot be negative")
 
     if not 0 <= discount_percent <= 100:
-        logger.error("Invalid discount percentage", extra={"correlation_id": correlation_id})
+        logger.error(
+            "Invalid discount percentage", extra={"correlation_id": correlation_id}
+        )
         raise ValueError("Discount must be between 0 and 100")
 
     result = price * (1 - discount_percent / 100)
-    logger.info("Discount applied successfully", extra={"correlation_id": correlation_id})
+    logger.info(
+        "Discount applied successfully", extra={"correlation_id": correlation_id}
+    )
     return result
 
 

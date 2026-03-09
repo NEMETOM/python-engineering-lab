@@ -1,8 +1,11 @@
-#price-calculator/tests/test_price_bdd.py
+# price-calculator/tests/test_price_bdd.py
 
 import pytest
-from pytest_bdd import scenarios, given, when, then, parsers
-from calculator.price import apply_discount, add_vat
+from pytest_bdd import given, parsers, scenarios, then, when
+
+from calculator.price import add_vat, apply_discount
+
+pytestmark = pytest.mark.bdd
 
 scenarios("features/price.feature")
 
@@ -36,6 +39,7 @@ def add_vat_step(context, vat):
 @then(parsers.parse("the final price should be {expected:d}"))
 def check_result(context, expected):
     import pytest
+
     assert context["result"] == pytest.approx(expected)
 
 
