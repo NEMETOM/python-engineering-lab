@@ -19,7 +19,7 @@ dev = [
 
 [build-system]
 requires = ["setuptools", "setuptools-scm"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
