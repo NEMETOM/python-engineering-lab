@@ -23,6 +23,7 @@ jobs:
           - price-calculator
           - pr-compliance-guard
           - event_stream_risk_detector
+          - fix-protocol-simulator
     defaults:
       run:
         working-directory: ${{ matrix.project }}
