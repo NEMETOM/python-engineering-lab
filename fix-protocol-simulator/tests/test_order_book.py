@@ -1,7 +1,7 @@
 # fix-protocol-simulator/tests/test_order_book.py
 
-from fix_simulator.exchange.order_book import OrderBook
 from fix_simulator.exchange.order import Order
+from fix_simulator.exchange.order_book import OrderBook
 
 
 def test_best_bid():

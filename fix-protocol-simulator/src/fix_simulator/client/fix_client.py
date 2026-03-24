@@ -1,19 +1,19 @@
 # fix-protocol-simulator/src/fix_simulator/client/fix_client.py
 
-import socket
 import logging
+import socket
 import uuid
 
-from fix_simulator.protocol.fix_message import FixMessage
-from fix_simulator.protocol.fix_parser import FixParser
+from fix_simulator.config.settings import settings
 from fix_simulator.protocol.fix_constants import (
+    MSG_SEQ_NUM,
     MSG_TYPE,
+    NEW_ORDER_SINGLE,
     SENDER_COMP_ID,
     TARGET_COMP_ID,
-    MSG_SEQ_NUM,
-    NEW_ORDER_SINGLE,
 )
-from fix_simulator.config.settings import settings
+from fix_simulator.protocol.fix_message import FixMessage
+from fix_simulator.protocol.fix_parser import FixParser
 
 logger = logging.getLogger(__name__)
 

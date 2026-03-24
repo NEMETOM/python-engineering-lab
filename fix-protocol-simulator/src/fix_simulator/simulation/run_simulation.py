@@ -2,8 +2,8 @@
 
 import asyncio
 
-from fix_simulator.server.fix_server import FixServer
 from fix_simulator.config.settings import settings
+from fix_simulator.server.fix_server import FixServer
 from fix_simulator.utils.logger import setup_logger
 
 

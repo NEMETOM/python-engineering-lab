@@ -1,6 +1,6 @@
 # fix-protocol-simulator/tests/test_run_simulation.py
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from fix_simulator.simulation.run_simulation import run
 

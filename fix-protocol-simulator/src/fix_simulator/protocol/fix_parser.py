@@ -1,8 +1,9 @@
 # fix-protocol-simulator/src/fix_simulator/protocol/fix_parser.py
 
 import logging
-from .fix_message import FixMessage
+
 from .fix_constants import SOH
+from .fix_message import FixMessage
 
 logger = logging.getLogger(__name__)
 

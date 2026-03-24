@@ -1,10 +1,9 @@
 # fix-protocol-simulator/tests/bdd/steps/trading_steps.py
 
-from behave import given, when, then
-
-from fix_simulator.exchange.order_book import OrderBook
+from behave import given, then, when
 from fix_simulator.exchange.matching_engine import MatchingEngine
 from fix_simulator.exchange.order import Order
+from fix_simulator.exchange.order_book import OrderBook
 
 
 @given("the order book is empty")

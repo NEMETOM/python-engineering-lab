@@ -1,8 +1,8 @@
 # fix-protocol-simulator/tests/test_matching_engine.py
 
-from fix_simulator.exchange.order_book import OrderBook
 from fix_simulator.exchange.matching_engine import MatchingEngine
 from fix_simulator.exchange.order import Order
+from fix_simulator.exchange.order_book import OrderBook
 
 
 def test_matching_trade():

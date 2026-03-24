@@ -5,8 +5,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from fix_simulator.utils.logger import setup_logger
 from fix_simulator.client.fix_client import FixClient
+from fix_simulator.utils.logger import setup_logger
 
 if __name__ == "__main__":
     setup_logger()
