@@ -1,0 +1,31 @@
+[project]
+name = "fix-protocol-simulator"
+version = "0.1.0"
+description = "Mini FIX protocol exchange simulator"
+authors = [
+    {name = "Tomas Nemeth"}
+]
+
+dependencies = [
+    "pydantic",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "behave",
+]
+
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.mypy]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
