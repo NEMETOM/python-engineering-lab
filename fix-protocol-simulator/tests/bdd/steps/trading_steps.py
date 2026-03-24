@@ -1,4 +1,4 @@
-#fix-protocol-simulator/tests/bdd/steps/trading_steps.py
+# fix-protocol-simulator/tests/bdd/steps/trading_steps.py
 
 from behave import given, when, then
 
@@ -24,9 +24,7 @@ def given_buy_orders_in_book(context):
 
 @when("a BUY order is placed at price {price} for quantity {qty}")
 def when_buy_order_placed(context, price, qty):
-    context.engine.process_order(
-        Order("B1", "BUY", float(price), int(qty))
-    )
+    context.engine.process_order(Order("B1", "BUY", float(price), int(qty)))
 
 
 @when("a SELL order is placed at price {price} for quantity {qty}")

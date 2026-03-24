@@ -1,4 +1,4 @@
-#fix-protocol-simulator/scripts/run_client.py
+# fix-protocol-simulator/scripts/run_client.py
 
 import sys
 from pathlib import Path

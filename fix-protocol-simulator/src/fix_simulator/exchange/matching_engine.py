@@ -1,4 +1,4 @@
-#fix-protocol-simulator/src/fix_simulator/exchange/matching_engine.py
+# fix-protocol-simulator/src/fix_simulator/exchange/matching_engine.py
 
 import logging
 
@@ -40,11 +40,6 @@ class MatchingEngine:
         trade_price = counterparty.price
         quantity = min(order.quantity, counterparty.quantity)
 
-        logger.info(
-            f"Trade executed price={trade_price} qty={quantity}"
-        )
+        logger.info(f"Trade executed price={trade_price} qty={quantity}")
 
-        return {
-            "price": trade_price,
-            "quantity": quantity
-        }
+        return {"price": trade_price, "quantity": quantity}

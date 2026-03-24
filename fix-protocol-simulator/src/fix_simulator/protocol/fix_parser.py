@@ -1,10 +1,11 @@
-#fix-protocol-simulator/src/fix_simulator/protocol/fix_parser.py
+# fix-protocol-simulator/src/fix_simulator/protocol/fix_parser.py
 
 import logging
 from .fix_message import FixMessage
 from .fix_constants import SOH
 
 logger = logging.getLogger(__name__)
+
 
 class FixParser:
     @staticmethod
@@ -27,5 +28,4 @@ class FixParser:
 
         logger.debug("Serializing FIX message")
 
-        return message.encode()      
-
+        return message.encode()

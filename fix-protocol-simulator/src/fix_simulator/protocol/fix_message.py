@@ -1,6 +1,7 @@
-#fix-protocol-simulator\src\fix_simulator\protocol\fix_message.py
+# fix-protocol-simulator\src\fix_simulator\protocol\fix_message.py
 
 from dataclasses import dataclass
+
 
 @dataclass
 class FixMessage:
@@ -8,7 +9,7 @@ class FixMessage:
 
     def get(self, tag):
         return self.fields.get(tag)
-    
+
     def set(self, tag, value):
         self.fields[tag] = value
 

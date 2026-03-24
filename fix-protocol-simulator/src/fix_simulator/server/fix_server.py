@@ -1,4 +1,4 @@
-#fix-protocol-simulator/src/fix_simulator/server/fix_server.py
+# fix-protocol-simulator/src/fix_simulator/server/fix_server.py
 
 import asyncio
 import logging
@@ -40,11 +40,7 @@ class FixServer:
 
     async def start(self):
 
-        server = await asyncio.start_server(
-            self.handle_client,
-            self.host,
-            self.port
-        )
+        server = await asyncio.start_server(self.handle_client, self.host, self.port)
 
         logger.info(f"FIX server running {self.host}:{self.port}")
 
