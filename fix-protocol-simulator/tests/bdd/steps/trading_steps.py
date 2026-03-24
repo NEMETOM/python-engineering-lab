@@ -13,7 +13,7 @@ def given_order_book_is_empty(context):
     context.trade = None
 
 
-@given("the following BUY orders are in the book")
+@given("the following BUY orders are in the book:")
 def given_buy_orders_in_book(context):
     for row in context.table:
         context.engine.process_order(
