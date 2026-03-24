@@ -1,6 +1,6 @@
 # fix-protocol-simulator/tests/bdd/steps/trading_steps.py
 
-from behave import given, then, when
+from behave import given, then, when  # type: ignore[import-untyped]
 from fix_simulator.exchange.matching_engine import MatchingEngine
 from fix_simulator.exchange.order import Order
 from fix_simulator.exchange.order_book import OrderBook
