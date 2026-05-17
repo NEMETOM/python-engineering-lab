@@ -1,0 +1,134 @@
+name: Order Service CI
+
+on:
+  push:
+    paths:
+      - 'fix-protocol-simulator-pro/services/order-service/**'
+      - 'fix-protocol-simulator-pro/shared/**'
+      - '.github/workflows/order-service.yml'
+  pull_request:
+    paths:
+      - 'fix-protocol-simulator-pro/services/order-service/**'
+      - 'fix-protocol-simulator-pro/shared/**'
+      - '.github/workflows/order-service.yml'
+  workflow_dispatch: # allow manual runs from the Actions tab
+
+# Restrict the default GITHUB_TOKEN to read-only; grant extra scopes explicitly
+# in the steps that need them (e.g. packages: write for a registry push).
+permissions:
+  contents: read
+
+# Cancel any in-progress run for the same workflow + branch when a new push
+# arrives, avoiding redundant work and stale deployments.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Test & Build
+    runs-on: ubuntu-latest
+
+    # All `run:` steps default to the project root unless overridden per-step.
+    defaults:
+      run:
+        working-directory: fix-protocol-simulator-pro
+
+    steps:
+      # ── 1. Source code ────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+
+      # ── 2. Python runtime ─────────────────────────────────────────────────────
+      - name: Set up Python 3.11
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        with:
+          python-version: '3.11'
+          # Cache pip's download cache keyed on both dependency manifests.
+          cache: pip
+          cache-dependency-path: |
+            fix-protocol-simulator-pro/shared/pyproject.toml
+            fix-protocol-simulator-pro/services/order-service/pyproject.toml
+
+      # ── 3. Shared platform library ────────────────────────────────────────────
+      # Must be installed before the service because the service imports from it.
+      - name: Install shared module
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ./shared
+
+      # ── 4. Service + test tools ───────────────────────────────────────────────
+      - name: Install service and test tools
+        working-directory: fix-protocol-simulator-pro/services/order-service
+        run: |
+          pip install -e .
+          pip install pytest pytest-cov
+
+      # ── 5. Unit tests with coverage ───────────────────────────────────────────
+      - name: Run pytest with coverage
+        working-directory: fix-protocol-simulator-pro/services/order-service
+        run: |
+          python -m pytest \
+            --cov=src \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            -v
+        # Add --cov-fail-under=80 once a coverage baseline has been agreed on.
+
+      # Optional: component BDD tests (uncomment when behave is available in CI)
+      # - name: Run BDD tests
+      #   working-directory: fix-protocol-simulator-pro/services/order-service
+      #   run: python -m behave tests/bdd/features/
+
+      # Optional: publish coverage XML as a build artifact
+      # - name: Upload coverage report
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: order-service-coverage
+      #     path: fix-protocol-simulator-pro/services/order-service/coverage.xml
+
+      # ── 6. Docker image ───────────────────────────────────────────────────────
+      # Build context is fix-protocol-simulator-pro/ so the Dockerfile can
+      # COPY shared/ alongside the service source.
+      - name: Build Docker image
+        run: |
+          docker build \
+            --file services/order-service/Dockerfile \
+            --tag order-service:latest \
+            .
+
+      # ── Bonus A: push to Docker Hub ───────────────────────────────────────────
+      # Required secrets: DOCKERHUB_USERNAME, DOCKERHUB_TOKEN
+      #
+      # - name: Log in to Docker Hub
+      #   uses: docker/login-action@v3
+      #   with:
+      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
+      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
+      #
+      # - name: Tag and push to Docker Hub
+      #   run: |
+      #     IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/order-service
+      #     docker tag order-service:latest ${IMAGE}:${{ github.sha }}
+      #     docker tag order-service:latest ${IMAGE}:latest
+      #     docker push ${IMAGE}:${{ github.sha }}
+      #     docker push ${IMAGE}:latest
+
+      # ── Bonus B: deploy via SSH ───────────────────────────────────────────────
+      # Required secrets: DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY
+      # Run this only after Bonus A so the image exists on the registry.
+      #
+      # - name: Deploy via SSH
+      #   uses: appleboy/ssh-action@v1
+      #   with:
+      #     host: ${{ secrets.DEPLOY_HOST }}
+      #     username: ${{ secrets.DEPLOY_USER }}
+      #     key: ${{ secrets.DEPLOY_SSH_KEY }}
+      #     script: |
+      #       docker pull ${{ secrets.DOCKERHUB_USERNAME }}/order-service:latest
+      #       docker stop order-service || true
+      #       docker rm  order-service || true
+      #       docker run -d \
+      #         --name order-service \
+      #         --restart unless-stopped \
+      #         ${{ secrets.DOCKERHUB_USERNAME }}/order-service:latest

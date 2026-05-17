@@ -1,5 +1,6 @@
-C:/Dev/python-engineering-lab/Archive
-C:/Dev/python-engineering-lab/MISC-python-scripts
+Archive/
+MISC-python-scripts/
+fix-protocol-simulator-pro/shared/config/config.yaml
 
 # Python cache
 __pycache__/

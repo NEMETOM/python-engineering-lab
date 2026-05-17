@@ -1,0 +1,10 @@
+{
+    "python.analysis.extraPaths": [
+        "services/fix-gateway/src",
+        "services/matching-engine/src",
+        "services/order-service/src",
+        "shared/common-utils/src",
+        "shared/event-models/src",
+        "shared/fix-protocol/src"
+    ]
+}

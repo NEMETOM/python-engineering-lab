@@ -1,0 +1,131 @@
+services:
+
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v23.3.21
+    command:
+      - redpanda
+      - start
+      - --smp=1
+      - --memory=256M
+      - --overprovisioned
+      - --kafka-addr=INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:29092
+      - --advertise-kafka-addr=INTERNAL://redpanda:9092,EXTERNAL://localhost:9092
+      - --rpc-addr=redpanda:33145
+      - --advertise-rpc-addr=redpanda:33145
+    ports:
+      - "9092:29092"
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster info > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 45s
+    deploy:
+      resources:
+        limits:
+          memory: 320m
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: fixuser
+      POSTGRES_PASSWORD: fixpass
+      POSTGRES_DB: fixdb
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fixuser -d fixdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  fix-gateway:
+    build:
+      context: .
+      dockerfile: services/fix-gateway/Dockerfile
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER: redpanda:9092
+      LOG_LEVEL: WARNING
+    profiles: [pipeline, full]
+
+  order-service:
+    build:
+      context: .
+      dockerfile: services/order-service/Dockerfile
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER: redpanda:9092
+      LOG_LEVEL: WARNING
+    profiles: [pipeline, full]
+
+  matching-engine:
+    build:
+      context: .
+      dockerfile: services/matching-engine/Dockerfile
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER: redpanda:9092
+      LOG_LEVEL: INFO
+    profiles: [pipeline, full]
+
+  market-data-service:
+    build:
+      context: .
+      dockerfile: services/market-data-service/Dockerfile
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER: redpanda:9092
+      LOG_LEVEL: WARNING
+      PUBLISH_INTERVAL: "10"
+    profiles: [full]
+
+  trade-store:
+    build:
+      context: .
+      dockerfile: services/trade-store/Dockerfile
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER: redpanda:9092
+      DATABASE_URL: postgresql://fixuser:fixpass@postgres:5432/fixdb
+      LOG_LEVEL: INFO
+    ports:
+      - "8000:8000"
+    profiles: [pipeline, full]
+
+  trade-store-consumer:
+    build:
+      context: .
+      dockerfile: services/trade-store/Dockerfile
+    command: ["python", "-m", "trade_store.consumer"]
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER: redpanda:9092
+      DATABASE_URL: postgresql://fixuser:fixpass@postgres:5432/fixdb
+      LOG_LEVEL: INFO
+    profiles: [pipeline, full]
+
+volumes:
+  postgres_data:

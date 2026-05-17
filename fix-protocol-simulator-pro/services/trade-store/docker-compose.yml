@@ -1,0 +1,16 @@
+postgres:
+  image: postgres:15
+  environment:
+    POSTGRES_USER: user
+    POSTGRES_PASSWORD: password
+    POSTGRES_DB: trades
+  ports:
+    - "5432:5432"
+
+trade-store:
+  build: ./services/trade-store
+  ports:
+    - "8000:8000"
+  depends_on:
+    - postgres
+    
