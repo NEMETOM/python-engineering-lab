@@ -1,0 +1,103 @@
+# fix-protocol-simulator-pro/services/fix-gateway/src/fix_gateway/server.py
+
+import socket
+
+from fix_gateway.config import settings
+from fix_gateway.fix_handler import FixHandler
+from fix_gateway.session_manager import SessionManager
+
+# now
+from fix_gateway.utils.logger import configure_logging, get_logger
+
+# later
+# from common_utils.logger import configure_logging, get_logger
+
+
+configure_logging()
+
+logger = get_logger(__name__)
+
+
+class FixServer:
+
+    def __init__(self):
+
+        self.host = settings.host
+
+        self.port = settings.port
+
+        self.session_manager = SessionManager()
+
+        self.fix_handler = FixHandler(delimiter=settings.fix_delimiter)
+
+    def start(self):
+
+        logger.info(f"starting FIX server {self.host}:{self.port}")
+
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
+
+            server.bind((self.host, self.port))
+
+            server.listen()
+
+            while True:
+
+                conn, addr = server.accept()
+
+                logger.info(f"client connected {addr}")
+
+                self.handle_connection(conn)
+
+    def handle_connection(self, conn):
+
+        with conn:
+
+            while True:
+
+                data = conn.recv(settings.buffer_size)
+
+                if not data:
+
+                    break
+
+                raw_message = data.decode()
+
+                logger.debug(f"received raw FIX {raw_message}")
+
+                fix_msg = self.fix_handler.parse(raw_message)
+
+                self.process_message(fix_msg)
+
+    def process_message(self, fix_msg: dict):
+
+        if self.fix_handler.is_logon(fix_msg):
+
+            sender = fix_msg.get("49")
+
+            self.session_manager.create_session(sender)
+
+            logger.info("logon processed")
+
+        elif self.fix_handler.is_heartbeat(fix_msg):
+
+            sender = fix_msg.get("49")
+
+            self.session_manager.update_heartbeat(sender)
+
+            logger.debug("heartbeat processed")
+
+        elif self.fix_handler.is_new_order(fix_msg):
+
+            logger.info("new order received")
+
+            logger.debug(fix_msg)
+
+            # later:
+            # publish to Kafka topic orders
+
+
+if __name__ == "__main__":
+
+    server = FixServer()
+
+    server.start()
