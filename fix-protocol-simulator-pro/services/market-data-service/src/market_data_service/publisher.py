@@ -25,7 +25,11 @@ class MarketPublisher:
             logger.debug("no market data yet, skipping")
             return
 
-        current_key = (snapshot["best_bid"], snapshot["best_ask"], snapshot["last_trade_price"])
+        current_key = (
+            snapshot["best_bid"],
+            snapshot["best_ask"],
+            snapshot["last_trade_price"],
+        )
 
         if current_key == self._last_published:
             logger.debug("market data unchanged, skipping")

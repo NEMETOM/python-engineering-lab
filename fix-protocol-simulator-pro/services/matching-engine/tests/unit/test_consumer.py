@@ -26,7 +26,14 @@ class TestConsumerRun:
 
     def test_single_unmatched_order_does_not_send_book_snapshot(self):
         msg = MagicMock()
-        msg.value = {"order_id": "B1", "symbol": "AAPL", "side": "BUY", "price": 100.0, "quantity": 10, "timestamp": "2026-01-01T00:00:00"}
+        msg.value = {
+            "order_id": "B1",
+            "symbol": "AAPL",
+            "side": "BUY",
+            "price": 100.0,
+            "quantity": 10,
+            "timestamp": "2026-01-01T00:00:00",
+        }
         with patch("matching_engine.consumer.create_consumer") as mock_create, patch(
             "matching_engine.consumer.Producer"
         ) as mock_producer_cls:

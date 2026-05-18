@@ -1,6 +1,6 @@
 # fix-protocol-simulator-pro/services/fix-gateway/tests/unit/test_server.py
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from fix_gateway.server import FixServer
 

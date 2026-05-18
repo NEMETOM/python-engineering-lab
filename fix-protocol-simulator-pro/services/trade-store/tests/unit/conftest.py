@@ -1,7 +1,8 @@
+import os
 from unittest.mock import MagicMock
 
-import shared.infrastructure.db as _db
+os.environ.setdefault("DATABASE_URL", "postgresql://localhost/fixdb")
 
-# Prevent Base.metadata.create_all from connecting to the DB
-# when trade_store.api.main is imported during test collection.
+import shared.infrastructure.db as _db  # noqa: E402
+
 _db.Base.metadata.create_all = MagicMock()

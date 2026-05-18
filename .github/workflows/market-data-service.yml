@@ -62,7 +62,7 @@ jobs:
         working-directory: fix-protocol-simulator-pro/services/market-data-service
         run: |
           pip install -e .
-          pip install pytest pytest-cov
+          pip install pytest pytest-cov ruff black isort mypy
 
       # ── 5. Unit tests with coverage ───────────────────────────────────────────
       - name: Run pytest with coverage
@@ -74,6 +74,16 @@ jobs:
             --cov-report=xml \
             -v
         # Add --cov-fail-under=80 once a coverage baseline has been agreed on.
+
+
+      # ── 5b. Lint ────────────────────────────────────────────
+      - name: Lint (ruff, black, isort, mypy)
+        working-directory: fix-protocol-simulator-pro/services/market-data-service
+        run: |
+          python -m ruff check .
+          python -m black --check .
+          python -m isort --check-only .
+          python -m mypy src/ --ignore-missing-imports --pretty --show-error-codes
 
       # Optional: component BDD tests (uncomment when behave is available in CI)
       # - name: Run BDD tests

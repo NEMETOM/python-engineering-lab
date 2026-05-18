@@ -32,7 +32,9 @@ class TestPublish:
         mock_producer = MagicMock()
         mock_create_producer.return_value = mock_producer
         mock_cache = MagicMock()
-        mock_cache.snapshot.return_value = _make_snapshot(best_bid=None, best_ask=None, last_trade_price=None)
+        mock_cache.snapshot.return_value = _make_snapshot(
+            best_bid=None, best_ask=None, last_trade_price=None
+        )
         publisher = MarketPublisher(mock_cache)
         publisher.publish()
         mock_producer.send.assert_not_called()
@@ -53,7 +55,10 @@ class TestPublish:
         mock_producer = MagicMock()
         mock_create_producer.return_value = mock_producer
         mock_cache = MagicMock()
-        mock_cache.snapshot.side_effect = [_make_snapshot(best_bid=99.0), _make_snapshot(best_bid=99.5)]
+        mock_cache.snapshot.side_effect = [
+            _make_snapshot(best_bid=99.0),
+            _make_snapshot(best_bid=99.5),
+        ]
         publisher = MarketPublisher(mock_cache)
         publisher.publish()
         publisher.publish()

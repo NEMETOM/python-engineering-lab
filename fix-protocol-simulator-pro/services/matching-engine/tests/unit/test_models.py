@@ -26,7 +26,14 @@ class TestOrder:
 
 class TestTrade:
     def test_trade_creation_stores_all_fields(self):
-        trade = Trade(trade_id="T1", symbol="AAPL", buy_order_id="B1", sell_order_id="S1", price=100.0, quantity=10)
+        trade = Trade(
+            trade_id="T1",
+            symbol="AAPL",
+            buy_order_id="B1",
+            sell_order_id="S1",
+            price=100.0,
+            quantity=10,
+        )
         assert trade.trade_id == "T1"
         assert trade.symbol == "AAPL"
         assert trade.buy_order_id == "B1"
@@ -35,7 +42,14 @@ class TestTrade:
         assert trade.quantity == 10
 
     def test_trade_dict_contains_all_fields(self):
-        trade = Trade(trade_id="T1", symbol="AAPL", buy_order_id="B1", sell_order_id="S1", price=100.0, quantity=10)
+        trade = Trade(
+            trade_id="T1",
+            symbol="AAPL",
+            buy_order_id="B1",
+            sell_order_id="S1",
+            price=100.0,
+            quantity=10,
+        )
         d = trade.__dict__
         assert d["trade_id"] == "T1"
         assert d["symbol"] == "AAPL"

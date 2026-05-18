@@ -20,7 +20,14 @@ def producer(mock_kafka_producer):
 
 
 def _make_trade(**overrides):
-    defaults = dict(trade_id="T1", symbol="AAPL", buy_order_id="B1", sell_order_id="S1", price=100.0, quantity=10)
+    defaults = dict(
+        trade_id="T1",
+        symbol="AAPL",
+        buy_order_id="B1",
+        sell_order_id="S1",
+        price=100.0,
+        quantity=10,
+    )
     return Trade(**{**defaults, **overrides})
 
 

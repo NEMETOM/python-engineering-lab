@@ -12,12 +12,15 @@ class TestDefaultSettings:
             assert cfg.Settings().kafka_broker == "kafka:9092"
 
     def test_default_database_url(self):
-        import trade_store.config as cfg
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("DATABASE_URL", None)
+            import trade_store.config as cfg
 
-        importlib.reload(cfg)
-        assert (
-            cfg.Settings().db_url == "postgresql://user:password@postgres:5432/trades"
-        )
+            importlib.reload(cfg)
+            assert (
+                cfg.Settings().db_url
+                == "postgresql://user:password@postgres:5432/trades"
+            )
 
 
 class TestEnvOverrides:

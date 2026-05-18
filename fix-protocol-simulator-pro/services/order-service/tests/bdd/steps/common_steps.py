@@ -1,9 +1,8 @@
 from datetime import datetime
 
 from behave import given
-from pydantic import ValidationError
-
 from order_service.schemas import RawOrderEvent
+from pydantic import ValidationError
 
 
 @given(
