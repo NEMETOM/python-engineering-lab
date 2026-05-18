@@ -12,6 +12,8 @@ on:
       - 'fix-protocol-simulator-pro/shared/**'
       - '.github/workflows/fix-gateway.yml'
   workflow_dispatch: # allow manual runs from the Actions tab
+  schedule:
+    - cron: '0 6 * * *'  # daily at 06:00 UTC
 
 # Restrict the default GITHUB_TOKEN to read-only; grant extra scopes explicitly
 # in the steps that need them (e.g. packages: write for a registry push).
