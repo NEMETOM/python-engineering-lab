@@ -2,20 +2,23 @@
 
 import socket
 
+from prometheus_client import start_http_server
+
 from fix_gateway.config import settings
 from fix_gateway.fix_handler import FixHandler
 from fix_gateway.session_manager import SessionManager
-
-# now
 from fix_gateway.utils.logger import configure_logging, get_logger
-
-# later
-# from common_utils.logger import configure_logging, get_logger
-
+from shared.observability.metrics import (
+    fix_messages_parse_errors,
+    fix_messages_received,
+    fix_reconnect_attempts,
+)
 
 configure_logging()
 
 logger = get_logger(__name__)
+
+_METRICS_PORT = 8001
 
 
 class FixServer:
@@ -74,7 +77,12 @@ class FixServer:
 
             sender = fix_msg.get("49")
 
+            if self.session_manager.get_session(sender):
+                fix_reconnect_attempts.inc()
+
             self.session_manager.create_session(sender)
+
+            fix_messages_received.labels(msg_type="logon").inc()
 
             logger.info("logon processed")
 
@@ -84,19 +92,30 @@ class FixServer:
 
             self.session_manager.update_heartbeat(sender)
 
+            fix_messages_received.labels(msg_type="heartbeat").inc()
+
             logger.debug("heartbeat processed")
 
         elif self.fix_handler.is_new_order(fix_msg):
+
+            fix_messages_received.labels(msg_type="new_order").inc()
 
             logger.info("new order received")
 
             logger.debug(fix_msg)
 
-            # later:
-            # publish to Kafka topic orders
+        else:
+
+            fix_messages_parse_errors.inc()
+
+            logger.warning(f"unrecognized FIX message type: {fix_msg.get('35', 'none')}")
 
 
 if __name__ == "__main__":
+
+    start_http_server(_METRICS_PORT)
+
+    logger.info(f"metrics server started on :{_METRICS_PORT}")
 
     server = FixServer()
 

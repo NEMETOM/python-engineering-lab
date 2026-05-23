@@ -9,6 +9,8 @@ from fix_gateway.utils.logger import get_logger
 # later
 # from common_utils.logger import configure_logging, get_logger
 
+from shared.observability.metrics import fix_sessions_active
+
 
 logger = get_logger(__name__)
 
@@ -35,6 +37,9 @@ class SessionManager:
         self.sessions = {}
 
     def create_session(self, sender_comp_id: str) -> Session:
+
+        if sender_comp_id not in self.sessions:
+            fix_sessions_active.inc()
 
         session = Session(sender_comp_id)
 
