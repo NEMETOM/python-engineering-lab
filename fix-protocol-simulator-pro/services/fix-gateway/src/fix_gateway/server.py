@@ -2,12 +2,11 @@
 
 import socket
 
-from prometheus_client import start_http_server
-
 from fix_gateway.config import settings
 from fix_gateway.fix_handler import FixHandler
 from fix_gateway.session_manager import SessionManager
 from fix_gateway.utils.logger import configure_logging, get_logger
+from prometheus_client import start_http_server
 from shared.observability.metrics import (
     fix_messages_parse_errors,
     fix_messages_received,

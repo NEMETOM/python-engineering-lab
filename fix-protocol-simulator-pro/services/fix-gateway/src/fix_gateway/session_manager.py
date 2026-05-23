@@ -5,11 +5,10 @@ from datetime import datetime
 
 # now
 from fix_gateway.utils.logger import get_logger
+from shared.observability.metrics import fix_sessions_active
 
 # later
 # from common_utils.logger import configure_logging, get_logger
-
-from shared.observability.metrics import fix_sessions_active
 
 logger = get_logger(__name__)
 
