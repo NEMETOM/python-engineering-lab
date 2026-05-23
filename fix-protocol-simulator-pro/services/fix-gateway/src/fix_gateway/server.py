@@ -68,7 +68,9 @@ class FixServer:
             logger.debug(fix_msg)
         else:
             fix_messages_parse_errors.inc()
-            logger.warning(f"unrecognized FIX message type: {fix_msg.get('35', 'none')}")
+            logger.warning(
+                f"unrecognized FIX message type: {fix_msg.get('35', 'none')}"
+            )
 
 
 if __name__ == "__main__":

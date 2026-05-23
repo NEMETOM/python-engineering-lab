@@ -1,13 +1,12 @@
 import time
 
-from prometheus_client import start_http_server
-
 from matching_engine.engine import MatchingEngine
 from matching_engine.infrastructure.kafka_client import create_consumer
 from matching_engine.models import Order
 from matching_engine.order_book import OrderBook
 from matching_engine.producer import Producer
 from matching_engine.utils.logger import configure_logging, get_logger
+from prometheus_client import start_http_server
 from shared.observability.metrics import (
     kafka_messages_consumed,
     order_matching_latency,
