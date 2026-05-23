@@ -1,0 +1,25 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: fix-gateway
+    static_configs:
+      - targets: ["fix-gateway:8001"]
+
+  - job_name: matching-engine
+    static_configs:
+      - targets: ["matching-engine:8003"]
+
+  - job_name: trade-store
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["trade-store:8000"]
+
+  - job_name: fix-filedrop-client
+    static_configs:
+      - targets: ["host.docker.internal:8005"]

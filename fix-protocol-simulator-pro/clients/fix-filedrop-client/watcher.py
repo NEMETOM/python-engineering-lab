@@ -4,11 +4,18 @@ from pathlib import Path
 from config import FILEDROP_DIR
 from logger import get_logger
 from processor import FileProcessor
+from prometheus_client import start_http_server
 
 logger = get_logger(__name__)
 
+_METRICS_PORT = 8005
+
 
 def run():
+
+    start_http_server(_METRICS_PORT)
+
+    logger.info(f"metrics server started on :{_METRICS_PORT}")
 
     processor = FileProcessor()
 

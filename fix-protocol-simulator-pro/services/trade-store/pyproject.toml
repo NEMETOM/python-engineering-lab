@@ -13,7 +13,8 @@ dependencies = [
  "psycopg2-binary",
  "fastapi",
  "uvicorn",
- "pyyaml"
+ "pyyaml",
+ "prometheus-client>=0.20",
 ]
 
 [tool.setuptools]

@@ -1,0 +1,10 @@
+apiVersion: 1
+
+providers:
+  - name: FIX Simulator Pro
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
