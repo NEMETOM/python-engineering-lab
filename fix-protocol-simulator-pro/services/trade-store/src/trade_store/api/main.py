@@ -2,9 +2,10 @@ import time
 
 from fastapi import FastAPI, Request
 from prometheus_client import make_asgi_app
+from starlette.middleware.base import BaseHTTPMiddleware
+
 from shared.infrastructure.db import Base, engine
 from shared.observability.metrics import api_request_latency, api_requests
-from starlette.middleware.base import BaseHTTPMiddleware
 from trade_store.api.routes import router
 
 

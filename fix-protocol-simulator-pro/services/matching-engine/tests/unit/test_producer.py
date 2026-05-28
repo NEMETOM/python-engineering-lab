@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from matching_engine.models import Order, Trade
 from matching_engine.order_book import OrderBook
 from matching_engine.producer import Producer

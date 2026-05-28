@@ -24,3 +24,7 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.isort]
+profile = "black"
+known_first_party = ["market_data_service", "shared"]

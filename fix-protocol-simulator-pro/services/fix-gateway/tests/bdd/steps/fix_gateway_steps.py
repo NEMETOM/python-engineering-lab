@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta
 
 from behave import given, then, when  # type: ignore[import-untyped]
+
 from fix_gateway.fix_handler import FixHandler
 from fix_gateway.session_manager import SessionManager
 

@@ -1,10 +1,11 @@
 from datetime import datetime
 
 import pytest
+from pydantic import ValidationError
+
 from matching_engine.schemas.book_event import BookEvent
 from matching_engine.schemas.order_event import OrderEvent
 from matching_engine.schemas.trade_event import TradeEvent
-from pydantic import ValidationError
 
 
 class TestOrderEvent:

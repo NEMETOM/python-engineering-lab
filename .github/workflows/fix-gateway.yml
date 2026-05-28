@@ -74,8 +74,8 @@ jobs:
             --cov=src \
             --cov-report=term-missing \
             --cov-report=xml \
+            --cov-fail-under=85 \
             -v
-        # Add --cov-fail-under=80 once a coverage baseline has been agreed on.
 
       # ── 5b. Lint ────────────────────────────────────────────
       - name: Lint (ruff, black, isort, mypy)

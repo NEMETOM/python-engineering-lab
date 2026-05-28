@@ -26,6 +26,10 @@ package-dir = {"" = "src"}
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.isort]
+profile = "black"
+known_first_party = ["fix_gateway", "shared"]
+
 [tool.mypy]
 mypy_path = "src"
 explicit_package_bases = true

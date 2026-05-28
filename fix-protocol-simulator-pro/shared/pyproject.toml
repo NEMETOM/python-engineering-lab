@@ -13,3 +13,7 @@ package-dir = {"" = ".."}
 [tool.setuptools.packages.find]
 where = [".."]
 include = ["shared", "shared.*"]
+
+[tool.isort]
+profile = "black"
+known_first_party = ["shared"]

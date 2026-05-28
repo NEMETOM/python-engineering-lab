@@ -25,6 +25,10 @@ test = [
   "behave",
 ]
 
+[tool.isort]
+profile = "black"
+known_first_party = ["matching_engine", "shared"]
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests/unit"]
