@@ -15,9 +15,10 @@ def step_when_pipeline_processes(context):
     msg = MagicMock()
     msg.value = context.msg_value
 
-    with patch("order_service.consumer.create_consumer") as mock_create_consumer, patch(
-        "order_service.consumer.Producer"
-    ) as mock_producer_cls:
+    with (
+        patch("order_service.consumer.create_consumer") as mock_create_consumer,
+        patch("order_service.consumer.Producer") as mock_producer_cls,
+    ):
         mock_create_consumer.return_value = iter([msg])
         mock_producer_cls.return_value = context.mock_producer
         run()
