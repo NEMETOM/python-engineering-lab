@@ -84,7 +84,7 @@ jobs:
           python -m ruff check .
           python -m black --check .
           python -m isort --check-only .
-          python -m mypy src/ --ignore-missing-imports --pretty --show-error-codes
+          python -m mypy src/
 
       # Optional: component BDD tests (uncomment when behave is available in CI)
       # - name: Run BDD tests

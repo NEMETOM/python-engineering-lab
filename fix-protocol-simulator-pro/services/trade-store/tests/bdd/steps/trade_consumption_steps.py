@@ -1,8 +1,9 @@
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
-import trade_store.consumer  # noqa: F401  # ensure module is in sys.modules before patching
 from behave import given, then, when
+
+import trade_store.consumer  # noqa: F401  # ensure module is in sys.modules before patching
 from trade_store.consumer import run
 
 

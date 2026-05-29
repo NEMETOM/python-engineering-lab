@@ -2,6 +2,7 @@ from datetime import datetime
 from unittest.mock import MagicMock
 
 from behave import given
+
 from trade_store.schemas.trade_event import TradeEvent
 
 

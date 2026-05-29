@@ -1,4 +1,5 @@
 from sqlalchemy import DateTime, Float, Integer
+
 from trade_store.models import TradeModel
 
 

@@ -2,6 +2,7 @@ from datetime import datetime
 
 import pytest
 from pydantic import ValidationError
+
 from trade_store.schemas.trade_event import TradeEvent
 
 

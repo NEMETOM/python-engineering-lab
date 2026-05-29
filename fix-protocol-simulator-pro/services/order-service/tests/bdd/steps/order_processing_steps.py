@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 from behave import given, then, when
+
 from order_service.consumer import run
 
 

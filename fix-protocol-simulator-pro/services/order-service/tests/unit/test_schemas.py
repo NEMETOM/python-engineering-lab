@@ -1,8 +1,9 @@
 from datetime import datetime
 
 import pytest
-from order_service.schemas import RawOrderEvent, ValidatedOrderEvent
 from pydantic import ValidationError
+
+from order_service.schemas import RawOrderEvent, ValidatedOrderEvent
 
 
 def _now():

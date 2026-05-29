@@ -1,5 +1,6 @@
-from shared.infrastructure.db import Base
 from sqlalchemy import Column, DateTime, Float, Integer, String
+
+from shared.infrastructure.db import Base
 
 
 class TradeModel(Base):
