@@ -9,3 +9,7 @@ dependencies = []
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/common_utils"]
+
+[tool.isort]
+profile = "black"
+known_first_party = ["common_utils"]

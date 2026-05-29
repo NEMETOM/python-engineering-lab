@@ -1,6 +1,7 @@
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
+
 from trade_store.api.main import app
 
 client = TestClient(app)

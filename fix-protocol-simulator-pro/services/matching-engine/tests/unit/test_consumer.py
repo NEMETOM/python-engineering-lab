@@ -3,9 +3,11 @@ from unittest.mock import MagicMock, patch
 
 class TestConsumerRun:
     def test_subscribes_to_validated_orders_topic(self):
-        with patch("matching_engine.consumer.start_http_server"), patch(
-            "matching_engine.consumer.create_consumer"
-        ) as mock_create, patch("matching_engine.consumer.Producer"):
+        with (
+            patch("matching_engine.consumer.start_http_server"),
+            patch("matching_engine.consumer.create_consumer") as mock_create,
+            patch("matching_engine.consumer.Producer"),
+        ):
             mock_create.return_value = []
             from matching_engine.consumer import run
 
@@ -13,11 +15,11 @@ class TestConsumerRun:
             mock_create.assert_called_once_with("validated_orders", "matching-engine")
 
     def test_no_orders_no_trades_sent(self):
-        with patch("matching_engine.consumer.start_http_server"), patch(
-            "matching_engine.consumer.create_consumer"
-        ) as mock_create, patch(
-            "matching_engine.consumer.Producer"
-        ) as mock_producer_cls:
+        with (
+            patch("matching_engine.consumer.start_http_server"),
+            patch("matching_engine.consumer.create_consumer") as mock_create,
+            patch("matching_engine.consumer.Producer") as mock_producer_cls,
+        ):
             mock_create.return_value = []
             mock_producer = MagicMock()
             mock_producer_cls.return_value = mock_producer
@@ -36,11 +38,11 @@ class TestConsumerRun:
             "quantity": 10,
             "timestamp": "2026-01-01T00:00:00",
         }
-        with patch("matching_engine.consumer.start_http_server"), patch(
-            "matching_engine.consumer.create_consumer"
-        ) as mock_create, patch(
-            "matching_engine.consumer.Producer"
-        ) as mock_producer_cls:
+        with (
+            patch("matching_engine.consumer.start_http_server"),
+            patch("matching_engine.consumer.create_consumer") as mock_create,
+            patch("matching_engine.consumer.Producer") as mock_producer_cls,
+        ):
             mock_create.return_value = [msg]
             mock_producer = MagicMock()
             mock_producer_cls.return_value = mock_producer
@@ -68,11 +70,11 @@ class TestConsumerRun:
             "quantity": 10,
             "timestamp": "2026-01-01T00:00:00",
         }
-        with patch("matching_engine.consumer.start_http_server"), patch(
-            "matching_engine.consumer.create_consumer"
-        ) as mock_create, patch(
-            "matching_engine.consumer.Producer"
-        ) as mock_producer_cls:
+        with (
+            patch("matching_engine.consumer.start_http_server"),
+            patch("matching_engine.consumer.create_consumer") as mock_create,
+            patch("matching_engine.consumer.Producer") as mock_producer_cls,
+        ):
             mock_create.return_value = [buy_msg, sell_msg]
             mock_producer = MagicMock()
             mock_producer_cls.return_value = mock_producer
@@ -93,11 +95,11 @@ class TestConsumerRun:
                 "quantity": 5,
                 "timestamp": "2026-01-01T00:00:00",
             }
-        with patch("matching_engine.consumer.start_http_server"), patch(
-            "matching_engine.consumer.create_consumer"
-        ) as mock_create, patch(
-            "matching_engine.consumer.Producer"
-        ) as mock_producer_cls:
+        with (
+            patch("matching_engine.consumer.start_http_server"),
+            patch("matching_engine.consumer.create_consumer") as mock_create,
+            patch("matching_engine.consumer.Producer") as mock_producer_cls,
+        ):
             mock_create.return_value = messages
             mock_producer = MagicMock()
             mock_producer_cls.return_value = mock_producer

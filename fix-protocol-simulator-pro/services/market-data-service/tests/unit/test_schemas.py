@@ -1,10 +1,11 @@
 from datetime import datetime, timezone
 
 import pytest
+from pydantic import ValidationError
+
 from market_data_service.schemas.market_data_event import MarketDataEvent
 from market_data_service.schemas.order_book_event import OrderBookEvent
 from market_data_service.schemas.trade_event import TradeEvent
-from pydantic import ValidationError
 
 NOW = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
 

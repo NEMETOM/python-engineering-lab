@@ -74,8 +74,8 @@ jobs:
             --cov=src \
             --cov-report=term-missing \
             --cov-report=xml \
+            --cov-fail-under=85 \
             -v
-        # Add --cov-fail-under=80 once a coverage baseline has been agreed on.
 
 
       # ── 5b. Lint ────────────────────────────────────────────
@@ -85,7 +85,7 @@ jobs:
           python -m ruff check .
           python -m black --check .
           python -m isort --check-only .
-          python -m mypy src/ --ignore-missing-imports --pretty --show-error-codes
+          python -m mypy src/
 
       # Optional: component BDD tests (uncomment when behave is available in CI)
       # - name: Run BDD tests

@@ -2,6 +2,7 @@ from datetime import datetime
 from unittest.mock import MagicMock
 
 import pytest
+
 from order_service.schemas import RawOrderEvent
 from order_service.validator import OrderValidator
 from shared.exceptions import ValidationError

@@ -1,8 +1,9 @@
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
-import trade_store.consumer  # noqa: F401  # ensure module is in sys.modules before patching
 from behave import given, then, when
+
+import trade_store.consumer  # noqa: F401  # ensure module is in sys.modules before patching
 from trade_store.consumer import run
 
 
@@ -49,9 +50,10 @@ def _run_pipeline(context):
     context.mock_repo = MagicMock()
     if getattr(context, "repo_side_effect", None):
         context.mock_repo.save.side_effect = context.repo_side_effect
-    with patch("trade_store.consumer.create_consumer") as mock_create, patch(
-        "trade_store.consumer.TradeRepository"
-    ) as mock_repo_cls:
+    with (
+        patch("trade_store.consumer.create_consumer") as mock_create,
+        patch("trade_store.consumer.TradeRepository") as mock_repo_cls,
+    ):
         mock_create.return_value = iter(context.messages)
         mock_repo_cls.return_value = context.mock_repo
         run()

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException
+
 from trade_store.repository import TradeRepository
 from trade_store.utils.logger import get_logger
 
