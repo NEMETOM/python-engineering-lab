@@ -69,7 +69,7 @@ This project was built to go beyond surface-level familiarity with these concept
 
 ## Key Features
 
-- **FIX Protocol Ingestion** - Parses `tag=value` pipe-delimited FIX messages. Identifies Logon (`35=A`), Heartbeat (`35=0`), and NewOrderSingle (`35=D`) message types with per-client session state tracking.
+- **FIX Protocol Ingestion** - Parses `tag=value` pipe-delimited FIX messages. Identifies Logon (`35=A`), Heartbeat (`35=0`), and NewOrderSingle (`35=D`) message types. Per-client session state is created on Logon and removed on TCP disconnect - the `fix_sessions_active` Gauge reflects the true number of live sessions at any point.
 - **Event-Driven Pipeline** - Fully decoupled services communicating exclusively through Redpanda (Kafka-compatible) topics. No direct service-to-service calls.
 - **Price-Time Priority Matching Engine** - Stateful in-memory order book. BUY orders match against the best ask; SELL orders match against the best bid. Partial fills and remainder queuing supported.
 - **Change-Detected Market Data Publishing** - Market data snapshots are only published when bid, ask, or last trade price actually changes - no unnecessary events.
@@ -114,14 +114,18 @@ Each pipeline runs four stages in sequence:
 Checkout → Install dependencies → Run pytest (coverage) → Lint → Build Docker image
 ```
 
+**Coverage gate** - all pipelines enforce a minimum of 85% total coverage via `--cov-fail-under=85`. Dropping below this threshold fails the build.
+
 **Lint stage** runs four checks in sequence - any failure blocks the build:
 
 ```bash
 python -m ruff check .          # fast linting
 python -m black --check .       # formatting
 python -m isort --check-only .  # import ordering
-python -m mypy src/ --ignore-missing-imports  # type checking
+python -m mypy src/             # type checking
 ```
+
+All four tools read their configuration from each service's `pyproject.toml` (`[tool.ruff]`, `[tool.black]`, `[tool.isort]`, `[tool.mypy]`). Running any tool locally produces identical results to CI - no hidden CLI flags.
 
 Every service follows the same pipeline:
 
@@ -521,7 +525,7 @@ The order-service and market-data-service follow the identical pattern:
 - **Histograms over averages** - Latency is tracked as a histogram, enabling P99/P95/P50 queries. Averages hide tail latency and are misleading for SLA analysis.
 - **Labels as dimensions** - `symbol`, `msg_type`, `status_code` labels allow Grafana to slice metrics per instrument or endpoint without separate metrics per value.
 - **Counter + rate()** - All throughput metrics are counters. Grafana uses `rate()` to compute per-second rates, which handles counter resets (pod restarts) correctly.
-- **Gauge for state** - `fix_sessions_active` and `orders_in_book` are gauges - values that go up and down, not monotonic.
+- **Gauge for state** - `fix_sessions_active` and `orders_in_book` are gauges - values that go up and down, not monotonic. `fix_sessions_active` is incremented on Logon and decremented when the TCP connection closes, so it always reflects current connected clients rather than a monotonically growing count.
 - **Separate metrics port** - fix-gateway and matching-engine expose metrics on dedicated ports (8001, 8003), keeping business traffic and observability traffic on separate sockets.
 
 ---
@@ -534,7 +538,7 @@ The order-service and market-data-service follow the identical pattern:
 
 **Change-detected event publishing** - The market data service tracks `(best_bid, best_ask, last_trade_price)` as a tuple and suppresses publication if nothing changed - reducing downstream noise without a polling interval.
 
-**Five independent CI pipelines** - Each service is independently deployable and independently tested. CI is path-filtered: only the pipeline for the changed service runs on a given PR. All five run daily on a cron schedule.
+**Five independent CI pipelines** - Each service is independently deployable and independently tested. CI is path-filtered: only the pipeline for the changed service runs on a given PR. All five run daily on a cron schedule. Coverage is enforced at 85% across all services; lint toolchain (ruff, black, isort, mypy) is fully configured in each service's `pyproject.toml` so local and CI behaviour are identical.
 
 **Production-style observability** - Structured JSON logging throughout (INFO for business events, DEBUG for infrastructure noise). Prometheus metrics instrumented across three services; Grafana dashboard auto-provisioned with 14 panels covering FIX message rates, matching latency (P50/P99), order book depth, and API error rates. Monitoring profile starts Prometheus + Grafana alongside the application stack via a single compose command.
 
@@ -546,7 +550,7 @@ The order-service and market-data-service follow the identical pattern:
 
 | Area | Detail |
 |---|---|
-| FIX TCP session | Full logon/heartbeat/logout lifecycle over persistent TCP connections (currently file-drop only) |
+| FIX TCP session | Full logout (`35=5`) handling and session expiry via heartbeat timeout; Logon + TCP disconnect lifecycle is already implemented |
 | Multi-symbol order book | Per-symbol book isolation - currently all symbols share one book |
 | WebSocket market data | Push-based streaming of market data snapshots to connected clients |
 | Kubernetes deployment | Helm charts for each service; horizontal scaling of the matching engine |

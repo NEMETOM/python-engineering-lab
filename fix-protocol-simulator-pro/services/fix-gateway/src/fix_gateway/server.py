@@ -39,6 +39,7 @@ class FixServer:
                 self.handle_connection(conn)
 
     def handle_connection(self, conn):
+        sender = None
         with conn:
             while True:
                 data = conn.recv(settings.buffer_size)
@@ -47,9 +48,12 @@ class FixServer:
                 raw_message = data.decode()
                 logger.debug(f"received raw FIX {raw_message}")
                 fix_msg = self.fix_handler.parse(raw_message)
-                self.process_message(fix_msg)
+                sender = self.process_message(fix_msg) or sender
+        if sender:
+            self.session_manager.remove_session(sender)
+            logger.info(f"client disconnected {sender}")
 
-    def process_message(self, fix_msg: dict):
+    def process_message(self, fix_msg: dict) -> str | None:
         if self.fix_handler.is_logon(fix_msg):
             sender = fix_msg.get("49")
             if self.session_manager.get_session(sender):
@@ -57,6 +61,7 @@ class FixServer:
             self.session_manager.create_session(sender)
             fix_messages_received.labels(msg_type="logon").inc()
             logger.info("logon processed")
+            return sender
         elif self.fix_handler.is_heartbeat(fix_msg):
             sender = fix_msg.get("49")
             self.session_manager.update_heartbeat(sender)
@@ -71,6 +76,7 @@ class FixServer:
             logger.warning(
                 f"unrecognized FIX message type: {fix_msg.get('35', 'none')}"
             )
+        return None
 
 
 if __name__ == "__main__":

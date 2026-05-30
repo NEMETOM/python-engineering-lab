@@ -52,8 +52,24 @@ def test_process_message_unknown_type_does_not_raise():
     server.process_message(fix_msg)  # should not raise
 
 
-def test_handle_connection_reads_and_processes():
+def test_process_message_logon_returns_sender():
+    server = FixServer()
+    fix_msg = {"35": "A", "49": "CLIENT1"}
 
+    result = server.process_message(fix_msg)
+
+    assert result == "CLIENT1"
+
+
+def test_process_message_non_logon_returns_none():
+    server = FixServer()
+
+    assert server.process_message({"35": "0", "49": "CLIENT1"}) is None
+    assert server.process_message({"35": "D", "49": "CLIENT1"}) is None
+    assert server.process_message({"35": "Z", "49": "CLIENT1"}) is None
+
+
+def test_handle_connection_reads_and_processes():
     server = FixServer()
 
     raw = b"35=A|49=CLIENT1|"
@@ -64,11 +80,25 @@ def test_handle_connection_reads_and_processes():
 
     server.handle_connection(conn)
 
-    assert server.session_manager.get_session("CLIENT1") is not None
+    # session is created during logon then removed on TCP close
+    assert server.session_manager.get_session("CLIENT1") is None
+
+
+def test_handle_connection_removes_session_on_disconnect():
+    server = FixServer()
+
+    logon = b"35=A|49=CLIENT2|"
+    conn = MagicMock()
+    conn.__enter__ = MagicMock(return_value=conn)
+    conn.__exit__ = MagicMock(return_value=False)
+    conn.recv.side_effect = [logon, b""]
+
+    server.handle_connection(conn)
+
+    assert server.session_manager.get_session("CLIENT2") is None
 
 
 def test_handle_connection_empty_data_exits_loop():
-
     server = FixServer()
 
     conn = MagicMock()
@@ -76,4 +106,4 @@ def test_handle_connection_empty_data_exits_loop():
     conn.__exit__ = MagicMock(return_value=False)
     conn.recv.return_value = b""
 
-    server.handle_connection(conn)  # should exit cleanly without processing
+    server.handle_connection(conn)  # no logon, no session to remove
