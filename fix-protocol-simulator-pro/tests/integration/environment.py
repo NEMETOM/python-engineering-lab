@@ -37,7 +37,7 @@ def before_all(context):
 
 
 def before_feature(context, feature):
-    if "needs_kafka" in feature.tags:
+    if "needs_kafka" in feature.tags or "needs_full_stack" in feature.tags:
         _verify_kafka()
 
 
