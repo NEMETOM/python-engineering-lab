@@ -75,8 +75,9 @@ This project was built to go beyond surface-level familiarity with these concept
 - **Change-Detected Market Data Publishing** - Market data snapshots are only published when bid, ask, or last trade price actually changes - no unnecessary events.
 - **Trade Persistence + REST API** - Every matched trade is persisted to PostgreSQL via a Kafka consumer. A FastAPI service exposes `GET /trades`, `GET /trades/{id}`, and `GET /health` with Swagger UI.
 - **Shared Internal Platform Library** - Cross-service Pydantic v2 schemas, Kafka client factory, structured JSON logging, SQLAlchemy session management, and typed exceptions - installed as an editable package across all services.
-- **Three-Layer Testing** - Unit tests (pytest), component BDD tests (behave + Gherkin), and infrastructure integration tests covering both PostgreSQL persistence and the Kafka pipeline.
-- **Five Independent CI/CD Pipelines** - Each service has its own GitHub Actions workflow with separate test, lint, and Docker build stages. Daily scheduled runs catch dependency drift.
+- **Dead Letter Queue** - FIX messages that fail parsing or validation in the filedrop client are published to a `dead_letter_orders` Kafka topic with the raw line and error reason before the file moves to `rejected/`. Failures are replayable and alertable without manual log inspection.
+- **Four-Layer Testing** - Unit tests (pytest), component BDD tests (behave + Gherkin), infrastructure integration tests (Kafka pipeline + PostgreSQL persistence), and end-to-end BDD tests that exercise the full flow from FIX file drop to `GET /trades`.
+- **Six Independent CI/CD Pipelines** - Five per-service pipelines (test, lint, Docker build) triggered on push and daily schedule, plus a dedicated E2E pipeline that starts the full Docker stack and runs the end-to-end BDD suite.
 
 ---
 
@@ -211,7 +212,7 @@ fix-protocol-simulator-pro/
 
 | Service | Consumes | Produces | Responsibility |
 |---|---|---|---|
-| **fix-gateway** | - | `raw_orders` | Parses FIX `tag=value` messages, identifies message types, manages per-client sessions |
+| **fix-gateway** | - | `raw_orders`, `dead_letter_orders` | Parses FIX `tag=value` messages, identifies message types, manages per-client sessions; publishes rejected lines to dead letter topic |
 | **order-service** | `raw_orders` | `validated_orders` | Validates price/quantity/side rules, assigns UUID order ID, drops invalid orders |
 | **matching-engine** | `validated_orders` | `trades`, `order_book_updates` | Price-time priority matching, partial fills, order book snapshots on each match |
 | **market-data-service** | `trades`, `order_book_updates` | `market_data` | Caches best bid/ask/last trade; publishes snapshot only on change |
@@ -415,6 +416,32 @@ python -m behave features/ --tags="@integration" --tags="~@needs_kafka"
 python -m behave features/ --tags="@needs_kafka"
 ```
 
+### End-to-End BDD Tests
+
+The E2E suite (`@e2e`) exercises the complete pipeline in a single test: a FIX file is dropped into the filedrop client, flows through Kafka → order-service → matching-engine → trade-store, and the resulting trade is asserted via `GET /trades`. The full Docker stack must be running.
+
+```bash
+# Start the full pipeline
+docker compose --profile full up -d
+
+# Install test dependencies (once)
+pip install -e shared && pip install -e services/fix-gateway && pip install -e services/trade-store
+pip install behave kafka-python sqlalchemy psycopg2-binary
+
+# Run E2E tests
+cd tests/integration
+python -m behave features/filedrop_e2e_pipeline.feature --tags="@e2e" -v
+```
+
+Two scenarios are covered:
+
+| Scenario | What it verifies |
+|---|---|
+| Crossing FIX pair | Buy + sell at the same price produces a matched trade visible in the REST API within 30 s |
+| Invalid message resilience | A bad FIX line is dead-lettered and does not block a subsequent valid crossing pair |
+
+In CI, E2E tests run in a dedicated workflow (`e2e.yml`) triggered manually or on a weekly schedule - not on every push, because they require Docker infrastructure and take longer than unit tests.
+
 ---
 
 ## Environment Variables
@@ -538,7 +565,9 @@ The order-service and market-data-service follow the identical pattern:
 
 **Change-detected event publishing** - The market data service tracks `(best_bid, best_ask, last_trade_price)` as a tuple and suppresses publication if nothing changed - reducing downstream noise without a polling interval.
 
-**Five independent CI pipelines** - Each service is independently deployable and independently tested. CI is path-filtered: only the pipeline for the changed service runs on a given PR. All five run daily on a cron schedule. Coverage is enforced at 85% across all services; lint toolchain (ruff, black, isort, mypy) is fully configured in each service's `pyproject.toml` so local and CI behaviour are identical.
+**Six independent CI pipelines** - Five per-service pipelines are path-filtered so only the changed service's pipeline runs on a PR; all five run daily. A sixth dedicated E2E pipeline starts the full Docker stack and runs the end-to-end BDD suite on a weekly schedule and on manual dispatch. Coverage is enforced at 85% across all services; lint toolchain (ruff, black, isort, mypy) is fully configured in each service's `pyproject.toml` so local and CI behaviour are identical.
+
+**Dead letter queue** - The filedrop client publishes any FIX message that fails parsing or validation to a `dead_letter_orders` Kafka topic (`{ source_file, raw_line, error, timestamp }`) before moving the file to `rejected/`. This makes failures observable, replayable, and alertable without manual log trawling - the same pattern used for error handling in production event-driven systems.
 
 **Production-style observability** - Structured JSON logging throughout (INFO for business events, DEBUG for infrastructure noise). Prometheus metrics instrumented across three services; Grafana dashboard auto-provisioned with 14 panels covering FIX message rates, matching latency (P50/P99), order book depth, and API error rates. Monitoring profile starts Prometheus + Grafana alongside the application stack via a single compose command.
 
