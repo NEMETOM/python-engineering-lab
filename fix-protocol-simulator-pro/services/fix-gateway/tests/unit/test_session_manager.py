@@ -77,3 +77,29 @@ def test_multiple_sessions_are_independent():
         manager.get_session("CLIENT1").session_id
         != manager.get_session("CLIENT2").session_id
     )
+
+
+def test_remove_session_deletes_it():
+    manager = SessionManager()
+    manager.create_session("CLIENT1")
+
+    manager.remove_session("CLIENT1")
+
+    assert manager.get_session("CLIENT1") is None
+
+
+def test_remove_session_unknown_sender_does_not_raise():
+    manager = SessionManager()
+
+    manager.remove_session("UNKNOWN")  # should not raise
+
+
+def test_remove_session_only_removes_target():
+    manager = SessionManager()
+    manager.create_session("CLIENT1")
+    manager.create_session("CLIENT2")
+
+    manager.remove_session("CLIENT1")
+
+    assert manager.get_session("CLIENT1") is None
+    assert manager.get_session("CLIENT2") is not None

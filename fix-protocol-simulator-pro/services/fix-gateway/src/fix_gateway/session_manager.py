@@ -36,6 +36,12 @@ class SessionManager:
     def get_session(self, sender_comp_id: str):
         return self.sessions.get(sender_comp_id)
 
+    def remove_session(self, sender_comp_id: str) -> None:
+        if sender_comp_id in self.sessions:
+            del self.sessions[sender_comp_id]
+            fix_sessions_active.dec()
+            logger.info(f"session removed {sender_comp_id}")
+
     def update_heartbeat(self, sender_comp_id: str):
         session = self.get_session(sender_comp_id)
         if session:
