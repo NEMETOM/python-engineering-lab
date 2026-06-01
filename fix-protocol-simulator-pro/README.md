@@ -5,6 +5,7 @@
 [![Matching Engine CI](https://github.com/NEMETOM/python-engineering-lab/actions/workflows/matching-engine.yml/badge.svg)](https://github.com/NEMETOM/python-engineering-lab/actions/workflows/matching-engine.yml)
 [![Market Data Service CI](https://github.com/NEMETOM/python-engineering-lab/actions/workflows/market-data-service.yml/badge.svg)](https://github.com/NEMETOM/python-engineering-lab/actions/workflows/market-data-service.yml)
 [![Trade Store CI](https://github.com/NEMETOM/python-engineering-lab/actions/workflows/trade-store.yml/badge.svg)](https://github.com/NEMETOM/python-engineering-lab/actions/workflows/trade-store.yml)
+[![Compliance Service CI](https://github.com/NEMETOM/python-engineering-lab/actions/workflows/compliance-service.yml/badge.svg)](https://github.com/NEMETOM/python-engineering-lab/actions/workflows/compliance-service.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Linting: ruff](https://img.shields.io/badge/linting-ruff-orange.svg)](https://github.com/astral-sh/ruff)
@@ -12,7 +13,7 @@
 
 ---
 
-An event-driven exchange simulator that models a real-world order flow pipeline using the FIX protocol - from client message ingestion through order validation, price-time priority matching, market data publication, and trade persistence. Built with Python microservices, Redpanda (Kafka-compatible), PostgreSQL, and Docker, following 12-Factor, Hexagonal Architecture, and Domain-Driven Design principles.
+An event-driven exchange simulator that models a real-world order flow pipeline using the FIX protocol - from client message ingestion through order validation, price-time priority matching, market data publication, and trade persistence - with a full RegTech compliance and surveillance module running as a parallel observer. Built with Python microservices, Redpanda (Kafka-compatible), PostgreSQL, and Docker, following 12-Factor, Hexagonal Architecture, and Domain-Driven Design principles.
 
 > Designed to reflect the architecture of production trading systems at firms such as Bloomberg, Fidessa, Coinbase, and Kraken - where FIX protocol ingestion, Kafka-based event routing, and microservice-bounded contexts are standard engineering practice.
 
@@ -29,41 +30,48 @@ This project was built to go beyond surface-level familiarity with these concept
 ## Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    External Clients                      │
-│           FIX File Drop  /  TCP Socket Client           │
-└──────────────────────────┬──────────────────────────────┘
-                           │  FIX tag=value messages (pipe-delimited)
-                           ▼
-              ┌────────────────────────┐
-              │      FIX Gateway       │  Session management, FIX parsing,
-              │                        │  Logon / Heartbeat / NewOrderSingle
-              └────────────┬───────────┘
-                           │ raw_orders (Kafka)
-                           ▼
-              ┌────────────────────────┐
-              │     Order Service      │  Business rule validation,
-              │                        │  UUID assignment, event enrichment
-              └────────────┬───────────┘
-                           │ validated_orders (Kafka)
-                           ▼
-              ┌────────────────────────┐
-              │    Matching Engine     │  Price-time priority order book,
-              │                        │  trade execution, book snapshots
-              └──────┬─────────────────┘
-                     │
-          ┌──────────┴──────────┐
-          │ trades (Kafka)      │ order_book_updates (Kafka)
-          ▼                     ▼
-┌──────────────────┐   ┌──────────────────────┐
-│   Trade Store    │   │  Market Data Service  │
-│                  │   │                       │
-│  PostgreSQL      │   │  Change-detected pub  │
-│  FastAPI REST    │   │  to market_data topic │
-└──────────────────┘   └──────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                       External Clients                        │
+│               FIX File Drop  /  TCP Socket Client            │
+└──────────────────────────────┬───────────────────────────────┘
+                               │  FIX tag=value messages (pipe-delimited)
+                               ▼
+                  ┌────────────────────────┐
+                  │      FIX Gateway       │  Session management, FIX parsing,
+                  │                        │  Logon / Heartbeat / NewOrderSingle
+                  └────────────┬───────────┘
+                               │ raw_orders (Kafka)
+               ┌───────────────┤
+               │               ▼
+               │  ┌────────────────────────┐
+               │  │     Order Service      │  Business rule validation,
+               │  │                        │  UUID assignment, enrichment
+               │  └────────────┬───────────┘
+               │               │ validated_orders (Kafka)
+               ├───────────────┤
+               ▼               ▼
+ ┌─────────────────────┐  ┌──────────────────────┐
+ │  Compliance Service │  │   Matching Engine    │  Price-time priority
+ │                     │  │                      │  order book, snapshots
+ │  Rules engine       │  └──────┬───────────────┘
+ │  Surveillance       │         │
+ │  Risk scoring       │  ┌──────┴──────────┐
+ │  Audit trail        │  │                 │
+ │  REST API :8010     │  ▼                 ▼
+ └─────────────────────┘ trades (Kafka)  order_book_updates (Kafka)
+                               │                 │
+                               ▼                 ▼
+                    ┌──────────────────┐  ┌──────────────────────┐
+                    │   Trade Store    │  │  Market Data Service  │
+                    │                  │  │                       │
+                    │  PostgreSQL      │  │  Change-detected pub  │
+                    │  FastAPI :8000   │  │  to market_data topic │
+                    └──────────────────┘  └──────────────────────┘
 ```
 
-**Message flow:** Client drops a FIX file → FIX Gateway parses and publishes → Order Service validates and enriches → Matching Engine applies price-time priority → matched trades fan out to Trade Store (persistence) and Market Data Service (real-time snapshot) in parallel.
+**Message flow:** Client drops a FIX file → FIX Gateway parses and publishes to `raw_orders` → Order Service validates and enriches → Matching Engine applies price-time priority → matched trades fan out to Trade Store (persistence) and Market Data Service (real-time snapshot) in parallel.
+
+**Compliance observer:** The Compliance Service taps both `raw_orders` and `validated_orders` as a passive consumer. It applies configurable compliance rules and surveillance detections, persists violations and audit trail records to PostgreSQL, and exposes findings via a dedicated REST API.
 
 ---
 
@@ -75,9 +83,10 @@ This project was built to go beyond surface-level familiarity with these concept
 - **Change-Detected Market Data Publishing** - Market data snapshots are only published when bid, ask, or last trade price actually changes - no unnecessary events.
 - **Trade Persistence + REST API** - Every matched trade is persisted to PostgreSQL via a Kafka consumer. A FastAPI service exposes `GET /trades`, `GET /trades/{id}`, and `GET /health` with Swagger UI.
 - **Shared Internal Platform Library** - Cross-service Pydantic v2 schemas, Kafka client factory, structured JSON logging, SQLAlchemy session management, and typed exceptions - installed as an editable package across all services.
+- **Compliance & Surveillance Module** - A dedicated RegTech microservice that passively observes the order pipeline. Six configurable compliance rules (missing client ID, market hours, trade size, price deviation, duplicate detection, invalid symbol) and four surveillance detections (wash trading, rapid-fire bursts, volume spikes, repeated orders) run against every order. Violations are persisted with SHA-256 tamper-evident audit trail records and are queryable via a REST API with per-client risk scores.
 - **Dead Letter Queue** - FIX messages that fail parsing or validation in the filedrop client are published to a `dead_letter_orders` Kafka topic with the raw line and error reason before the file moves to `rejected/`. Failures are replayable and alertable without manual log inspection.
 - **Four-Layer Testing** - Unit tests (pytest), component BDD tests (behave + Gherkin), infrastructure integration tests (Kafka pipeline + PostgreSQL persistence), and end-to-end BDD tests that exercise the full flow from FIX file drop to `GET /trades`.
-- **Six Independent CI/CD Pipelines** - Five per-service pipelines (test, lint, Docker build) triggered on push and daily schedule, plus a dedicated E2E pipeline that starts the full Docker stack and runs the end-to-end BDD suite.
+- **Seven Independent CI/CD Pipelines** - Six per-service pipelines (test, lint, Docker build) triggered on push and daily schedule, plus a dedicated E2E pipeline that starts the full Docker stack and runs the end-to-end BDD suite.
 
 ---
 
@@ -102,7 +111,7 @@ This project was built to go beyond surface-level familiarity with these concept
 
 ## CI/CD Pipeline
 
-Each of the five services has an independent GitHub Actions workflow. Pipelines are triggered on:
+Each of the six services has an independent GitHub Actions workflow. Pipelines are triggered on:
 
 - **Push** - path-filtered per service (only the affected service's pipeline runs)
 - **Pull request** - same path filtering, enforced on every PR
@@ -181,12 +190,30 @@ fix-protocol-simulator-pro/
 │   │   ├── src/fix_gateway/
 │   │   │   ├── server.py            # TCP socket server
 │   │   │   ├── fix_handler.py       # FIX parser (tag=value)
-│   │   │   └── session_manager.py   # Per-client session state
+│   │   │   └── session_manager.py   # Per-client session state (inc/dec on connect/disconnect)
 │   │   └── tests/                   # unit + BDD tests
 │   ├── order-service/               # Validation, enrichment, UUID assignment
 │   ├── matching-engine/             # Price-time priority order book + trade execution
 │   ├── market-data-service/         # Change-detected snapshot publishing
-│   └── trade-store/                 # Kafka consumer + PostgreSQL + FastAPI REST
+│   ├── trade-store/                 # Kafka consumer + PostgreSQL + FastAPI REST
+│   └── compliance-service/          # RegTech compliance & surveillance module
+│       ├── src/compliance_service/
+│       │   ├── consumer.py          # Dual-topic consumer (raw_orders + validated_orders)
+│       │   ├── models.py            # SQLAlchemy: violations, risk scores, audit trail
+│       │   ├── config.py            # YAML policy loader
+│       │   ├── rules/
+│       │   │   ├── base.py          # Rule ABC, Violation dataclass, Severity enum
+│       │   │   ├── compliance/      # 6 compliance rules (size, symbol, hours, ...)
+│       │   │   └── surveillance/    # 4 surveillance detections (wash, rapid-fire, ...)
+│       │   ├── engine/
+│       │   │   ├── rules_engine.py  # Evaluates rules, collects violations
+│       │   │   ├── risk_scorer.py   # Weighted risk score per severity
+│       │   │   └── audit_logger.py  # SHA-256 tamper-evident audit trail
+│       │   ├── repository/          # ViolationRepository, AuditRepository
+│       │   └── api/                 # FastAPI: /violations, /risk, /audit, /health
+│       ├── policies/
+│       │   └── compliance_policies.yaml  # All rule thresholds - no code change needed
+│       └── tests/                   # unit + BDD tests (83 tests, 88% coverage)
 ├── shared/                          # Internal platform library
 │   ├── schemas/                     # Pydantic v2 event schemas (OrderEvent, TradeEvent, BookEvent)
 │   ├── infrastructure/              # Kafka client factory, SQLAlchemy session, DB setup
@@ -200,7 +227,7 @@ fix-protocol-simulator-pro/
 │           └── dashboards/          # fix_simulator_overview.json (14 panels, 4 rows)
 ├── clients/
 │   └── fix-filedrop-client/         # Local directory watcher - drops FIX files into pipeline
-├── data/                            # Sample FIX message files (buy/sell pairs per symbol)
+├── data/                            # Sample + compliance test FIX files
 ├── tests/
 │   └── integration/                 # BDD integration tests (PostgreSQL + Kafka)
 └── scripts/                         # Local utility scripts (DB connectivity check, etc.)
@@ -217,6 +244,7 @@ fix-protocol-simulator-pro/
 | **matching-engine** | `validated_orders` | `trades`, `order_book_updates` | Price-time priority matching, partial fills, order book snapshots on each match |
 | **market-data-service** | `trades`, `order_book_updates` | `market_data` | Caches best bid/ask/last trade; publishes snapshot only on change |
 | **trade-store** | `trades` | - | Persists trades to PostgreSQL; exposes REST API via FastAPI |
+| **compliance-service** | `raw_orders`, `validated_orders` | - (DB only) | Passive observer: applies compliance rules + surveillance detections; persists violations, risk scores, and audit trail; exposes REST API |
 | **shared** | - | - | Internal library: schemas, Kafka factory, logging, DB session, exceptions |
 
 ---
@@ -242,7 +270,7 @@ Services are grouped into profiles:
 | Profile | Services |
 |---|---|
 | _(none)_ | `redpanda`, `postgres` only |
-| `pipeline` | + `fix-gateway`, `order-service`, `matching-engine`, `trade-store` |
+| `pipeline` | + `fix-gateway`, `order-service`, `matching-engine`, `trade-store`, `compliance-api`, `compliance-consumer` |
 | `full` | + all of the above + `market-data-service` |
 | `monitoring` | + `prometheus`, `grafana` (combine with pipeline or full) |
 
@@ -276,10 +304,12 @@ docker compose ps
 | order-service | Up | - |
 | matching-engine | Up | 8003 (metrics) |
 | trade-store | Up | 8000, 8000/metrics |
+| compliance-api | Up | 8010 |
+| compliance-consumer | Up | - |
 | prometheus | Up (monitoring profile) | 9090 |
 | grafana | Up (monitoring profile) | 3000 |
 
-### 4. REST API
+### 4. Trade Store REST API
 
 Swagger UI: `http://localhost:8000/docs`
 
@@ -291,7 +321,23 @@ Swagger UI: `http://localhost:8000/docs`
 
 > Only matched trades appear in the API. Unmatched orders rest in the matching engine's in-memory order book until a crossing counterpart arrives.
 
-### 5. Run the file-drop watcher (separate terminal)
+### 5. Compliance REST API
+
+Swagger UI: `http://localhost:8010/docs`
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/health` | Health check |
+| `GET` | `/violations` | List violations (filter: `client_id`, `severity`, `status`, `rule_name`) |
+| `GET` | `/violations/{id}` | Single violation detail with raw event payload |
+| `PATCH` | `/violations/{id}/status` | Update status: `REVIEWED`, `DISMISSED`, `ESCALATED` |
+| `GET` | `/risk` | All clients sorted by risk score descending |
+| `GET` | `/risk/{client_id}` | Risk profile for a specific client |
+| `GET` | `/audit` | Compliance audit trail (filter: `client_id`, `event_type`) |
+
+Compliance policies (enabled/disabled rules, thresholds) are configured in `services/compliance-service/policies/compliance_policies.yaml` - no code change required.
+
+### 6. Run the file-drop watcher (separate terminal)
 
 ```bash
 pip install -e shared
@@ -300,7 +346,7 @@ pip install -e services/fix-gateway
 python clients/fix-filedrop-client/watcher.py
 ```
 
-### 6. Drop a FIX order file
+### 7. Drop a FIX order file
 
 ```bash
 # Create a buy order
@@ -311,6 +357,21 @@ echo "35=D|55=EURUSD|54=2|44=1.09|38=100|" > clients/fix-filedrop-client/filedro
 ```
 
 The watcher detects each file, publishes to `raw_orders`, and moves it to `processed/` on success or `rejected/` on validation failure. Ready-to-use sample files are in `data/`.
+
+**Compliance test data** - the `data/` directory includes files purpose-built to exercise the compliance rules engine:
+
+| File | What it triggers |
+|---|---|
+| `compliance_valid_orders.txt` | All rules pass - clean baseline |
+| `compliance_missing_client_id.txt` | `MissingClientIdRule` HIGH |
+| `compliance_invalid_symbol.txt` | `InvalidSymbolRule` CRITICAL |
+| `compliance_excessive_size.txt` | `TradeSizeRule` HIGH (per-symbol limits) |
+| `compliance_price_deviation.txt` | `PriceDeviationRule` HIGH (builds baseline, then spikes) |
+| `compliance_duplicate_orders.txt` | `DuplicateOrderRule` MEDIUM |
+| `surveillance_wash_trading.txt` | `WashTradingRule` CRITICAL |
+| `surveillance_rapid_fire.txt` | `RapidFireRule` HIGH |
+| `surveillance_volume_spike.txt` | `VolumeSpikeRule` HIGH |
+| `surveillance_repeated_orders.txt` | `RepeatedOrdersRule` MEDIUM |
 
 ---
 
@@ -359,12 +420,13 @@ Result: moved to `rejected/`, error logged by the order service.
 Each service has isolated unit tests with mocked infrastructure (Kafka, DB). Coverage is reported per service.
 
 ```bash
-cd services/matching-engine && python -m pytest -v
-cd services/order-service   && python -m pytest -v
-cd services/trade-store     && python -m pytest -v
+cd services/matching-engine   && python -m pytest -v
+cd services/order-service     && python -m pytest -v
+cd services/trade-store       && python -m pytest -v
 cd services/market-data-service && python -m pytest -v
-cd services/fix-gateway     && python -m pytest -v
-cd shared                   && python -m pytest -v
+cd services/fix-gateway       && python -m pytest -v
+cd services/compliance-service && python -m pytest -v
+cd shared                     && python -m pytest -v
 ```
 
 ### BDD Component Tests (Gherkin)
@@ -372,10 +434,18 @@ cd shared                   && python -m pytest -v
 Business behaviour is specified as Gherkin feature files and executed with behave. Feature files and step implementations are co-located under `tests/bdd/` in each service.
 
 ```bash
-cd services/matching-engine && python -m behave tests/bdd/features/
-cd services/order-service   && python -m behave tests/bdd/features/
-cd services/trade-store     && python -m behave tests/bdd/features/
+cd services/matching-engine    && python -m behave tests/bdd/features/
+cd services/order-service      && python -m behave tests/bdd/features/
+cd services/trade-store        && python -m behave tests/bdd/features/
+cd services/compliance-service && python -m behave tests/bdd/features/
 ```
+
+The compliance BDD suite covers two feature files:
+
+| Feature | Scenarios |
+|---|---|
+| `compliance_rules.feature` | Missing client ID, trade size limits, invalid symbol, duplicate detection |
+| `surveillance_detections.feature` | Wash trading, rapid-fire bursts, volume spike, repeated orders |
 
 Example scenario from the matching engine:
 
@@ -449,7 +519,7 @@ In CI, E2E tests run in a dedicated workflow (`e2e.yml`) triggered manually or o
 | Variable | Default | Used by |
 |---|---|---|
 | `KAFKA_BROKER` | `localhost:9092` | All services |
-| `DATABASE_URL` | _(reads config.yaml)_ | trade-store |
+| `DATABASE_URL` | _(reads config.yaml)_ | trade-store, compliance-service |
 | `LOG_LEVEL` | `INFO` | All services |
 | `LOG_FORMAT` | `plain` | All services (`json` for structured logs) |
 | `PUBLISH_INTERVAL` | `10` | market-data-service |
@@ -565,7 +635,9 @@ The order-service and market-data-service follow the identical pattern:
 
 **Change-detected event publishing** - The market data service tracks `(best_bid, best_ask, last_trade_price)` as a tuple and suppresses publication if nothing changed - reducing downstream noise without a polling interval.
 
-**Six independent CI pipelines** - Five per-service pipelines are path-filtered so only the changed service's pipeline runs on a PR; all five run daily. A sixth dedicated E2E pipeline starts the full Docker stack and runs the end-to-end BDD suite on a weekly schedule and on manual dispatch. Coverage is enforced at 85% across all services; lint toolchain (ruff, black, isort, mypy) is fully configured in each service's `pyproject.toml` so local and CI behaviour are identical.
+**RegTech compliance and surveillance module** - A purpose-built compliance microservice that passively observes the order pipeline. Ten rules across two categories: six compliance checks (missing client ID, invalid instrument, market hours, trade size, price deviation, duplicate detection) and four surveillance detections (wash trading, rapid-fire bursts, volume spikes, repeated order patterns). Rules are YAML-configurable at runtime with no code change required. Violations are persisted with SHA-256 tamper-evident audit trail records and a per-client risk scoring model weighted by severity - the same pattern used in regulatory reporting systems.
+
+**Seven independent CI pipelines** - Six per-service pipelines are path-filtered so only the changed service's pipeline runs on a PR; all six run daily. A seventh dedicated E2E pipeline starts the full Docker stack and runs the end-to-end BDD suite on a weekly schedule and on manual dispatch. Coverage is enforced at 85% across all services; lint toolchain (ruff, black, isort, mypy) is fully configured in each service's `pyproject.toml` so local and CI behaviour are identical.
 
 **Dead letter queue** - The filedrop client publishes any FIX message that fails parsing or validation to a `dead_letter_orders` Kafka topic (`{ source_file, raw_line, error, timestamp }`) before moving the file to `rejected/`. This makes failures observable, replayable, and alertable without manual log trawling - the same pattern used for error handling in production event-driven systems.
 
