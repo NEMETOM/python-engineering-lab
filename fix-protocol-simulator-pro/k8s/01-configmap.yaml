@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fix-simulator-config
+  namespace: fix-simulator
+data:
+  KAFKA_BROKER: "redpanda:9092"
+  LOG_LEVEL: "INFO"
+  LOG_FORMAT: "json"
+  PUBLISH_INTERVAL: "10"

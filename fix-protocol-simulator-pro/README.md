@@ -228,6 +228,23 @@ fix-protocol-simulator-pro/
 ├── clients/
 │   └── fix-filedrop-client/         # Local directory watcher - drops FIX files into pipeline
 ├── data/                            # Sample + compliance test FIX files
+├── k8s/                             # Raw Kubernetes manifests (apply with kubectl or kustomize)
+│   ├── 00-namespace.yaml
+│   ├── 01-configmap.yaml
+│   ├── 02-secret.yaml
+│   ├── redpanda.yaml                # StatefulSet + headless + ClusterIP services
+│   ├── postgres.yaml                # StatefulSet + PVC
+│   ├── fix-gateway.yaml             # Deployment + Service
+│   ├── matching-engine.yaml         # Deployment + Service + HPA
+│   ├── trade-store.yaml             # API Deployment + consumer Deployment + LoadBalancer
+│   ├── compliance-service.yaml      # API Deployment + consumer Deployment + LoadBalancer + policies ConfigMap
+│   ├── market-data-service.yaml
+│   └── kustomization.yaml           # Apply everything: kubectl apply -k k8s/
+├── helm/
+│   └── fix-simulator-pro/           # Helm chart - parameterised for dev/staging/prod
+│       ├── Chart.yaml
+│       ├── values.yaml              # All tuneable knobs (replicas, resources, image registry)
+│       └── templates/               # Go-templated versions of all k8s/ manifests
 ├── tests/
 │   └── integration/                 # BDD integration tests (PostgreSQL + Kafka)
 └── scripts/                         # Local utility scripts (DB connectivity check, etc.)
@@ -372,6 +389,205 @@ The watcher detects each file, publishes to `raw_orders`, and moves it to `proce
 | `surveillance_rapid_fire.txt` | `RapidFireRule` HIGH |
 | `surveillance_volume_spike.txt` | `VolumeSpikeRule` HIGH |
 | `surveillance_repeated_orders.txt` | `RepeatedOrdersRule` MEDIUM |
+
+---
+
+## Kubernetes Deployment
+
+The project ships with both raw manifests (`k8s/`) and a Helm chart (`helm/fix-simulator-pro/`) for Kubernetes deployment. All services are already Kubernetes-ready - they use environment variables for all configuration and have no local-filesystem state.
+
+### Prerequisites
+
+- Kubernetes cluster (local: [minikube](https://minikube.sigs.k8s.io/) or [kind](https://kind.sigs.k8s.io/), cloud: EKS / GKE / AKS)
+- `kubectl` configured against your cluster
+- `helm` v3+ (for the Helm chart option)
+- `metrics-server` installed in the cluster (required for HPA on the matching engine)
+
+### 1. Build and push images
+
+```bash
+cd fix-protocol-simulator-pro
+
+# Build all service images
+docker build -f services/fix-gateway/Dockerfile        -t YOUR_REGISTRY/fix-gateway:latest        .
+docker build -f services/order-service/Dockerfile      -t YOUR_REGISTRY/order-service:latest      .
+docker build -f services/matching-engine/Dockerfile    -t YOUR_REGISTRY/matching-engine:latest    .
+docker build -f services/trade-store/Dockerfile        -t YOUR_REGISTRY/trade-store:latest        .
+docker build -f services/compliance-service/Dockerfile -t YOUR_REGISTRY/compliance-service:latest .
+docker build -f services/market-data-service/Dockerfile -t YOUR_REGISTRY/market-data-service:latest .
+
+# Push to your registry
+docker push YOUR_REGISTRY/fix-gateway:latest
+# ... repeat for each service
+```
+
+> For local testing with minikube, run `eval $(minikube docker-env)` before building so images land directly in the cluster's registry without a push step.
+
+### 2a. Deploy with kubectl (raw manifests)
+
+```bash
+# Update the secret in k8s/02-secret.yaml with real credentials first, then:
+kubectl apply -k k8s/
+
+# Watch pods come up
+kubectl get pods -n fix-simulator -w
+```
+
+Apply order is handled automatically by kustomize. Redpanda and PostgreSQL must be `Running` and passing their health probes before the application pods schedule successfully (Kubernetes restarts them automatically until the dependency is ready).
+
+### 2b. Deploy with Helm
+
+```bash
+# Install with default values (uses image tag 'latest', no registry prefix)
+helm install fix-simulator ./helm/fix-simulator-pro \
+  --namespace fix-simulator --create-namespace
+
+# Install with a custom image registry and production-grade resource limits
+helm install fix-simulator ./helm/fix-simulator-pro \
+  --namespace fix-simulator --create-namespace \
+  --set image.registry=docker.io/myuser \
+  --set image.tag=1.0.0 \
+  --set matchingEngine.autoscaling.maxReplicas=10 \
+  --set postgres.credentials.password=supersecret
+
+# Upgrade after a code change
+helm upgrade fix-simulator ./helm/fix-simulator-pro --namespace fix-simulator --set image.tag=1.0.1
+
+# Tear down
+helm uninstall fix-simulator --namespace fix-simulator
+```
+
+### 3. Verify
+
+```bash
+kubectl get all -n fix-simulator
+```
+
+| Resource | Expected state |
+|---|---|
+| `statefulset/redpanda` | 1/1 Ready |
+| `statefulset/postgres` | 1/1 Ready |
+| `deployment/fix-gateway` | 1/1 Available |
+| `deployment/order-service` | 1/1 Available |
+| `deployment/matching-engine` | 1/1+ Available (HPA manages replicas) |
+| `deployment/trade-store-api` | 2/2 Available |
+| `deployment/trade-store-consumer` | 1/1 Available |
+| `deployment/compliance-api` | 1/1 Available |
+| `deployment/compliance-consumer` | 1/1 Available |
+| `deployment/market-data-service` | 1/1 Available |
+
+```bash
+# Get the external IPs for the two REST APIs
+kubectl get svc -n fix-simulator trade-store compliance-service
+
+# Trade Store API
+curl http://<TRADE_STORE_EXTERNAL_IP>:8000/health
+
+# Compliance API
+curl http://<COMPLIANCE_EXTERNAL_IP>:8010/health
+```
+
+### 4. Day-to-day operations
+
+**View logs**
+
+```bash
+# Stream logs from any service
+kubectl logs -n fix-simulator deploy/matching-engine -f
+kubectl logs -n fix-simulator deploy/compliance-api -f
+kubectl logs -n fix-simulator deploy/trade-store-consumer -f
+
+# Last 100 lines from all pods of a deployment
+kubectl logs -n fix-simulator deploy/compliance-consumer --tail=100
+```
+
+**Access the APIs locally** (when no external LoadBalancer is available, e.g. minikube)
+
+```bash
+# Forward Trade Store API to localhost:8000
+kubectl port-forward -n fix-simulator svc/trade-store 8000:8000 &
+
+# Forward Compliance API to localhost:8010
+kubectl port-forward -n fix-simulator svc/compliance-service 8010:8010 &
+
+# Now query as normal
+curl http://localhost:8000/trades
+curl http://localhost:8010/violations
+curl http://localhost:8010/risk
+```
+
+**Send a test order through the pipeline**
+
+```bash
+# Port-forward the FIX gateway TCP socket
+kubectl port-forward -n fix-simulator svc/fix-gateway 9878:9878 &
+
+# Drop a compliance test file via the filedrop client (runs locally)
+cp data/compliance_excessive_size.txt clients/fix-filedrop-client/filedrop/
+
+# Then check violations appeared
+curl http://localhost:8010/violations | python -m json.tool
+```
+
+**Scale a service manually**
+
+```bash
+# Scale trade-store API to 3 replicas
+kubectl scale -n fix-simulator deploy/trade-store-api --replicas=3
+
+# Check HPA status on the matching engine
+kubectl get hpa -n fix-simulator matching-engine
+
+# Override HPA and force a specific replica count (disables autoscaling temporarily)
+kubectl patch hpa -n fix-simulator matching-engine -p '{"spec":{"minReplicas":2,"maxReplicas":2}}'
+```
+
+**Update compliance policies without rebuilding**
+
+```bash
+# Edit rules live - changes take effect on the next consumer poll cycle
+kubectl edit configmap -n fix-simulator compliance-policies
+
+# Or apply an updated policies file
+kubectl create configmap compliance-policies \
+  --from-file=compliance_policies.yaml=services/compliance-service/policies/compliance_policies.yaml \
+  --namespace fix-simulator --dry-run=client -o yaml | kubectl apply -f -
+
+# Restart consumers to pick up the new mount
+kubectl rollout restart -n fix-simulator deploy/compliance-consumer
+kubectl rollout restart -n fix-simulator deploy/compliance-api
+```
+
+**Rolling restart after a new image**
+
+```bash
+# Restart a single service (zero-downtime for replicas > 1)
+kubectl rollout restart -n fix-simulator deploy/trade-store-api
+
+# Watch the rollout
+kubectl rollout status -n fix-simulator deploy/trade-store-api
+
+# Roll back if something goes wrong
+kubectl rollout undo -n fix-simulator deploy/trade-store-api
+```
+
+**Tear down**
+
+```bash
+# kubectl
+kubectl delete -k k8s/
+
+# Helm
+helm uninstall fix-simulator --namespace fix-simulator
+kubectl delete namespace fix-simulator   # also removes PVCs and all remaining resources
+```
+
+### Architecture notes
+
+- **Redpanda** runs as a `StatefulSet` with a headless service for pod identity and a standard `ClusterIP` service (`redpanda:9092`) for Kafka clients. All application services use `KAFKA_BROKER=redpanda:9092`.
+- **Compliance policies** are mounted from a `ConfigMap` (`compliance-policies`) so rules can be updated with `kubectl edit configmap compliance-policies -n fix-simulator` without rebuilding the image.
+- **HPA** on the matching engine scales between 1 and 5 replicas at 70% CPU. Requires `metrics-server` in the cluster.
+- **Secrets** - `k8s/02-secret.yaml` uses `stringData` for readability during development. For production, use `kubectl create secret` with values from a secrets manager (AWS Secrets Manager, Vault, etc.) and never commit credentials to the repository.
 
 ---
 
@@ -637,6 +853,8 @@ The order-service and market-data-service follow the identical pattern:
 
 **RegTech compliance and surveillance module** - A purpose-built compliance microservice that passively observes the order pipeline. Ten rules across two categories: six compliance checks (missing client ID, invalid instrument, market hours, trade size, price deviation, duplicate detection) and four surveillance detections (wash trading, rapid-fire bursts, volume spikes, repeated order patterns). Rules are YAML-configurable at runtime with no code change required. Violations are persisted with SHA-256 tamper-evident audit trail records and a per-client risk scoring model weighted by severity - the same pattern used in regulatory reporting systems.
 
+**Kubernetes-ready deployment** - Raw manifests (`k8s/`) and a parameterised Helm chart (`helm/fix-simulator-pro/`) cover all services. StatefulSets for Redpanda and PostgreSQL with PersistentVolumeClaims, a HorizontalPodAutoscaler on the matching engine (1-5 replicas at 70% CPU), and a ConfigMap-mounted compliance policy file so rules can be changed without rebuilding the image. Every application service is stateless and twelve-factor compliant, making the transition from Docker Compose to Kubernetes require no Python changes.
+
 **Seven independent CI pipelines** - Six per-service pipelines are path-filtered so only the changed service's pipeline runs on a PR; all six run daily. A seventh dedicated E2E pipeline starts the full Docker stack and runs the end-to-end BDD suite on a weekly schedule and on manual dispatch. Coverage is enforced at 85% across all services; lint toolchain (ruff, black, isort, mypy) is fully configured in each service's `pyproject.toml` so local and CI behaviour are identical.
 
 **Dead letter queue** - The filedrop client publishes any FIX message that fails parsing or validation to a `dead_letter_orders` Kafka topic (`{ source_file, raw_line, error, timestamp }`) before moving the file to `rejected/`. This makes failures observable, replayable, and alertable without manual log trawling - the same pattern used for error handling in production event-driven systems.
@@ -654,7 +872,6 @@ The order-service and market-data-service follow the identical pattern:
 | FIX TCP session | Full logout (`35=5`) handling and session expiry via heartbeat timeout; Logon + TCP disconnect lifecycle is already implemented |
 | Multi-symbol order book | Per-symbol book isolation - currently all symbols share one book |
 | WebSocket market data | Push-based streaming of market data snapshots to connected clients |
-| Kubernetes deployment | Helm charts for each service; horizontal scaling of the matching engine |
 | OpenTelemetry traces | Distributed tracing across services; correlate a single order through all 4 hops |
 | Schema registry | Confluent Schema Registry for Avro/Protobuf event versioning |
 | Async I/O | Replace blocking Kafka consumers with asyncio-based consumers (aiokafka) |

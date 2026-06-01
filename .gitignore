@@ -32,3 +32,6 @@ htmlcov/
 .venv/
 venv/
 env/
+
+# Personal backlog - not for public repository
+fix-protocol-simulator-pro/future_enhancements.md

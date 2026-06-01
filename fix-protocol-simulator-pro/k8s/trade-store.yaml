@@ -1,0 +1,110 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: trade-store
+  namespace: fix-simulator
+  labels:
+    app: trade-store
+spec:
+  type: LoadBalancer
+  ports:
+    - name: api
+      port: 8000
+      targetPort: 8000
+  selector:
+    app: trade-store-api
+---
+# API - FastAPI REST
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trade-store-api
+  namespace: fix-simulator
+  labels:
+    app: trade-store-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: trade-store-api
+  template:
+    metadata:
+      labels:
+        app: trade-store-api
+    spec:
+      containers:
+        - name: trade-store-api
+          image: trade-store:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              name: api
+          envFrom:
+            - configMapRef:
+                name: fix-simulator-config
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: fix-simulator-secret
+                  key: database-url
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+---
+# Consumer - Kafka to PostgreSQL
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trade-store-consumer
+  namespace: fix-simulator
+  labels:
+    app: trade-store-consumer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: trade-store-consumer
+  template:
+    metadata:
+      labels:
+        app: trade-store-consumer
+    spec:
+      containers:
+        - name: trade-store-consumer
+          image: trade-store:latest
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "trade_store.consumer"]
+          envFrom:
+            - configMapRef:
+                name: fix-simulator-config
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: fix-simulator-secret
+                  key: database-url
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
