@@ -1,0 +1,64 @@
+compliance:
+  missing_client_id:
+    enabled: true
+
+  market_hours:
+    enabled: true
+    start: "09:30"
+    end: "16:00"
+    timezone: "America/New_York"
+
+  trade_size:
+    enabled: true
+    max_quantity:
+      default: 10000
+      BTCUSD: 100
+      ETHUSD: 500
+      EURUSD: 1000000
+      GBPUSD: 500000
+
+  price_deviation:
+    enabled: true
+    max_deviation_pct: 5.0
+
+  duplicate_order:
+    enabled: true
+    window_seconds: 60
+
+  allowed_symbols:
+    enabled: true
+    symbols:
+      - EURUSD
+      - GBPUSD
+      - BTCUSD
+      - ETHUSD
+      - AAPL
+      - MSFT
+
+surveillance:
+  wash_trading:
+    enabled: true
+    window_seconds: 300
+
+  rapid_fire:
+    enabled: true
+    max_orders: 10
+    window_seconds: 60
+
+  volume_spike:
+    enabled: true
+    spike_multiplier: 5.0
+    baseline_window_seconds: 3600
+
+  repeated_orders:
+    enabled: true
+    repeat_threshold: 5
+    window_seconds: 300
+
+risk_scoring:
+  weights:
+    LOW: 1
+    MEDIUM: 5
+    HIGH: 20
+    CRITICAL: 100
+  high_risk_threshold: 200
