@@ -1,0 +1,177 @@
+---
+# ConfigMap for compliance policies YAML - edit rules here without rebuilding the image
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: compliance-policies
+  namespace: fix-simulator
+data:
+  compliance_policies.yaml: |
+    compliance:
+      missing_client_id:
+        enabled: true
+      market_hours:
+        enabled: true
+        start: "09:30"
+        end: "16:00"
+        timezone: "America/New_York"
+      trade_size:
+        enabled: true
+        max_quantity:
+          default: 10000
+          BTCUSD: 100
+          ETHUSD: 500
+          EURUSD: 1000000
+          GBPUSD: 500000
+      price_deviation:
+        enabled: true
+        max_deviation_pct: 5.0
+      duplicate_order:
+        enabled: true
+        window_seconds: 60
+      allowed_symbols:
+        enabled: true
+        symbols: [EURUSD, GBPUSD, BTCUSD, ETHUSD, AAPL, MSFT]
+    surveillance:
+      wash_trading:
+        enabled: true
+        window_seconds: 300
+      rapid_fire:
+        enabled: true
+        max_orders: 10
+        window_seconds: 60
+      volume_spike:
+        enabled: true
+        spike_multiplier: 5.0
+        baseline_window_seconds: 3600
+      repeated_orders:
+        enabled: true
+        repeat_threshold: 5
+        window_seconds: 300
+    risk_scoring:
+      weights: {LOW: 1, MEDIUM: 5, HIGH: 20, CRITICAL: 100}
+      high_risk_threshold: 200
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: compliance-service
+  namespace: fix-simulator
+  labels:
+    app: compliance-service
+spec:
+  type: LoadBalancer
+  ports:
+    - name: api
+      port: 8010
+      targetPort: 8010
+  selector:
+    app: compliance-api
+---
+# API - FastAPI REST
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: compliance-api
+  namespace: fix-simulator
+  labels:
+    app: compliance-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: compliance-api
+  template:
+    metadata:
+      labels:
+        app: compliance-api
+    spec:
+      containers:
+        - name: compliance-api
+          image: compliance-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8010
+              name: api
+          envFrom:
+            - configMapRef:
+                name: fix-simulator-config
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: fix-simulator-secret
+                  key: database-url
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8010
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8010
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          volumeMounts:
+            - name: policies
+              mountPath: /app/policies
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: policies
+          configMap:
+            name: compliance-policies
+---
+# Consumer - dual-topic Kafka listener
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: compliance-consumer
+  namespace: fix-simulator
+  labels:
+    app: compliance-consumer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: compliance-consumer
+  template:
+    metadata:
+      labels:
+        app: compliance-consumer
+    spec:
+      containers:
+        - name: compliance-consumer
+          image: compliance-service:latest
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "compliance_service.consumer"]
+          envFrom:
+            - configMapRef:
+                name: fix-simulator-config
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: fix-simulator-secret
+                  key: database-url
+          volumeMounts:
+            - name: policies
+              mountPath: /app/policies
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: policies
+          configMap:
+            name: compliance-policies

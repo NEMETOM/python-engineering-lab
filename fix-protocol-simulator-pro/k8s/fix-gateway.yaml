@@ -1,0 +1,66 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fix-gateway
+  namespace: fix-simulator
+  labels:
+    app: fix-gateway
+spec:
+  ports:
+    - name: fix-tcp
+      port: 9878
+      targetPort: 9878
+    - name: metrics
+      port: 8001
+      targetPort: 8001
+  selector:
+    app: fix-gateway
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fix-gateway
+  namespace: fix-simulator
+  labels:
+    app: fix-gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fix-gateway
+  template:
+    metadata:
+      labels:
+        app: fix-gateway
+    spec:
+      containers:
+        - name: fix-gateway
+          image: fix-gateway:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9878
+              name: fix-tcp
+            - containerPort: 8001
+              name: metrics
+          envFrom:
+            - configMapRef:
+                name: fix-simulator-config
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: fix-simulator-secret
+                  key: database-url
+          livenessProbe:
+            tcpSocket:
+              port: 9878
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi

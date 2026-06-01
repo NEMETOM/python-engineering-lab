@@ -1,0 +1,111 @@
+# Redpanda - single-replica StatefulSet suitable for development / simulation.
+# For production use the official Redpanda Helm chart: helm install redpanda redpanda/redpanda
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redpanda-headless
+  namespace: fix-simulator
+  labels:
+    app: redpanda
+spec:
+  clusterIP: None
+  ports:
+    - name: kafka
+      port: 9092
+    - name: rpc
+      port: 33145
+  selector:
+    app: redpanda
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redpanda
+  namespace: fix-simulator
+  labels:
+    app: redpanda
+spec:
+  ports:
+    - name: kafka
+      port: 9092
+      targetPort: 9092
+    - name: admin
+      port: 9644
+      targetPort: 9644
+  selector:
+    app: redpanda
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redpanda-data
+  namespace: fix-simulator
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redpanda
+  namespace: fix-simulator
+spec:
+  serviceName: redpanda-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redpanda
+  template:
+    metadata:
+      labels:
+        app: redpanda
+    spec:
+      containers:
+        - name: redpanda
+          image: docker.redpanda.com/redpandadata/redpanda:v23.3.21
+          command:
+            - redpanda
+            - start
+            - --smp=1
+            - --memory=1G
+            - --overprovisioned
+            - --kafka-addr=0.0.0.0:9092
+            - --advertise-kafka-addr=redpanda:9092
+            - --pandaproxy-addr=0.0.0.0:8082
+            - --advertise-pandaproxy-addr=redpanda:8082
+            - --rpc-addr=0.0.0.0:33145
+            - --advertise-rpc-addr=redpanda-0.redpanda-headless.fix-simulator.svc.cluster.local:33145
+            - --mode=dev-container
+          ports:
+            - containerPort: 9092
+              name: kafka
+            - containerPort: 9644
+              name: admin
+          readinessProbe:
+            tcpSocket:
+              port: 9092
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 9092
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          volumeMounts:
+            - name: redpanda-data
+              mountPath: /var/lib/redpanda/data
+          resources:
+            requests:
+              cpu: 250m
+              memory: 1Gi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+      volumes:
+        - name: redpanda-data
+          persistentVolumeClaim:
+            claimName: redpanda-data

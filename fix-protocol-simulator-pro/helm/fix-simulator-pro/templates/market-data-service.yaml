@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: market-data-service
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: market-data-service
+    {{ include "fix-simulator.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.marketDataService.replicas }}
+  selector:
+    matchLabels:
+      app: market-data-service
+  template:
+    metadata:
+      labels:
+        app: market-data-service
+    spec:
+      containers:
+        - name: market-data-service
+          image: {{ include "fix-simulator.image" (dict "root" . "name" "market-data-service") }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: fix-simulator-config
+          resources:
+            {{- toYaml .Values.marketDataService.resources | nindent 12 }}
