@@ -137,6 +137,40 @@ services:
     restart: on-failure
     profiles: [pipeline, full]
 
+  compliance-api:
+    build:
+      context: .
+      dockerfile: services/compliance-service/Dockerfile
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER: redpanda:9092
+      DATABASE_URL: postgresql://fixuser:fixpass@postgres:5432/fixdb
+      LOG_LEVEL: INFO
+    ports:
+      - "8010:8010"
+    profiles: [pipeline, full]
+
+  compliance-consumer:
+    build:
+      context: .
+      dockerfile: services/compliance-service/Dockerfile
+    command: ["python", "-m", "compliance_service.consumer"]
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER: redpanda:9092
+      DATABASE_URL: postgresql://fixuser:fixpass@postgres:5432/fixdb
+      LOG_LEVEL: INFO
+    restart: on-failure
+    profiles: [pipeline, full]
+
   prometheus:
     image: prom/prometheus:v2.51.0
     command:
