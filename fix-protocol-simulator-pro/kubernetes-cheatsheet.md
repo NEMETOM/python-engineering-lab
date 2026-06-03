@@ -1,10 +1,6 @@
 # Kubernetes Cheat Sheet - FIX Protocol Simulator Pro
 ### Beginner's Guide
 
-Personal reference - not committed to the repository.
-
----
-
 ## 1. First-Time Setup (do this once)
 
 ### Enable Kubernetes in Docker Desktop
