@@ -15,3 +15,14 @@ resources:
   - trade-store.yaml
   - compliance-service.yaml
   - market-data-service.yaml
+  - monitoring.yaml
+
+# Builds the Grafana dashboard ConfigMap automatically from the existing JSON file.
+# No need to copy or embed the dashboard - kustomize reads it directly.
+configMapGenerator:
+  - name: grafana-dashboard-json
+    namespace: fix-simulator
+    options:
+      disableNameSuffixHash: true
+    files:
+      - fix_simulator_overview.json=../infrastructure/monitoring/grafana/dashboards/fix_simulator_overview.json

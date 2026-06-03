@@ -122,6 +122,12 @@ kubectl port-forward -n fix-simulator svc/compliance-service 8010:8010
 
 # FIX Gateway TCP (for sending FIX messages directly) -> localhost:9878
 kubectl port-forward -n fix-simulator svc/fix-gateway 9878:9878
+
+# Grafana -> http://localhost:3000  (admin / admin)
+kubectl port-forward -n fix-simulator svc/grafana 3000:3000
+
+# Prometheus -> http://localhost:9090
+kubectl port-forward -n fix-simulator svc/prometheus 9090:9090
 ```
 
 Run each command in a separate terminal, then open:
@@ -129,6 +135,8 @@ Run each command in a separate terminal, then open:
 - Trade Store Swagger: http://localhost:8000/docs
 - Violations: http://localhost:8010/violations
 - Compliance Swagger: http://localhost:8010/docs
+- Grafana dashboard: http://localhost:3000  (login: admin / admin)
+- Prometheus targets: http://localhost:9090/targets
 
 ---
 
