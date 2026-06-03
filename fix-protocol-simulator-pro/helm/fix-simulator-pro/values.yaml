@@ -1,5 +1,31 @@
 namespace: fix-simulator
 
+# ── Monitoring (Prometheus + Grafana) ────────────────────────────────────────
+monitoring:
+  enabled: true
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    storage: 5Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  grafana:
+    image: grafana/grafana:10.4.2
+    storage: 1Gi
+    adminUser: admin
+    adminPassword: admin
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+
 # ── Image configuration ──────────────────────────────────────────────────────
 # Set registry to your Docker Hub username or private registry prefix.
 # Example: registry: docker.io/myuser
