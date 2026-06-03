@@ -85,6 +85,7 @@ This project was built to go beyond surface-level familiarity with these concept
 - **Shared Internal Platform Library** - Cross-service Pydantic v2 schemas, Kafka client factory, structured JSON logging, SQLAlchemy session management, and typed exceptions - installed as an editable package across all services.
 - **Compliance & Surveillance Module** - A dedicated RegTech microservice that passively observes the order pipeline. Six configurable compliance rules (missing client ID, market hours, trade size, price deviation, duplicate detection, invalid symbol) and four surveillance detections (wash trading, rapid-fire bursts, volume spikes, repeated orders) run against every order. Violations are persisted with SHA-256 tamper-evident audit trail records and are queryable via a REST API with per-client risk scores.
 - **Dead Letter Queue** - FIX messages that fail parsing or validation in the filedrop client are published to a `dead_letter_orders` Kafka topic with the raw line and error reason before the file moves to `rejected/`. Failures are replayable and alertable without manual log inspection.
+- **Kubernetes + Helm Deployment** - Raw manifests (`k8s/`) and a parameterised Helm chart (`helm/fix-simulator-pro/`) ship alongside the Docker Compose stack. One command deploys the full pipeline to any Kubernetes cluster. The matching engine has a HorizontalPodAutoscaler; compliance policies are mounted from a ConfigMap so rules can be updated without rebuilding the image.
 - **Four-Layer Testing** - Unit tests (pytest), component BDD tests (behave + Gherkin), infrastructure integration tests (Kafka pipeline + PostgreSQL persistence), and end-to-end BDD tests that exercise the full flow from FIX file drop to `GET /trades`.
 - **Seven Independent CI/CD Pipelines** - Six per-service pipelines (test, lint, Docker build) triggered on push and daily schedule, plus a dedicated E2E pipeline that starts the full Docker stack and runs the end-to-end BDD suite.
 
@@ -395,6 +396,19 @@ The watcher detects each file, publishes to `raw_orders`, and moves it to `proce
 ## Kubernetes Deployment
 
 The project ships with both raw manifests (`k8s/`) and a Helm chart (`helm/fix-simulator-pro/`) for Kubernetes deployment. All services are already Kubernetes-ready - they use environment variables for all configuration and have no local-filesystem state.
+
+**Quick reference - most common commands:**
+
+- Enable a local cluster: Docker Desktop → Settings → Kubernetes → Enable Kubernetes
+- Deploy everything: `kubectl apply -k k8s/`
+- Deploy with Helm: `helm install fix-simulator ./helm/fix-simulator-pro --namespace fix-simulator --create-namespace`
+- Watch pods come up: `kubectl get pods -n fix-simulator -w`
+- Stream logs: `kubectl logs -n fix-simulator deploy/compliance-api -f`
+- Access APIs locally: `kubectl port-forward -n fix-simulator svc/trade-store 8000:8000`
+- Update compliance rules without rebuilding: `kubectl edit configmap -n fix-simulator compliance-policies`
+- Tear down: `kubectl delete -k k8s/` or `helm uninstall fix-simulator -n fix-simulator`
+
+See [§ Day-to-day operations](#4-day-to-day-operations) below for the full operations reference.
 
 ### Prerequisites
 

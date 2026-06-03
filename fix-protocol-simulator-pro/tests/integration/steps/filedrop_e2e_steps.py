@@ -6,7 +6,7 @@ from pathlib import Path
 from behave import then, when
 
 _here = Path(__file__).resolve()
-_repo_root = _here.parent.parent.parent  # fix-protocol-simulator-pro/
+_repo_root = _here.parent.parent.parent.parent  # fix-protocol-simulator-pro/
 _filedrop_dir = _repo_root / "clients" / "fix-filedrop-client"
 _fix_gateway_src = _repo_root / "services" / "fix-gateway" / "src"
 
