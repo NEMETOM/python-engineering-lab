@@ -39,7 +39,32 @@ docker-desktop   Ready    control-plane   ...   v1.xx.x
 
 ---
 
-## 3. Build Images (do this after every code change)
+## 3. Docker Compose vs Kubernetes - Quick Comparison
+
+| Task | Docker Compose | Kubernetes |
+|---|---|---|
+| Start full pipeline | `docker compose --profile full up --build` | `kubectl apply -k k8s/` |
+| Start with monitoring | `docker compose --profile full --profile monitoring up` | Included in `kubectl apply -k k8s/` |
+| Stop everything | `docker compose down` | `kubectl delete -k k8s/` |
+| View logs | `docker compose logs -f fix-gateway` | `kubectl logs -n fix-simulator deploy/fix-gateway -f` |
+| Restart a service | `docker compose restart fix-gateway` | `kubectl rollout restart -n fix-simulator deploy/fix-gateway` |
+| Scale a service | Not supported (1 replica only) | `kubectl scale -n fix-simulator deploy/trade-store-api --replicas=3` |
+| Access Trade Store API | `http://localhost:8000` directly | `kubectl port-forward -n fix-simulator svc/trade-store 8000:8000` first |
+| Access Compliance API | `http://localhost:8010` directly | `kubectl port-forward -n fix-simulator svc/compliance-service 8010:8010` first |
+| Access Grafana | `http://localhost:3000` directly | `kubectl port-forward -n fix-simulator svc/grafana 3000:3000` first |
+| Update compliance rules | Edit YAML file + restart container | `kubectl edit configmap -n fix-simulator compliance-policies` (live) |
+| Filedrop watcher | `python clients/fix-filedrop-client/watcher.py` | Same - always runs locally |
+| Persist data across restarts | Named Docker volumes | PersistentVolumeClaims (automatic) |
+| Auto-restart on crash | `restart: on-failure` | Built-in (always restarts) |
+| Auto-scale under load | Not supported | HPA on matching engine (1-5 replicas) |
+
+**When to use Docker Compose:** local development, quick iteration, running tests.
+
+**When to use Kubernetes:** simulating production, testing scaling, HPA behaviour, or demonstrating the project to others.
+
+---
+
+## 4. Build Images (do this after every code change)
 
 All images must be built from the `fix-protocol-simulator-pro/` directory
 so the Dockerfiles can copy the `shared/` folder.
@@ -60,7 +85,7 @@ docker build -f services/market-data-service/Dockerfile -t market-data-service:l
 
 ---
 
-## 4. Deploy the Full Stack
+## 5. Deploy the Full Stack
 
 ```bash
 # Deploy everything (namespace, databases, all services)
@@ -75,7 +100,7 @@ Redpanda and PostgreSQL take the longest (~30-60 seconds).
 
 ---
 
-## 5. Check What's Running
+## 6. Check What's Running
 
 ```bash
 # See all pods and their status
@@ -108,7 +133,7 @@ market-data-service-xxx                 1/1     Running   0
 
 ---
 
-## 6. Access the APIs Locally
+## 7. Access the APIs Locally
 
 Kubernetes services are not directly accessible from your browser.
 Use `port-forward` to map them to `localhost`:
@@ -140,7 +165,7 @@ Run each command in a separate terminal, then open:
 
 ---
 
-## 7. View Logs
+## 8. View Logs
 
 ```bash
 # Follow logs from a service (like docker logs -f)
@@ -160,7 +185,7 @@ kubectl logs -n fix-simulator statefulset/redpanda --tail=30
 
 ---
 
-## 8. Drop a FIX Order File (Test the Pipeline)
+## 9. Drop a FIX Order File (Test the Pipeline)
 
 The filedrop watcher runs locally (not in Kubernetes), so you still run it the usual way:
 
@@ -191,7 +216,7 @@ curl http://localhost:8010/risk | python -m json.tool
 
 ---
 
-## 9. Update Compliance Rules (Without Rebuilding)
+## 10. Update Compliance Rules (Without Rebuilding)
 
 Compliance policies live in a ConfigMap - edit them live:
 
@@ -209,7 +234,7 @@ kubectl rollout restart -n fix-simulator deploy/compliance-api
 
 ---
 
-## 10. Scale Services
+## 11. Scale Services
 
 ```bash
 # Scale trade-store API to 3 replicas (zero-downtime)
@@ -227,7 +252,7 @@ kubectl get hpa -n fix-simulator matching-engine
 
 ---
 
-## 11. Restart a Service
+## 12. Restart a Service
 
 Useful after rebuilding an image or changing a ConfigMap:
 
@@ -242,7 +267,7 @@ kubectl rollout status -n fix-simulator deploy/compliance-api
 
 ---
 
-## 12. Troubleshoot a Crashing Pod
+## 13. Troubleshoot a Crashing Pod
 
 ```bash
 # Find which pods are not Running
@@ -263,7 +288,7 @@ Common reasons a pod crashes:
 
 ---
 
-## 13. Common kubectl Cheat Sheet
+## 14. Common kubectl Cheat Sheet
 
 ```bash
 # Get everything in the namespace
@@ -290,7 +315,7 @@ kubectl top nodes
 
 ---
 
-## 14. Tear Down
+## 15. Tear Down
 
 ```bash
 # Remove all project resources (keeps the namespace)
@@ -307,7 +332,7 @@ kubectl apply -k k8s/
 
 ---
 
-## 15. Helm Alternative Commands
+## 16. Helm Alternative Commands
 
 If you deployed with Helm instead of kubectl:
 
@@ -330,7 +355,7 @@ kubectl delete namespace fix-simulator
 
 ---
 
-## 16. Quick Reference Card
+## 17. Quick Reference Card
 
 ```
 Deploy:      kubectl apply -k k8s/
