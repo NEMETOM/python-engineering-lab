@@ -73,9 +73,7 @@ spec:
             - --smp=1
             - --memory=1G
             - --overprovisioned
-            - --kafka-addr=0.0.0.0:9092
             - --advertise-kafka-addr=redpanda:9092
-            - --pandaproxy-addr=0.0.0.0:8082
             - --advertise-pandaproxy-addr=redpanda:8082
             - --rpc-addr=0.0.0.0:33145
             - --advertise-rpc-addr=redpanda-0.redpanda-headless.fix-simulator.svc.cluster.local:33145

@@ -273,11 +273,14 @@ kubectl rollout status -n fix-simulator deploy/compliance-api
 # Find which pods are not Running
 kubectl get pods -n fix-simulator | grep -v Running
 
-# Describe a pod to see events and error messages
+# Describe a pod - shows Events section with the actual failure reason
 kubectl describe pod -n fix-simulator <pod-name>
 
-# Get logs from a crashed pod (previous run)
+# Get logs from a crashed pod (the previous run, before the restart)
 kubectl logs -n fix-simulator <pod-name> --previous
+
+# Get logs from a specific container inside a pod (multi-container pods)
+kubectl logs -n fix-simulator <pod-name> -c <container-name> --previous
 ```
 
 Common reasons a pod crashes:
@@ -285,6 +288,56 @@ Common reasons a pod crashes:
 - **Pending** - not enough resources or no node available
 - **ImagePullBackOff** - image name wrong or not built yet; re-run `docker build`
 - **Error** - application error on startup; check logs
+
+### CrashLoopBackOff - clearing the exponential backoff
+
+After many restarts Kubernetes applies exponential backoff (up to ~5 minutes between attempts).
+Even after the root cause is fixed, pods can appear stuck for a long time.
+Force an immediate retry for all deployments and statefulsets at once:
+
+```bash
+kubectl rollout restart deployment  -n fix-simulator
+kubectl rollout restart statefulset -n fix-simulator
+```
+
+Or target a single service:
+
+```bash
+kubectl rollout restart -n fix-simulator deploy/trade-store-api
+kubectl rollout restart -n fix-simulator statefulset/redpanda
+```
+
+### Check whether a service is actually reachable from localhost
+
+```bash
+# EXTERNAL-IP should show "localhost" for LoadBalancer services on Docker Desktop
+# <none> means it is ClusterIP only - not reachable from outside the cluster
+kubectl get svc -n fix-simulator
+```
+
+### Port-forward databases for local integration tests
+
+Use this when your integration tests need a direct DB or broker connection and
+the service is ClusterIP (no LoadBalancer):
+
+```bash
+# PostgreSQL - maps localhost:5433 -> cluster postgres:5432
+kubectl port-forward -n fix-simulator svc/postgres 5433:5432
+
+# Redpanda/Kafka - maps localhost:9092 -> cluster redpanda:9092
+kubectl port-forward -n fix-simulator svc/redpanda 9092:9092
+```
+
+Run each in a separate terminal and keep it open while the tests run.
+
+### Read the startup flags a running pod is actually using
+
+```bash
+# Shows the exact command + args the container was started with
+kubectl get pod -n fix-simulator <pod-name> -o jsonpath='{.spec.containers[0].args}'
+```
+
+Useful to confirm a config change was actually applied to the cluster after `kubectl apply`.
 
 ---
 
@@ -317,22 +370,74 @@ kubectl top nodes
 
 ## 15. Tear Down
 
+**Full reset - removes everything including old containers, volumes and data (recommended when finishing a session):**
 ```bash
-# Remove all project resources (keeps the namespace)
-kubectl delete -k k8s/
-
-# Remove everything including the namespace and PVCs (full reset)
 kubectl delete namespace fix-simulator
 ```
+All containers disappear from Docker Desktop within a few seconds.
 
-Redeploy fresh:
+**Soft stop - removes running pods but keeps data volumes (PostgreSQL trades, Prometheus metrics survive):**
+```bash
+kubectl delete -k k8s/
+```
+
+**Redeploy fresh after either option:**
 ```bash
 kubectl apply -k k8s/
+```
+The namespace is recreated automatically on the next apply.
+
+---
+
+**PowerShell shortcuts - paste into your profile (`$PROFILE`) so you never have to remember the full commands:**
+
+```powershell
+function k8s-up   { kubectl apply -k C:\Dev\python-engineering-lab\fix-protocol-simulator-pro\k8s\ }
+function k8s-down { kubectl delete namespace fix-simulator }
+```
+
+Then from any terminal:
+```powershell
+k8s-up     # deploy everything
+k8s-down   # tear down everything
+
+Or just run the full command directly - no setup needed:
+kubectl delete namespace fix-simulator
 ```
 
 ---
 
-## 16. Helm Alternative Commands
+## 16. Starting Again After a Laptop Restart
+
+When you restart your laptop Docker Desktop starts automatically, but the pods do not.
+You need to redeploy - but whether you also need to rebuild depends on whether the images are still there.
+
+**Step 1 - Check if images are still present (PowerShell):**
+```powershell
+docker images | Select-String "fix-gateway|order-service|matching-engine|trade-store|compliance|market-data"
+```
+
+- **All 6 images listed** - skip the build step, go straight to Step 2
+- **Empty or missing images** - rebuild first (see Section 4), then go to Step 2
+
+**Step 2 - Redeploy (no rebuild needed if images are present):**
+```powershell
+kubectl apply -k k8s/
+```
+
+**Step 3 - Watch pods come back up:**
+```powershell
+kubectl get pods -n fix-simulator -w
+```
+
+Wait until all pods show `1/1 Running`, then port-forward as normal (Section 7).
+
+> Images survive laptop restarts because they are stored on disk by Docker.
+> Only the running pods are lost when you shut down - the images are always reused.
+
+---
+
+## 17. Helm Alternative Commands
 
 If you deployed with Helm instead of kubectl:
 
@@ -355,15 +460,20 @@ kubectl delete namespace fix-simulator
 
 ---
 
-## 17. Quick Reference Card
+## 18. Quick Reference Card
 
 ```
-Deploy:      kubectl apply -k k8s/
-Status:      kubectl get pods -n fix-simulator
-Logs:        kubectl logs -n fix-simulator deploy/<service> -f
-API access:  kubectl port-forward -n fix-simulator svc/trade-store 8000:8000
-Restart:     kubectl rollout restart -n fix-simulator deploy/<service>
-Scale:       kubectl scale -n fix-simulator deploy/<service> --replicas=N
-Edit rules:  kubectl edit configmap -n fix-simulator compliance-policies
-Tear down:   kubectl delete -k k8s/
+Deploy:           kubectl apply -k k8s/
+Status:           kubectl get pods -n fix-simulator
+Logs:             kubectl logs -n fix-simulator deploy/<service> -f
+Crash logs:       kubectl logs -n fix-simulator <pod-name> --previous
+Describe pod:     kubectl describe pod -n fix-simulator <pod-name>
+API access:       kubectl port-forward -n fix-simulator svc/trade-store 8000:8000
+DB access:        kubectl port-forward -n fix-simulator svc/postgres 5433:5432
+Restart one:      kubectl rollout restart -n fix-simulator deploy/<service>
+Restart all:      kubectl rollout restart deployment statefulset -n fix-simulator
+Scale:            kubectl scale -n fix-simulator deploy/<service> --replicas=N
+Edit rules:       kubectl edit configmap -n fix-simulator compliance-policies
+Check services:   kubectl get svc -n fix-simulator
+Tear down:        kubectl delete -k k8s/
 ```

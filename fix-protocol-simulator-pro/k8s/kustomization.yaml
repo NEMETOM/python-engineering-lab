@@ -25,4 +25,4 @@ configMapGenerator:
     options:
       disableNameSuffixHash: true
     files:
-      - fix_simulator_overview.json=../infrastructure/monitoring/grafana/dashboards/fix_simulator_overview.json
+      - fix_simulator_overview.json=fix_simulator_overview.json
