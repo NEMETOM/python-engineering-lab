@@ -513,6 +513,8 @@ Scripts live in `scripts/` and can be run from any directory.
 | Script | When to use it |
 |---|---|
 | `.\scripts\k8s-up.ps1` | Deploy the full stack and wait for all pods to be Ready |
+| `.\scripts\k8s-down.ps1` | Full teardown - deletes namespace and all data volumes |
+| `.\scripts\k8s-down.ps1 -Soft` | Soft stop - removes pods but keeps PVCs (PostgreSQL and Redpanda data survives) |
 | `.\scripts\k8s-restart.ps1` | Clear CrashLoopBackOff backoff - restarts all deployments + statefulsets and auto-scales down stuck replicasets |
 | `.\scripts\k8s-port-forward.ps1` | Start background port-forwards for services not on LoadBalancer (prometheus, fix-gateway). Press Ctrl+C to stop all. |
 | `.\scripts\build-images.ps1` | Rebuild all six Docker images after a code change |

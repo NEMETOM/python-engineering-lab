@@ -1,6 +1,14 @@
 import shutil
 from datetime import datetime, timezone
 
+
+def _move_safe(src, dst):
+    """Move src to dst; silently no-ops if src is already gone (moved by the watcher)."""
+    try:
+        shutil.move(src, dst)
+    except FileNotFoundError:
+        pass
+
 from config import PROCESSED_DIR, REJECTED_DIR
 from fix_gateway.fix_handler import FixHandler
 from logger import get_logger
@@ -68,13 +76,13 @@ class FileProcessor:
                         },
                     )
 
-            shutil.move(filepath, PROCESSED_DIR / filepath.name)
+            _move_safe(filepath, PROCESSED_DIR / filepath.name)
             logger.info(
                 f"processed {filepath.name}: {success} published, {skipped} skipped"
             )
 
         except Exception as e:
-            shutil.move(filepath, REJECTED_DIR / filepath.name)
+            _move_safe(filepath, REJECTED_DIR / filepath.name)
             logger.error(f"rejected file {filepath.name} reason={e}")
             self.producer.send(
                 _DEAD_LETTER_TOPIC,
