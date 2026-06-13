@@ -437,7 +437,99 @@ Wait until all pods show `1/1 Running`, then port-forward as normal (Section 7).
 
 ---
 
-## 17. Helm Alternative Commands
+## 17. Kubernetes Fails to Start (Docker Desktop)
+
+Use this section when Docker Desktop shows Kubernetes as failed/yellow instead of green.
+
+### Step 1 - Check if port 6443 is blocked by a foreign process
+
+```powershell
+netstat -ano | Select-String ":6443"
+```
+
+One entry is expected (Docker Desktop itself - `com.docker.backend`). If a different process owns the port:
+
+```powershell
+Get-Process -Id <PID>          # identify the process
+Stop-Process -Id <PID> -Force  # kill it
+```
+
+Then retry: Docker Desktop Settings → Kubernetes → **Reset Kubernetes Cluster**.
+
+### Step 2 - cgroup v2 conflict (most common cause on Windows 10 + WSL2)
+
+**Symptom in logs:**
+```
+starting kubelet: waiting for [/sys/fs/cgroup/cpu/kubepods /sys/fs/cgroup/cpu/podruntime]: not all files found after 1m0s timeout
+```
+
+The kubelet expects cgroup v1 paths but the WSL2 kernel is running cgroup v2 unified hierarchy.
+
+**Fix:** force cgroup v1 in WSL2. Open (or create) `%USERPROFILE%\.wslconfig`:
+
+```powershell
+notepad "$env:USERPROFILE\.wslconfig"
+```
+
+Add under a `[wsl2]` section:
+
+```ini
+[wsl2]
+kernelCommandLine = systemd.unified_cgroup_hierarchy=0
+```
+
+Shut down WSL and restart Docker Desktop:
+
+```powershell
+wsl --shutdown
+```
+
+Wait 10 seconds, reopen Docker Desktop, wait for the green Docker icon, then Settings → Kubernetes → **Reset Kubernetes Cluster**.
+
+### Step 3 - Read the actual failure reason from logs
+
+```powershell
+# Find the most recently written Docker Desktop logs
+Get-ChildItem "$env:LOCALAPPDATA\Docker\log\host" -Filter "*.log" |
+  Sort-Object LastWriteTime -Descending | Select-Object -First 5 | Select-Object FullName
+
+# Search backend log for errors
+Get-Content "$env:LOCALAPPDATA\Docker\log\host\com.docker.backend.exe.log" -Tail 60 |
+  Select-String -Pattern "error|failed|kubelet|timeout" -CaseSensitive:$false
+```
+
+### Step 4 - Nuclear reset (last resort)
+
+Docker Desktop → Troubleshoot (bug icon) → **Reset to factory defaults**
+
+This removes all containers, images, and the Kubernetes cluster. Rebuild images afterwards (Section 4).
+
+---
+
+## 18. PowerShell Helper Scripts
+
+Scripts live in `scripts/` and can be run from any directory.
+
+| Script | When to use it |
+|---|---|
+| `.\scripts\k8s-up.ps1` | Deploy the full stack and wait for all pods to be Ready |
+| `.\scripts\k8s-restart.ps1` | Clear CrashLoopBackOff backoff - restarts all deployments + statefulsets and auto-scales down stuck replicasets |
+| `.\scripts\k8s-port-forward.ps1` | Start background port-forwards for services not on LoadBalancer (prometheus, fix-gateway). Press Ctrl+C to stop all. |
+| `.\scripts\build-images.ps1` | Rebuild all six Docker images after a code change |
+
+### What's already on LoadBalancer (no port-forward needed)
+
+| Service | localhost address |
+|---|---|
+| Trade Store API | http://localhost:8000/docs |
+| Compliance API | http://localhost:8010/docs |
+| Grafana | http://localhost:3000 (admin / admin) |
+| PostgreSQL | localhost:5433 |
+| Redpanda/Kafka | localhost:9092 |
+
+---
+
+## 19. Helm Alternative Commands
 
 If you deployed with Helm instead of kubectl:
 
@@ -460,7 +552,7 @@ kubectl delete namespace fix-simulator
 
 ---
 
-## 18. Quick Reference Card
+## 20. Quick Reference Card
 
 ```
 Deploy:           kubectl apply -k k8s/
