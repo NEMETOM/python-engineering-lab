@@ -1,3 +1,9 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
 
   redpanda:
@@ -22,6 +28,7 @@ services:
       timeout: 10s
       retries: 10
       start_period: 45s
+    logging: *default-logging
     deploy:
       resources:
         limits:
@@ -42,6 +49,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    logging: *default-logging
     deploy:
       resources:
         limits:
@@ -59,6 +67,7 @@ services:
       LOG_LEVEL: WARNING
     ports:
       - "8001:8001"
+    logging: *default-logging
     profiles: [pipeline, full]
 
   order-service:
@@ -71,6 +80,7 @@ services:
     environment:
       KAFKA_BROKER: redpanda:9092
       LOG_LEVEL: WARNING
+    logging: *default-logging
     restart: on-failure
     profiles: [pipeline, full]
 
@@ -86,6 +96,7 @@ services:
       LOG_LEVEL: INFO
     ports:
       - "8003:8003"
+    logging: *default-logging
     restart: on-failure
     profiles: [pipeline, full]
 
@@ -100,6 +111,7 @@ services:
       KAFKA_BROKER: redpanda:9092
       LOG_LEVEL: WARNING
       PUBLISH_INTERVAL: "10"
+    logging: *default-logging
     restart: on-failure
     profiles: [full]
 
@@ -118,6 +130,7 @@ services:
       LOG_LEVEL: INFO
     ports:
       - "8000:8000"
+    logging: *default-logging
     profiles: [pipeline, full]
 
   trade-store-consumer:
@@ -134,6 +147,7 @@ services:
       KAFKA_BROKER: redpanda:9092
       DATABASE_URL: postgresql://fixuser:fixpass@postgres:5432/fixdb
       LOG_LEVEL: INFO
+    logging: *default-logging
     restart: on-failure
     profiles: [pipeline, full]
 
@@ -152,6 +166,7 @@ services:
       LOG_LEVEL: INFO
     ports:
       - "8010:8010"
+    logging: *default-logging
     profiles: [pipeline, full]
 
   compliance-consumer:
@@ -168,6 +183,7 @@ services:
       KAFKA_BROKER: redpanda:9092
       DATABASE_URL: postgresql://fixuser:fixpass@postgres:5432/fixdb
       LOG_LEVEL: INFO
+    logging: *default-logging
     restart: on-failure
     profiles: [pipeline, full]
 
@@ -184,6 +200,7 @@ services:
       - prometheus_data:/prometheus
     ports:
       - "9090:9090"
+    logging: *default-logging
     profiles: [monitoring]
 
   grafana:
@@ -201,6 +218,7 @@ services:
       - grafana_data:/var/lib/grafana
     ports:
       - "3000:3000"
+    logging: *default-logging
     profiles: [monitoring]
 
 volumes:
