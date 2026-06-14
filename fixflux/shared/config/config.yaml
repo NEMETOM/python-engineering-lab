@@ -1,0 +1,8 @@
+database:
+  host: localhost
+  port: 5433
+  name: fixdb
+  user: fixuser
+  password: fixpass
+  #jdbc_driver_path: "C:/Users/tomne/AppData/Local/jars/postgresql-42.7.8.jar"
+  jdbc_driver_path: "C:/Dev/jars/postgresql-42.7.8.jar"

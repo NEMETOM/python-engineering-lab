@@ -1,0 +1,57 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fix-gateway
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: fix-gateway
+    {{ include "fixflux.labels" . | nindent 4 }}
+spec:
+  ports:
+    - name: fix-tcp
+      port: 9878
+      targetPort: 9878
+    - name: metrics
+      port: 8001
+      targetPort: 8001
+  selector:
+    app: fix-gateway
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fix-gateway
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: fix-gateway
+    {{ include "fixflux.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.fixGateway.replicas }}
+  selector:
+    matchLabels:
+      app: fix-gateway
+  template:
+    metadata:
+      labels:
+        app: fix-gateway
+    spec:
+      containers:
+        - name: fix-gateway
+          image: {{ include "fixflux.image" (dict "root" . "name" "fix-gateway") }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 9878
+              name: fix-tcp
+            - containerPort: 8001
+              name: metrics
+          envFrom:
+            - configMapRef:
+                name: fixflux-config
+          livenessProbe:
+            tcpSocket:
+              port: 9878
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.fixGateway.resources | nindent 12 }}

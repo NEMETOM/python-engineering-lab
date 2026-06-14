@@ -1,0 +1,159 @@
+namespace: fixflux
+
+# ── Monitoring (Prometheus + Grafana) ────────────────────────────────────────
+monitoring:
+  enabled: true
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    storage: 5Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  grafana:
+    image: grafana/grafana:10.4.2
+    storage: 1Gi
+    adminUser: admin
+    adminPassword: admin
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+
+# ── Image configuration ──────────────────────────────────────────────────────
+# Set registry to your Docker Hub username or private registry prefix.
+# Example: registry: docker.io/myuser
+image:
+  registry: ""
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# ── Redpanda (Kafka-compatible broker) ───────────────────────────────────────
+redpanda:
+  image: docker.redpanda.com/redpandadata/redpanda:v23.3.21
+  storage: 10Gi
+  resources:
+    requests:
+      cpu: 250m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+# ── PostgreSQL ────────────────────────────────────────────────────────────────
+postgres:
+  image: postgres:15-alpine
+  storage: 5Gi
+  credentials:
+    user: fixuser
+    password: fixpass
+    database: fixdb
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# ── Shared application config ─────────────────────────────────────────────────
+config:
+  logLevel: INFO
+  logFormat: json
+  publishInterval: "10"
+
+# ── FIX Gateway ───────────────────────────────────────────────────────────────
+fixGateway:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# ── Order Service ─────────────────────────────────────────────────────────────
+orderService:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# ── Matching Engine ───────────────────────────────────────────────────────────
+matchingEngine:
+  replicas: 1
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+
+# ── Trade Store ───────────────────────────────────────────────────────────────
+tradeStore:
+  api:
+    replicas: 2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# ── Compliance Service ────────────────────────────────────────────────────────
+complianceService:
+  api:
+    replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# ── Risk Service ─────────────────────────────────────────────────────────────
+riskService:
+  replicas: 1
+  limits:
+    notional: "1000000"
+    fatFingerPct: "10.0"
+    grossPosition: "10000"
+    netPosition: "5000"
+    maxOpenOrders: "10"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# ── Market Data Service ───────────────────────────────────────────────────────
+marketDataService:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi

@@ -1,0 +1,17 @@
+apiVersion: v2
+name: fixflux
+description: >
+  FIXFlux - Stateful low-latency FIX Protocol Engine with compliance
+  and surveillance module. Includes FIX gateway, order service, matching engine,
+  trade store, compliance service, and market data service.
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - fix-protocol
+  - trading
+  - matching-engine
+  - compliance
+  - regtech
+maintainers:
+  - name: Tomas Nemeth

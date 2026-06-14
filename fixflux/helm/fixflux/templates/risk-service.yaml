@@ -1,0 +1,39 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: risk-service
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: risk-service
+    {{ include "fixflux.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.riskService.replicas }}
+  selector:
+    matchLabels:
+      app: risk-service
+  template:
+    metadata:
+      labels:
+        app: risk-service
+    spec:
+      containers:
+        - name: risk-service
+          image: {{ include "fixflux.image" (dict "root" . "name" "risk-service") }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: fixflux-config
+          env:
+            - name: RISK_NOTIONAL_LIMIT
+              value: {{ .Values.riskService.limits.notional | quote }}
+            - name: RISK_FAT_FINGER_PCT
+              value: {{ .Values.riskService.limits.fatFingerPct | quote }}
+            - name: RISK_GROSS_POSITION_LIMIT
+              value: {{ .Values.riskService.limits.grossPosition | quote }}
+            - name: RISK_NET_POSITION_LIMIT
+              value: {{ .Values.riskService.limits.netPosition | quote }}
+            - name: RISK_MAX_OPEN_ORDERS
+              value: {{ .Values.riskService.limits.maxOpenOrders | quote }}
+          resources:
+            {{- toYaml .Values.riskService.resources | nindent 12 }}
