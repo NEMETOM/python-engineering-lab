@@ -1,0 +1,25 @@
+# Version control
+.git
+.github
+
+# Python artifacts
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+
+# Test outputs and logs
+**/logs/
+**/.coverage
+**/htmlcov/
+
+# Local environment
+.env
+.env.*
+
+# Editor / OS noise
+.vscode
+.idea
+**/.DS_Store

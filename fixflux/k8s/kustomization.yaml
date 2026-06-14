@@ -1,0 +1,29 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: fixflux
+
+resources:
+  - 00-namespace.yaml
+  - 01-configmap.yaml
+  - 02-secret.yaml
+  - redpanda.yaml
+  - postgres.yaml
+  - fix-gateway.yaml
+  - order-service.yaml
+  - matching-engine.yaml
+  - trade-store.yaml
+  - compliance-service.yaml
+  - market-data-service.yaml
+  - risk-service.yaml
+  - monitoring.yaml
+
+# Builds the Grafana dashboard ConfigMap automatically from the existing JSON file.
+# No need to copy or embed the dashboard - kustomize reads it directly.
+configMapGenerator:
+  - name: grafana-dashboard-json
+    namespace: fixflux
+    options:
+      disableNameSuffixHash: true
+    files:
+      - fix_simulator_overview.json=fix_simulator_overview.json

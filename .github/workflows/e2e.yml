@@ -19,7 +19,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: fix-protocol-simulator-pro
+        working-directory: fixflux
 
     steps:
       - name: Checkout repository
@@ -31,9 +31,9 @@ jobs:
           python-version: '3.11'
           cache: pip
           cache-dependency-path: |
-            fix-protocol-simulator-pro/shared/pyproject.toml
-            fix-protocol-simulator-pro/services/trade-store/pyproject.toml
-            fix-protocol-simulator-pro/services/fix-gateway/pyproject.toml
+            fixflux/shared/pyproject.toml
+            fixflux/services/trade-store/pyproject.toml
+            fixflux/services/fix-gateway/pyproject.toml
 
       - name: Start full Docker pipeline
         run: |

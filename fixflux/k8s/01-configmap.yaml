@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fixflux-config
+  namespace: fixflux
+data:
+  KAFKA_BROKER: "redpanda:9092"
+  LOG_LEVEL: "INFO"
+  LOG_FORMAT: "json"
+  PUBLISH_INTERVAL: "10"
+  RISK_NOTIONAL_LIMIT: "1000000"
+  RISK_FAT_FINGER_PCT: "10.0"
+  RISK_GROSS_POSITION_LIMIT: "10000"
+  RISK_NET_POSITION_LIMIT: "5000"
+  RISK_MAX_OPEN_ORDERS: "10"
