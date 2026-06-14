@@ -1,0 +1,7 @@
+# Runtime drop/output directories - contents are transient, not source
+filedrop/*
+!filedrop/.gitkeep
+processed/*
+!processed/.gitkeep
+rejected/*
+!rejected/.gitkeep
