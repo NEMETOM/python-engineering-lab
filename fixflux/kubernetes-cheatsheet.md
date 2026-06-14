@@ -540,27 +540,20 @@ fix-gateway → raw_orders → order-service → validated_orders
 
 ```bash
 # Check if risk-service is running
-kubectl get pods -n fix-simulator -l app=risk-service
+kubectl get pods -n fixflux -l app=risk-service
 
 # Live logs (shows approved/rejected per order)
-kubectl logs -n fix-simulator deploy/risk-service -f
+kubectl logs -n fixflux deploy/risk-service -f
 
 # Override a limit without rebuilding (takes effect on next restart)
-kubectl set env -n fix-simulator deploy/risk-service RISK_NOTIONAL_LIMIT=5000000
+kubectl set env -n fixflux deploy/risk-service RISK_NOTIONAL_LIMIT=5000000
 
 # Tail rejected orders
-kubectl exec -n fix-simulator <redpanda-pod> -- \
+kubectl exec -n fixflux <redpanda-pod> -- \
   rpk topic consume risk_rejected_orders --offset start
 ```
 
-### Running risk-service BDD tests locally
-
-```bash
-cd fixflux/services/risk-service
-pip install -e .
-pip install behave
-python -m behave tests/bdd/features/
-```
+For local development and BDD testing see the Testing section in [README.md](README.md).
 
 ---
 

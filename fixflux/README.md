@@ -51,25 +51,33 @@ This project was built to go beyond surface-level familiarity with these concept
                ├───────────────┤
                ▼               ▼
  ┌─────────────────────┐  ┌──────────────────────┐
- │  Compliance Service │  │   Matching Engine    │  Price-time priority
- │                     │  │                      │  order book, snapshots
- │  Rules engine       │  └──────┬───────────────┘
- │  Surveillance       │         │
- │  Risk scoring       │  ┌──────┴──────────┐
- │  Audit trail        │  │                 │
- │  REST API :8010     │  ▼                 ▼
- └─────────────────────┘ trades (Kafka)  order_book_updates (Kafka)
-                               │                 │
-                               ▼                 ▼
-                    ┌──────────────────┐  ┌──────────────────────┐
-                    │   Trade Store    │  │  Market Data Service  │
-                    │                  │  │                       │
-                    │  PostgreSQL      │  │  Change-detected pub  │
-                    │  FastAPI :8000   │  │  to market_data topic │
-                    └──────────────────┘  └──────────────────────┘
+ │  Compliance Service │  │    Risk Service       │  MiFID II pre-trade checks:
+ │                     │  │                       │  notional cap, fat-finger,
+ │  Rules engine       │  └──────┬──────────┬─────┘  position limits, open orders
+ │  Surveillance       │         │          │
+ │  Risk scoring       │  risk_approved  risk_rejected
+ │  Audit trail        │         │
+ │  REST API :8010     │         ▼
+ └─────────────────────┘  ┌──────────────────────┐
+                           │   Matching Engine    │  Price-time priority
+                           │                      │  order book, snapshots
+                           └──────┬───────────────┘
+                                  │
+                           ┌──────┴──────────┐
+                           │                 │
+                           ▼                 ▼
+                    trades (Kafka)  order_book_updates (Kafka)
+                           │                 │
+                           ▼                 ▼
+                ┌──────────────────┐  ┌──────────────────────┐
+                │   Trade Store    │  │  Market Data Service  │
+                │                  │  │                       │
+                │  PostgreSQL      │  │  Change-detected pub  │
+                │  FastAPI :8000   │  │  to market_data topic │
+                └──────────────────┘  └──────────────────────┘
 ```
 
-**Message flow:** Client drops a FIX file → FIX Gateway parses and publishes to `raw_orders` → Order Service validates and enriches → Matching Engine applies price-time priority → matched trades fan out to Trade Store (persistence) and Market Data Service (real-time snapshot) in parallel.
+**Message flow:** Client drops a FIX file → FIX Gateway parses and publishes to `raw_orders` → Order Service validates and enriches → Risk Service applies four MiFID II pre-trade checks → approved orders flow to Matching Engine via `risk_approved_orders` → matched trades fan out to Trade Store (persistence) and Market Data Service (real-time snapshot) in parallel. Rejected orders are published to `risk_rejected_orders`.
 
 **Compliance observer:** The Compliance Service taps both `raw_orders` and `validated_orders` as a passive consumer. It applies configurable compliance rules and surveillance detections, persists violations and audit trail records to PostgreSQL, and exposes findings via a dedicated REST API.
 
@@ -86,8 +94,9 @@ This project was built to go beyond surface-level familiarity with these concept
 - **Compliance & Surveillance Module** - A dedicated RegTech microservice that passively observes the order pipeline. Six configurable compliance rules (missing client ID, market hours, trade size, price deviation, duplicate detection, invalid symbol) and four surveillance detections (wash trading, rapid-fire bursts, volume spikes, repeated orders) run against every order. Violations are persisted with SHA-256 tamper-evident audit trail records and are queryable via a REST API with per-client risk scores.
 - **Dead Letter Queue** - FIX messages that fail parsing or validation in the filedrop client are published to a `dead_letter_orders` Kafka topic with the raw line and error reason before the file moves to `rejected/`. Failures are replayable and alertable without manual log inspection.
 - **Kubernetes + Helm Deployment** - Raw manifests (`k8s/`) and a parameterised Helm chart (`helm/fixflux/`) ship alongside the Docker Compose stack. One command deploys the full pipeline to any Kubernetes cluster. The matching engine has a HorizontalPodAutoscaler; compliance policies are mounted from a ConfigMap so rules can be updated without rebuilding the image.
+- **MiFID II Pre-Trade Risk Checks** - A dedicated risk-service sits between `order-service` and `matching-engine` and enforces four checks in sequence: notional cap (`price × qty > 1M`), fat-finger guard (>10% deviation from last trade price), gross/net position limits (10,000 / 5,000 units), and max open orders per client (10). All thresholds are overridable via environment variables. Rejected orders are published to `risk_rejected_orders` with a machine-readable reason; approved orders proceed to `risk_approved_orders`.
 - **Four-Layer Testing** - Unit tests (pytest), component BDD tests (behave + Gherkin), infrastructure integration tests (Kafka pipeline + PostgreSQL persistence), and end-to-end BDD tests that exercise the full flow from FIX file drop to `GET /trades`.
-- **Seven Independent CI/CD Pipelines** - Six per-service pipelines (test, lint, Docker build) triggered on push and daily schedule, plus a dedicated E2E pipeline that starts the full Docker stack and runs the end-to-end BDD suite.
+- **Eight Independent CI/CD Pipelines** - Seven per-service pipelines (test, lint, Docker build) triggered on push and daily schedule, plus a dedicated E2E pipeline that starts the full Docker stack and runs the end-to-end BDD suite.
 
 ---
 
@@ -259,7 +268,8 @@ fixflux/
 |---|---|---|---|
 | **fix-gateway** | - | `raw_orders`, `dead_letter_orders` | Parses FIX `tag=value` messages, identifies message types, manages per-client sessions; publishes rejected lines to dead letter topic |
 | **order-service** | `raw_orders` | `validated_orders` | Validates price/quantity/side rules, assigns UUID order ID, drops invalid orders |
-| **matching-engine** | `validated_orders` | `trades`, `order_book_updates` | Price-time priority matching, partial fills, order book snapshots on each match |
+| **risk-service** | `validated_orders`, `trades` | `risk_approved_orders`, `risk_rejected_orders` | Four MiFID II pre-trade checks: notional cap, fat-finger, gross/net position limits, max open orders; tracks positions from `trades` topic |
+| **matching-engine** | `risk_approved_orders` | `trades`, `order_book_updates` | Price-time priority matching, partial fills, order book snapshots on each match |
 | **market-data-service** | `trades`, `order_book_updates` | `market_data` | Caches best bid/ask/last trade; publishes snapshot only on change |
 | **trade-store** | `trades` | - | Persists trades to PostgreSQL; exposes REST API via FastAPI |
 | **compliance-service** | `raw_orders`, `validated_orders` | - (DB only) | Passive observer: applies compliance rules + surveillance detections; persists violations, risk scores, and audit trail; exposes REST API |
@@ -650,13 +660,14 @@ Result: moved to `rejected/`, error logged by the order service.
 Each service has isolated unit tests with mocked infrastructure (Kafka, DB). Coverage is reported per service.
 
 ```bash
-cd services/matching-engine   && python -m pytest -v
-cd services/order-service     && python -m pytest -v
-cd services/trade-store       && python -m pytest -v
+cd services/matching-engine    && python -m pytest -v
+cd services/order-service      && python -m pytest -v
+cd services/risk-service       && python -m pytest -v
+cd services/trade-store        && python -m pytest -v
 cd services/market-data-service && python -m pytest -v
-cd services/fix-gateway       && python -m pytest -v
+cd services/fix-gateway        && python -m pytest -v
 cd services/compliance-service && python -m pytest -v
-cd shared                     && python -m pytest -v
+cd shared                      && python -m pytest -v
 ```
 
 ### BDD Component Tests (Gherkin)
@@ -666,9 +677,19 @@ Business behaviour is specified as Gherkin feature files and executed with behav
 ```bash
 cd services/matching-engine    && python -m behave tests/bdd/features/
 cd services/order-service      && python -m behave tests/bdd/features/
+cd services/risk-service       && python -m behave tests/bdd/features/
 cd services/trade-store        && python -m behave tests/bdd/features/
+cd services/market-data-service && python -m behave tests/bdd/features/
 cd services/compliance-service && python -m behave tests/bdd/features/
 ```
+
+The risk-service BDD suite covers three feature files:
+
+| Feature | Scenarios |
+|---|---|
+| `risk_checks.feature` | Notional cap approved/rejected, fat-finger approved/rejected/skipped (no ref price) |
+| `position_limits.feature` | Gross/net position approved/rejected, max open orders, fills release slots |
+| `risk_pipeline.feature` | Approved orders forwarded, rejected orders sent to rejected topic, trades update last price |
 
 The compliance BDD suite covers two feature files:
 
@@ -753,6 +774,11 @@ In CI, E2E tests run in a dedicated workflow (`e2e.yml`) triggered manually or o
 | `LOG_LEVEL` | `INFO` | All services |
 | `LOG_FORMAT` | `plain` | All services (`json` for structured logs) |
 | `PUBLISH_INTERVAL` | `10` | market-data-service |
+| `RISK_NOTIONAL_LIMIT` | `1000000` | risk-service - rejects if `price × qty` exceeds this |
+| `RISK_FAT_FINGER_PCT` | `10.0` | risk-service - rejects if order price deviates >N% from last trade |
+| `RISK_GROSS_POSITION_LIMIT` | `10000` | risk-service - max absolute position per client per symbol |
+| `RISK_NET_POSITION_LIMIT` | `5000` | risk-service - max net long or short per client per symbol |
+| `RISK_MAX_OPEN_ORDERS` | `10` | risk-service - max unmatched open orders per client |
 
 ---
 
