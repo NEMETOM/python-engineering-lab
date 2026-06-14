@@ -12,7 +12,9 @@ class TestConsumerRun:
             from matching_engine.consumer import run
 
             run()
-            mock_create.assert_called_once_with("risk_approved_orders", "matching-engine")
+            mock_create.assert_called_once_with(
+                "risk_approved_orders", "matching-engine"
+            )
 
     def test_no_orders_no_trades_sent(self):
         with (
