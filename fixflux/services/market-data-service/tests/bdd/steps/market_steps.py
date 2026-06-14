@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 from behave import given, then, use_step_matcher, when
+
 from market_data_service.market_cache import MarketCache
 from market_data_service.publisher import MarketPublisher
 
