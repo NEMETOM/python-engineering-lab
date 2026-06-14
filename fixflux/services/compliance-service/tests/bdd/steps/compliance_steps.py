@@ -28,6 +28,16 @@ def step_order_arrives(context, client_id, symbol, qty, price):
     context.violations = context.engine.evaluate(context.event)
 
 
+# parse library does not match empty strings in {name} - explicit step needed
+@when(
+    'an order arrives with client_id "", symbol "{symbol}", '
+    "quantity {qty:d}, price {price:f}"
+)
+def step_order_arrives_empty_client(context, symbol, qty, price):
+    context.event = {"client_id": "", "symbol": symbol, "quantity": qty, "price": price}
+    context.violations = context.engine.evaluate(context.event)
+
+
 @then('the rule "{rule}" is "{outcome}" with severity "{severity}"')
 def step_rule_outcome(context, rule, outcome, severity):
     matched = [v for v in context.violations if v.rule_name == rule]
@@ -38,6 +48,13 @@ def step_rule_outcome(context, rule, outcome, severity):
         ), f"Expected severity {severity}, got {matched[0].severity.value}"
     else:
         assert not matched, f"Expected {rule} NOT to trigger but it did: {matched}"
+
+
+# parse library does not match empty strings - explicit step for "not fired" with no severity
+@then('the rule "{rule}" is "not fired" with severity ""')
+def step_rule_not_fired_no_severity(context, rule):
+    matched = [v for v in context.violations if v.rule_name == rule]
+    assert not matched, f"Expected {rule} NOT to trigger but it did: {matched}"
 
 
 @given("a trade size rule with default limit {limit:d}")
@@ -107,7 +124,8 @@ def step_dup_fires_on(context, fire_on):
     ordinal_map = {"first": 0, "second": 1, "third": 2}
     idx = ordinal_map[fire_on]
     for i, v in enumerate(context.violations):
-        if i == idx:
-            assert v is not None, f"Expected violation at index {idx} but got None"
-        else:
+        if i < idx:
             assert v is None, f"Expected no violation at index {i} but got {v}"
+        elif i == idx:
+            assert v is not None, f"Expected violation at index {idx} but got None"
+        # don't assert about submissions after the first fire

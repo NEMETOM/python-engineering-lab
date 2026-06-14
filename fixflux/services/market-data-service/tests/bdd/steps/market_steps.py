@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock, patch
+
 from behave import given, then, use_step_matcher, when
 
 from market_data_service.market_cache import MarketCache
@@ -30,8 +32,11 @@ def receive_order_book(context, bid, ask):
 
 @when("the publisher publishes")
 def publisher_publishes(context):
-    publisher = MarketPublisher(context.cache)
-    publisher.publish()
+    with patch(
+        "market_data_service.publisher.create_producer", return_value=MagicMock()
+    ):
+        publisher = MarketPublisher(context.cache)
+        publisher.publish()
     context.published_snapshot = context.cache.snapshot()
 
 
