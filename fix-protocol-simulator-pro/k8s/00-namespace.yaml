@@ -1,6 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: fix-simulator
-  labels:
-    app.kubernetes.io/part-of: fix-simulator-pro

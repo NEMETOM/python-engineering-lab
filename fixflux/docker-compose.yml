@@ -1,0 +1,247 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v23.3.21
+    command:
+      - redpanda
+      - start
+      - --smp=1
+      - --memory=256M
+      - --overprovisioned
+      - --kafka-addr=INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:29092
+      - --advertise-kafka-addr=INTERNAL://redpanda:9092,EXTERNAL://localhost:9092
+      - --rpc-addr=redpanda:33145
+      - --advertise-rpc-addr=redpanda:33145
+    ports:
+      - "9092:29092"
+    volumes:
+      - redpanda_data:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster info > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 45s
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 320m
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: fixuser
+      POSTGRES_PASSWORD: fixpass
+      POSTGRES_DB: fixdb
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fixuser -d fixdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  fix-gateway:
+    build:
+      context: .
+      dockerfile: services/fix-gateway/Dockerfile
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER: redpanda:9092
+      LOG_LEVEL: WARNING
+    ports:
+      - "8001:8001"
+    logging: *default-logging
+    profiles: [pipeline, full]
+
+  order-service:
+    build:
+      context: .
+      dockerfile: services/order-service/Dockerfile
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER: redpanda:9092
+      LOG_LEVEL: WARNING
+    logging: *default-logging
+    restart: on-failure
+    profiles: [pipeline, full]
+
+  risk-service:
+    build:
+      context: .
+      dockerfile: services/risk-service/Dockerfile
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER: redpanda:9092
+      LOG_LEVEL: WARNING
+      RISK_NOTIONAL_LIMIT: "1000000"
+      RISK_FAT_FINGER_PCT: "10.0"
+      RISK_GROSS_POSITION_LIMIT: "10000"
+      RISK_NET_POSITION_LIMIT: "5000"
+      RISK_MAX_OPEN_ORDERS: "10"
+    logging: *default-logging
+    restart: on-failure
+    profiles: [pipeline, full]
+
+  matching-engine:
+    build:
+      context: .
+      dockerfile: services/matching-engine/Dockerfile
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER: redpanda:9092
+      LOG_LEVEL: INFO
+    ports:
+      - "8003:8003"
+    logging: *default-logging
+    restart: on-failure
+    profiles: [pipeline, full]
+
+  market-data-service:
+    build:
+      context: .
+      dockerfile: services/market-data-service/Dockerfile
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER: redpanda:9092
+      LOG_LEVEL: WARNING
+      PUBLISH_INTERVAL: "10"
+    logging: *default-logging
+    restart: on-failure
+    profiles: [full]
+
+  trade-store:
+    build:
+      context: .
+      dockerfile: services/trade-store/Dockerfile
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER: redpanda:9092
+      DATABASE_URL: postgresql://fixuser:fixpass@postgres:5432/fixdb
+      LOG_LEVEL: INFO
+    ports:
+      - "8000:8000"
+    logging: *default-logging
+    profiles: [pipeline, full]
+
+  trade-store-consumer:
+    build:
+      context: .
+      dockerfile: services/trade-store/Dockerfile
+    command: ["python", "-m", "trade_store.consumer"]
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER: redpanda:9092
+      DATABASE_URL: postgresql://fixuser:fixpass@postgres:5432/fixdb
+      LOG_LEVEL: INFO
+    logging: *default-logging
+    restart: on-failure
+    profiles: [pipeline, full]
+
+  compliance-api:
+    build:
+      context: .
+      dockerfile: services/compliance-service/Dockerfile
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER: redpanda:9092
+      DATABASE_URL: postgresql://fixuser:fixpass@postgres:5432/fixdb
+      LOG_LEVEL: INFO
+    ports:
+      - "8010:8010"
+    logging: *default-logging
+    profiles: [pipeline, full]
+
+  compliance-consumer:
+    build:
+      context: .
+      dockerfile: services/compliance-service/Dockerfile
+    command: ["python", "-m", "compliance_service.consumer"]
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER: redpanda:9092
+      DATABASE_URL: postgresql://fixuser:fixpass@postgres:5432/fixdb
+      LOG_LEVEL: INFO
+    logging: *default-logging
+    restart: on-failure
+    profiles: [pipeline, full]
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+      - "--web.enable-lifecycle"
+    volumes:
+      - ./infrastructure/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    logging: *default-logging
+    profiles: [monitoring]
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    depends_on:
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/fix_simulator_overview.json
+    volumes:
+      - ./infrastructure/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infrastructure/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    logging: *default-logging
+    profiles: [monitoring]
+
+volumes:
+  postgres_data:
+  redpanda_data:
+  prometheus_data:
+  grafana_data:

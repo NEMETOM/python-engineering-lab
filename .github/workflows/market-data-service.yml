@@ -3,13 +3,13 @@ name: Market Data Service CI
 on:
   push:
     paths:
-      - 'fix-protocol-simulator-pro/services/market-data-service/**'
-      - 'fix-protocol-simulator-pro/shared/**'
+      - 'fixflux/services/market-data-service/**'
+      - 'fixflux/shared/**'
       - '.github/workflows/market-data-service.yml'
   pull_request:
     paths:
-      - 'fix-protocol-simulator-pro/services/market-data-service/**'
-      - 'fix-protocol-simulator-pro/shared/**'
+      - 'fixflux/services/market-data-service/**'
+      - 'fixflux/shared/**'
       - '.github/workflows/market-data-service.yml'
   workflow_dispatch: # allow manual runs from the Actions tab
   schedule:
@@ -34,7 +34,7 @@ jobs:
     # All `run:` steps default to the project root unless overridden per-step.
     defaults:
       run:
-        working-directory: fix-protocol-simulator-pro
+        working-directory: fixflux
 
     steps:
       # ── 1. Source code ────────────────────────────────────────────────────────
@@ -49,8 +49,8 @@ jobs:
           # Cache pip's download cache keyed on both dependency manifests.
           cache: pip
           cache-dependency-path: |
-            fix-protocol-simulator-pro/shared/pyproject.toml
-            fix-protocol-simulator-pro/services/market-data-service/pyproject.toml
+            fixflux/shared/pyproject.toml
+            fixflux/services/market-data-service/pyproject.toml
 
       # ── 3. Shared platform library ────────────────────────────────────────────
       # Must be installed before the service because the service imports from it.
@@ -61,14 +61,14 @@ jobs:
 
       # ── 4. Service + test tools ───────────────────────────────────────────────
       - name: Install service and test tools
-        working-directory: fix-protocol-simulator-pro/services/market-data-service
+        working-directory: fixflux/services/market-data-service
         run: |
           pip install -e .
           pip install pytest pytest-cov ruff black isort mypy
 
       # ── 5. Unit tests with coverage ───────────────────────────────────────────
       - name: Run pytest with coverage
-        working-directory: fix-protocol-simulator-pro/services/market-data-service
+        working-directory: fixflux/services/market-data-service
         run: |
           python -m pytest \
             --cov=src \
@@ -80,7 +80,7 @@ jobs:
 
       # ── 5b. Lint ────────────────────────────────────────────
       - name: Lint (ruff, black, isort, mypy)
-        working-directory: fix-protocol-simulator-pro/services/market-data-service
+        working-directory: fixflux/services/market-data-service
         run: |
           python -m ruff check .
           python -m black --check .
@@ -89,7 +89,7 @@ jobs:
 
       # Optional: component BDD tests (uncomment when behave is available in CI)
       # - name: Run BDD tests
-      #   working-directory: fix-protocol-simulator-pro/services/market-data-service
+      #   working-directory: fixflux/services/market-data-service
       #   run: python -m behave tests/bdd/features/
 
       # Optional: publish coverage XML as a build artifact
@@ -97,10 +97,10 @@ jobs:
       #   uses: actions/upload-artifact@v4
       #   with:
       #     name: market-data-service-coverage
-      #     path: fix-protocol-simulator-pro/services/market-data-service/coverage.xml
+      #     path: fixflux/services/market-data-service/coverage.xml
 
       # ── 6. Docker image ───────────────────────────────────────────────────────
-      # Build context is fix-protocol-simulator-pro/ so the Dockerfile can
+      # Build context is fixflux/ so the Dockerfile can
       # COPY shared/ alongside the service source.
       - name: Build Docker image
         run: |

@@ -3,13 +3,13 @@ name: Compliance Service CI
 on:
   push:
     paths:
-      - 'fix-protocol-simulator-pro/services/compliance-service/**'
-      - 'fix-protocol-simulator-pro/shared/**'
+      - 'fixflux/services/compliance-service/**'
+      - 'fixflux/shared/**'
       - '.github/workflows/compliance-service.yml'
   pull_request:
     paths:
-      - 'fix-protocol-simulator-pro/services/compliance-service/**'
-      - 'fix-protocol-simulator-pro/shared/**'
+      - 'fixflux/services/compliance-service/**'
+      - 'fixflux/shared/**'
       - '.github/workflows/compliance-service.yml'
   workflow_dispatch:
   schedule:
@@ -29,7 +29,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: fix-protocol-simulator-pro
+        working-directory: fixflux
 
     steps:
       - name: Checkout repository
@@ -41,20 +41,20 @@ jobs:
           python-version: '3.11'
           cache: pip
           cache-dependency-path: |
-            fix-protocol-simulator-pro/shared/pyproject.toml
-            fix-protocol-simulator-pro/services/compliance-service/pyproject.toml
+            fixflux/shared/pyproject.toml
+            fixflux/services/compliance-service/pyproject.toml
 
       - name: Install shared module
         run: pip install -e ./shared
 
       - name: Install service and test tools
-        working-directory: fix-protocol-simulator-pro/services/compliance-service
+        working-directory: fixflux/services/compliance-service
         run: |
           pip install -e .
           pip install pytest pytest-cov ruff black isort mypy httpx behave
 
       - name: Run pytest with coverage
-        working-directory: fix-protocol-simulator-pro/services/compliance-service
+        working-directory: fixflux/services/compliance-service
         run: |
           python -m pytest \
             --cov=src \
@@ -64,7 +64,7 @@ jobs:
             -v
 
       - name: Lint (ruff, black, isort, mypy)
-        working-directory: fix-protocol-simulator-pro/services/compliance-service
+        working-directory: fixflux/services/compliance-service
         run: |
           python -m ruff check .
           python -m black --check .
