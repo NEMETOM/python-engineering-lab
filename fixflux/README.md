@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/FixFlux-Logo.png" width="120" alt="FIXFlux" />
+</p>
+
 # FIXFlux | Stateful Low-Latency FIX Protocol Engine
 
 [![Fix Gateway CI](https://github.com/NEMETOM/python-engineering-lab/actions/workflows/fix-gateway.yml/badge.svg)](https://github.com/NEMETOM/python-engineering-lab/actions/workflows/fix-gateway.yml)
