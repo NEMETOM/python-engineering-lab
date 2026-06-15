@@ -588,19 +588,19 @@ If you deployed with Helm instead of kubectl:
 
 ```bash
 # Install
-helm install fix-simulator ./helm/fixflux \
-  --namespace fix-simulator --create-namespace
+helm install fixflux ./helm/fixflux \
+  --namespace fixflux --create-namespace
 
 # See what's installed
-helm list -n fix-simulator
+helm list -n fixflux
 
 # Upgrade after a code change
-helm upgrade fix-simulator ./helm/fixflux \
-  --namespace fix-simulator --set image.tag=latest
+helm upgrade fixflux ./helm/fixflux \
+  --namespace fixflux --set image.tag=latest
 
 # Uninstall (removes everything including PVCs)
-helm uninstall fix-simulator --namespace fix-simulator
-kubectl delete namespace fix-simulator
+helm uninstall fixflux --namespace fixflux
+kubectl delete namespace fixflux
 ```
 
 ---
@@ -609,16 +609,119 @@ kubectl delete namespace fix-simulator
 
 ```
 Deploy:           kubectl apply -k k8s/
-Status:           kubectl get pods -n fix-simulator
-Logs:             kubectl logs -n fix-simulator deploy/<service> -f
-Crash logs:       kubectl logs -n fix-simulator <pod-name> --previous
-Describe pod:     kubectl describe pod -n fix-simulator <pod-name>
-API access:       kubectl port-forward -n fix-simulator svc/trade-store 8000:8000
-DB access:        kubectl port-forward -n fix-simulator svc/postgres 5433:5432
-Restart one:      kubectl rollout restart -n fix-simulator deploy/<service>
-Restart all:      kubectl rollout restart deployment statefulset -n fix-simulator
-Scale:            kubectl scale -n fix-simulator deploy/<service> --replicas=N
-Edit rules:       kubectl edit configmap -n fix-simulator compliance-policies
-Check services:   kubectl get svc -n fix-simulator
+Status:           kubectl get pods -n fixflux
+Logs:             kubectl logs -n fixflux deploy/<service> -f
+Crash logs:       kubectl logs -n fixflux <pod-name> --previous
+Describe pod:     kubectl describe pod -n fixflux <pod-name>
+API access:       kubectl port-forward -n fixflux svc/trade-store 8000:8000
+DB access:        kubectl port-forward -n fixflux svc/postgres 5433:5432
+Restart one:      kubectl rollout restart -n fixflux deploy/<service>
+Restart all:      kubectl rollout restart deployment statefulset -n fixflux
+Scale:            kubectl scale -n fixflux deploy/<service> --replicas=N
+Edit rules:       kubectl edit configmap -n fixflux compliance-policies
+Check services:   kubectl get svc -n fixflux
 Tear down:        kubectl delete -k k8s/
 ```
+
+---
+
+## 22. Housekeeping & Disk Space Management
+
+Docker's WSL2 virtual disk (`docker_data.vhdx`) grows as you build images and run containers but does **not** shrink automatically when you delete them. On a laptop with a single drive this will eventually starve Kubernetes - etcd cannot write state and the cluster fails to start.
+
+### Check how much space Docker is using
+
+```bash
+docker system df
+```
+
+```
+TYPE            TOTAL     ACTIVE    SIZE      RECLAIMABLE
+Images          23        8         18.4GB    12.1GB (65%)
+Containers      4         4         1.2MB     0B (0%)
+Local Volumes   3         3         412MB     0B (0%)
+Build Cache     47        0         3.8GB     3.8GB
+```
+
+### Prune unused Docker data (safe - only removes stopped containers and untagged images)
+
+```bash
+# Remove stopped containers, dangling images, unused networks, build cache
+docker system prune -f
+
+# Also remove ALL unused images (not just dangling) - more aggressive
+docker system prune -af
+
+# Also remove unused volumes (careful - this deletes persistent data)
+docker system prune -af --volumes
+```
+
+Run `docker system prune -f` weekly to keep the vhdx from growing unchecked.
+
+### Compact the vhdx - reclaim deleted space back to Windows
+
+Pruning removes data inside the virtual disk but the `.vhdx` file on Windows stays the same size until you compact it. Do this after a big prune:
+
+```powershell
+# 1. Shut down WSL2 first (Docker Desktop must be stopped)
+wsl --shutdown
+
+# 2. Compact via diskpart (built into Windows - no extra tools needed)
+diskpart
+```
+
+Inside diskpart:
+```
+select vdisk file="C:\Users\tomne\AppData\Local\Docker\wsl\disk\docker_data.vhdx"
+attach vdisk readonly
+compact vdisk
+detach vdisk
+exit
+```
+
+Or if Hyper-V tools are available (faster):
+```powershell
+Optimize-VHD -Path "$env:LOCALAPPDATA\Docker\wsl\disk\docker_data.vhdx" -Mode Full
+```
+
+Restart Docker Desktop afterwards.
+
+### Fix: Kubernetes fails to start after Docker Desktop crashes
+
+Docker Desktop's backend crashes when Windows sleeps/hibernates while it is running (`exit status 0x40010004` in the host log). Each crash leaves the Kubernetes etcd state corrupted.
+
+**Quick fix** (preserves all your images and containers):
+
+Docker Desktop → Settings → Kubernetes → **Reset Kubernetes cluster** → Apply & Restart
+
+**If Reset Kubernetes cluster does not help:**
+
+```powershell
+wsl --shutdown
+# Wait 10 seconds, then reopen Docker Desktop
+```
+
+**Last resort** (wipes everything):
+
+Docker Desktop → Troubleshoot → **Reset to factory defaults**
+
+### Prevent crashes: set a WSL2 memory cap
+
+Docker Desktop uses WSL2 which by default can consume all available RAM. When Windows runs low on memory it kills the WSL2 process, which crashes Docker Desktop and corrupts Kubernetes state. Add a cap:
+
+Create or edit `C:\Users\tomne\.wslconfig`:
+
+```ini
+[wsl2]
+memory=4GB      # limit WSL2 to 4 GB (adjust to your machine)
+swap=2GB
+processors=4
+```
+
+Then restart WSL2:
+
+```powershell
+wsl --shutdown
+```
+
+Reopen Docker Desktop. This prevents the OOM kill cycle that causes the recurring crashes.
