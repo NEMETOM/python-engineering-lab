@@ -22,52 +22,54 @@
 ### 1.1 Infrastructure Overview
 
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│  DigitalOcean Region (e.g. AMS3 or LON1)                             │
-│                                                                       │
-│  ┌──────────────────────────────────────────────────────────────┐    │
-│  │  Premium Droplet: fix-sim-prod                               │    │
-│  │  Ubuntu 24.04 LTS | 2 vCPU | 4GB RAM | 80GB NVMe            │    │
-│  │                                                              │    │
-│  │  ┌────────────────────────────────────────────────────────┐  │    │
-│  │  │  k3s single-node cluster (namespace: fix-simulator)    │  │    │
-│  │  │                                                        │  │    │
-│  │  │  ┌──────────┐  ┌──────────────┐  ┌─────────────────┐  │  │    │
-│  │  │  │ redpanda │  │  postgres    │  │   prometheus    │  │  │    │
-│  │  │  │ (SS)     │  │  (SS)        │  │   + grafana     │  │  │    │
-│  │  │  │ 10Gi PVC │  │  5Gi PVC     │  │   6Gi PVC       │  │  │    │
-│  │  │  └──────────┘  └──────────────┘  └─────────────────┘  │  │    │
-│  │  │                                                        │  │    │
-│  │  │  ┌───────────┐ ┌─────────────┐ ┌──────────────────┐  │  │    │
-│  │  │  │fix-gateway│ │order-service│ │ matching-engine  │  │  │    │
-│  │  │  │port 9878  │ │  (consumer) │ │   (HPA 1-3)      │  │  │    │
-│  │  │  └───────────┘ └─────────────┘ └──────────────────┘  │  │    │
-│  │  │                                                        │  │    │
-│  │  │  ┌───────────┐ ┌──────────────────┐ ┌─────────────┐  │  │    │
-│  │  │  │trade-store│ │compliance-api    │ │market-data  │  │  │    │
-│  │  │  │api+consumer│ │+consumer         │ │service      │  │  │    │
-│  │  │  └───────────┘ └──────────────────┘ └─────────────┘  │  │    │
-│  │  │                                                        │  │    │
-│  │  │  ┌──────────────────────────────────────────────────┐  │  │    │
-│  │  │  │  Traefik IngressController (k3s built-in)        │  │  │    │
-│  │  │  │  IngressRoute → trade-store :8000                │  │  │    │
-│  │  │  │  IngressRoute → compliance-api :8010             │  │  │    │
-│  │  │  │  IngressRoute → grafana :3000                    │  │  │    │
-│  │  │  └──────────────────────────────────────────────────┘  │  │    │
-│  │  └────────────────────────────────────────────────────────┘  │    │
-│  │                                                              │    │
-│  │  DigitalOcean Firewall (UFW equivalent)                      │    │
-│  │    Inbound:  22 (SSH), 80/443 (Traefik), 9878 (FIX TCP)     │    │
-│  │    Outbound: unrestricted                                    │    │
-│  └──────────────────────────────────────────────────────────────┘    │
-│                                                                       │
-│  ┌─────────────────────────────────┐                                  │
-│  │  DigitalOcean Container Registry│  (DOCR - free tier: 1 repo)     │
-│  │  registry.digitalocean.com/     │                                  │
-│  │  <your-org>/fix-sim:*           │                                  │
-│  └─────────────────────────────────┘                                  │
-└──────────────────────────────────────────────────────────────────────┘
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚  DigitalOcean Region (e.g. AMS3 or LON1)                             â”‚
+â”‚                                                                       â”‚
+â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”    â”‚
+â”‚  â”‚  Premium Droplet: fixflux-prod                               â”‚    â”‚
+â”‚  â”‚  Ubuntu 24.04 LTS | 2 vCPU | 4GB RAM | 80GB NVMe            â”‚    â”‚
+â”‚  â”‚                                                              â”‚    â”‚
+â”‚  â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”‚    â”‚
+â”‚  â”‚  â”‚  k3s single-node cluster (namespace: fixflux)    â”‚  â”‚    â”‚
+â”‚  â”‚  â”‚                                                        â”‚  â”‚    â”‚
+â”‚  â”‚  â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”‚  â”‚    â”‚
+â”‚  â”‚  â”‚  â”‚ redpanda â”‚  â”‚  postgres    â”‚  â”‚   prometheus    â”‚  â”‚  â”‚    â”‚
+â”‚  â”‚  â”‚  â”‚ (SS)     â”‚  â”‚  (SS)        â”‚  â”‚   + grafana     â”‚  â”‚  â”‚    â”‚
+â”‚  â”‚  â”‚  â”‚ 10Gi PVC â”‚  â”‚  5Gi PVC     â”‚  â”‚   6Gi PVC       â”‚  â”‚  â”‚    â”‚
+â”‚  â”‚  â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â”‚  â”‚    â”‚
+â”‚  â”‚  â”‚                                                        â”‚  â”‚    â”‚
+â”‚  â”‚  â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â” â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â” â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”‚  â”‚    â”‚
+â”‚  â”‚  â”‚  â”‚fix-gatewayâ”‚ â”‚order-serviceâ”‚ â”‚ matching-engine  â”‚  â”‚  â”‚    â”‚
+â”‚  â”‚  â”‚  â”‚port 9878  â”‚ â”‚  (consumer) â”‚ â”‚   (HPA 1-3)      â”‚  â”‚  â”‚    â”‚
+â”‚  â”‚  â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜ â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜ â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â”‚  â”‚    â”‚
+â”‚  â”‚  â”‚                                                        â”‚  â”‚    â”‚
+â”‚  â”‚  â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â” â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â” â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”‚  â”‚    â”‚
+â”‚  â”‚  â”‚  â”‚trade-storeâ”‚ â”‚compliance-api    â”‚ â”‚market-data  â”‚  â”‚  â”‚    â”‚
+â”‚  â”‚  â”‚  â”‚api+consumerâ”‚ â”‚+consumer         â”‚ â”‚service      â”‚  â”‚  â”‚    â”‚
+â”‚  â”‚  â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜ â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜ â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â”‚  â”‚    â”‚
+â”‚  â”‚  â”‚                                                        â”‚  â”‚    â”‚
+â”‚  â”‚  â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”‚  â”‚    â”‚
+â”‚  â”‚  â”‚  â”‚  Traefik IngressController (k3s built-in)        â”‚  â”‚  â”‚    â”‚
+â”‚  â”‚  â”‚  â”‚  IngressRoute â†’ trade-store :8000                â”‚  â”‚  â”‚    â”‚
+â”‚  â”‚  â”‚  â”‚  IngressRoute â†’ compliance-api :8010             â”‚  â”‚  â”‚    â”‚
+â”‚  â”‚  â”‚  â”‚  IngressRoute â†’ grafana :3000                    â”‚  â”‚  â”‚    â”‚
+â”‚  â”‚  â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â”‚  â”‚    â”‚
+â”‚  â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â”‚    â”‚
+â”‚  â”‚                                                              â”‚    â”‚
+â”‚  â”‚  DigitalOcean Firewall (UFW equivalent)                      â”‚    â”‚
+â”‚  â”‚    Inbound:  22 (SSH), 80/443 (Traefik), 9878 (FIX TCP)     â”‚    â”‚
+â”‚  â”‚    Outbound: unrestricted                                    â”‚    â”‚
+â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜    â”‚
+â”‚                                                                       â”‚
+â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”                                  â”‚
+â”‚  â”‚  DigitalOcean Container Registryâ”‚  (DOCR - free tier: 1 repo)     â”‚
+â”‚  â”‚  registry.digitalocean.com/     â”‚                                  â”‚
+â”‚  â”‚  <your-org>/fixflux:*           â”‚                                  â”‚
+â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜                                  â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 ```
+
+> **risk-service note:** risk-service sits between order-service and matching-engine (`validated_orders` → risk-service → `risk_approved_orders` / `risk_rejected_orders` → matching-engine). It is omitted from the ASCII topology above for width, but is deployed as a standard pod alongside the other application services.
 
 ### 1.2 Droplet Sizing Analysis
 
@@ -91,8 +93,9 @@
 | fix-gateway + order-service | 256Mi + 256Mi |
 | trade-store-api + trade-store-consumer | 256Mi + 256Mi |
 | market-data-service | 256Mi |
+| risk-service | 256Mi |
 | grafana | 256Mi |
-| **Total** | **~5.4Gi** |
+| **Total** | **~5.7Gi** |
 
 **The total limits slightly exceed physical RAM - this is normal for limit-based scheduling.** The key constraint is requests (~2.3Gi) which are well within the 4GB minus overhead (~3.4Gi usable). Kubernetes only evicts pods when the node is memory-pressured; limits are a ceiling per pod, not a reservation. The one risk is redpanda: if it approaches its 600Mi limit and other pods are also peaking simultaneously, the kernel OOM killer may intervene. See Section 2.3 for the mitigation.
 
@@ -114,10 +117,10 @@ On Docker Desktop, `LoadBalancer` type services expose on `localhost` automatica
 
 | Local (Docker Desktop) | Cloud (k3s on DO) | Reason |
 |---|---|---|
-| `LoadBalancer` → `localhost:8000` | `ClusterIP` + Traefik `IngressRoute` | No extra cost; HTTPS termination |
-| `LoadBalancer` → `localhost:9092` | `NodePort 30092` | Kafka protocol - not HTTP, can't use ingress |
-| `LoadBalancer` → `localhost:5433` | `ClusterIP` only | DB not public; connect via SSH tunnel |
-| `LoadBalancer` → `localhost:3000` | `ClusterIP` + Traefik `IngressRoute` | Grafana behind HTTPS |
+| `LoadBalancer` â†’ `localhost:8000` | `ClusterIP` + Traefik `IngressRoute` | No extra cost; HTTPS termination |
+| `LoadBalancer` â†’ `localhost:9092` | `NodePort 30092` | Kafka protocol - not HTTP, can't use ingress |
+| `LoadBalancer` â†’ `localhost:5433` | `ClusterIP` only | DB not public; connect via SSH tunnel |
+| `LoadBalancer` â†’ `localhost:3000` | `ClusterIP` + Traefik `IngressRoute` | Grafana behind HTTPS |
 
 ---
 
@@ -215,7 +218,7 @@ monitoring:
 # Ingress (Traefik, k3s default)
 ingress:
   enabled: true
-  host: "fix-sim.yourdomain.com"   # replace with real domain or DO droplet IP
+  host: "fixflux.yourdomain.com"   # replace with real domain or DO droplet IP
   tls: true
   annotations:
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
@@ -224,8 +227,8 @@ ingress:
 Deploy with:
 
 ```bash
-helm upgrade --install fix-simulator ./helm/fixflux \
-  --namespace fix-simulator \
+helm upgrade --install fixflux ./helm/fixflux \
+  --namespace fixflux \
   --create-namespace \
   -f helm/values-digitalocean.yaml
 ```
@@ -259,7 +262,7 @@ k3s ships with Traefik v2. Add these resources (not currently in `k8s/` or `helm
 apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
 metadata:
-  name: fix-simulator-http
+  name: fixflux-http
   namespace: {{ .Values.namespace }}
 spec:
   entryPoints:
@@ -328,7 +331,7 @@ jobs:
           DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DO_TOKEN }}
       - name: Build and push images
         run: |
-          for svc in fix-gateway order-service matching-engine trade-store compliance-service market-data-service; do
+          for svc in fix-gateway order-service risk-service matching-engine trade-store compliance-service market-data-service; do
             docker build -f services/$svc/Dockerfile \
               -t registry.digitalocean.com/${{ vars.DOCR_ORG }}/$svc:${{ github.sha }} \
               -t registry.digitalocean.com/${{ vars.DOCR_ORG }}/$svc:latest .
@@ -340,11 +343,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Set kubectl context
-        run: doctl kubernetes cluster kubeconfig save fix-sim-prod  # if using DOKS, else SSH
+        run: doctl kubernetes cluster kubeconfig save fixflux-prod  # if using DOKS, else SSH
       - name: Helm upgrade
         run: |
-          helm upgrade --install fix-simulator ./helm/fixflux \
-            --namespace fix-simulator --create-namespace \
+          helm upgrade --install fixflux ./helm/fixflux \
+            --namespace fixflux --create-namespace \
             -f helm/values-digitalocean.yaml \
             --set image.tag=${{ github.sha }} \
             --wait --timeout 5m
@@ -384,6 +387,10 @@ The existing `monitoring.yaml` scrape config targets services by name within the
 - job_name: market-data-service
   static_configs:
     - targets: ["market-data-service:8002"]  # verify port
+
+- job_name: risk-service
+  static_configs:
+    - targets: ["risk-service:8003"]  # verify port
 ```
 
 ### 3.3 Existing Grafana Dashboard Migration
@@ -494,7 +501,7 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: image-pruner
-  namespace: fix-simulator
+  namespace: fixflux
 spec:
   schedule: "0 3 * * 0"   # 03:00 UTC every Sunday
   jobTemplate:
@@ -532,7 +539,7 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: pvc-monitor
-  namespace: fix-simulator
+  namespace: fixflux
 spec:
   schedule: "0 * * * *"   # every hour
   jobTemplate:
@@ -590,7 +597,7 @@ USED=$(df / | awk 'NR==2{print $5}' | tr -d '%')
 
 if [ "$USED" -gt "$THRESHOLD" ]; then
     echo "WARNING: root disk at ${USED}%" | \
-    mail -s "fix-sim-prod disk alert" tomas.nemeth@dataddo.com
+    mail -s "fixflux-prod disk alert" tomas.nemeth@dataddo.com
 fi
 ```
 
@@ -605,17 +612,17 @@ Work through these phases in order. Do not proceed to the next phase if anything
 ### Phase 0: Pre-Flight (Local Machine)
 
 - [ ] `doctl auth init` - authenticate DigitalOcean CLI with a personal access token
-- [ ] `doctl registry create fix-sim --region ams3` - create DOCR (or confirm it exists)
+- [ ] `doctl registry create fixflux --region ams3` - create DOCR (or confirm it exists)
 - [ ] `doctl registry login` - authorize Docker to push to DOCR
-- [ ] Build all 6 application images locally (from `fixflux/`):
+- [ ] Build all 7 application images locally (from `fixflux/`):
   ```bash
-  for svc in fix-gateway order-service matching-engine trade-store compliance-service market-data-service; do
+  for svc in fix-gateway order-service risk-service matching-engine trade-store compliance-service market-data-service; do
     docker build -f services/$svc/Dockerfile -t registry.digitalocean.com/<org>/$svc:latest .
   done
   ```
 - [ ] Push images:
   ```bash
-  for svc in fix-gateway order-service matching-engine trade-store compliance-service market-data-service; do
+  for svc in fix-gateway order-service risk-service matching-engine trade-store compliance-service market-data-service; do
     docker push registry.digitalocean.com/<org>/$svc:latest
   done
   ```
@@ -628,7 +635,7 @@ Work through these phases in order. Do not proceed to the next phase if anything
 
 - [ ] Create droplet via DO console or CLI:
   ```bash
-  doctl compute droplet create fix-sim-prod \
+  doctl compute droplet create fixflux-prod \
     --region ams3 \
     --size s-2vcpu-4gb-intel \
     --image ubuntu-24-04-x64 \
@@ -656,9 +663,9 @@ Work through these phases in order. Do not proceed to the next phase if anything
 - [ ] Verify cluster is up: `kubectl get nodes` (should show `Ready`)
 - [ ] Copy kubeconfig to local machine:
   ```bash
-  scp root@<droplet-ip>:/etc/rancher/k3s/k3s.yaml ~/.kube/do-fix-sim
+  scp root@<droplet-ip>:/etc/rancher/k3s/k3s.yaml ~/.kube/do-fixflux
   # Edit server: to https://<droplet-ip>:6443
-  export KUBECONFIG=~/.kube/do-fix-sim
+  export KUBECONFIG=~/.kube/do-fixflux
   kubectl get nodes  # should work from local machine
   ```
 - [ ] Install MetalLB or kube-vip for LoadBalancer support (optional - only if you want LoadBalancer type on non-DOKS):
@@ -672,13 +679,13 @@ Work through these phases in order. Do not proceed to the next phase if anything
 
 - [ ] Create namespace:
   ```bash
-  kubectl create namespace fix-simulator
+  kubectl create namespace fixflux
   ```
 - [ ] Link DOCR to k3s (so it can pull images):
   ```bash
   doctl registry kubernetes-manifest | kubectl apply -f -
-  kubectl patch serviceaccount default -n fix-simulator \
-    -p '{"imagePullSecrets": [{"name": "registry-fix-sim"}]}'
+  kubectl patch serviceaccount default -n fixflux \
+    -p '{"imagePullSecrets": [{"name": "registry-fixflux"}]}'
   ```
 - [ ] Install cert-manager (for TLS):
   ```bash
@@ -717,7 +724,7 @@ Work through these phases in order. Do not proceed to the next phase if anything
     --set ports.web.nodePort=30080 \
     --set ports.websecure.nodePort=30443
   ```
-- [ ] Point your domain's A record to `<droplet-ip>` and wait for DNS propagation: `dig +short fix-sim.yourdomain.com`
+- [ ] Point your domain's A record to `<droplet-ip>` and wait for DNS propagation: `dig +short fixflux.yourdomain.com`
 
 ---
 
@@ -737,26 +744,28 @@ Deploy stateful services and wait for them to be fully Ready before deploying ap
 - [ ] Deploy PostgreSQL:
   ```bash
   kubectl apply -f k8s/postgres.yaml
-  kubectl wait --for=condition=Ready pod/postgres-0 -n fix-simulator --timeout=120s
+  kubectl wait --for=condition=Ready pod/postgres-0 -n fixflux --timeout=120s
   ```
 - [ ] Verify PostgreSQL accepts connections:
   ```bash
-  kubectl exec -n fix-simulator postgres-0 -- pg_isready -U fixuser -d fixdb
+  kubectl exec -n fixflux postgres-0 -- pg_isready -U fixuser -d fixdb
   ```
 - [ ] Deploy Redpanda:
   ```bash
   kubectl apply -f k8s/redpanda.yaml
-  kubectl wait --for=condition=Ready pod/redpanda-0 -n fix-simulator --timeout=180s
+  kubectl wait --for=condition=Ready pod/redpanda-0 -n fixflux --timeout=180s
   ```
 - [ ] Verify Redpanda is healthy:
   ```bash
-  kubectl exec -n fix-simulator redpanda-0 -- rpk cluster info
+  kubectl exec -n fixflux redpanda-0 -- rpk cluster info
   ```
 - [ ] Set topic retention (Section 4.2):
   ```bash
-  kubectl exec -n fix-simulator redpanda-0 -- rpk topic alter-config raw_orders \
-    --set retention.ms=86400000 --set retention.bytes=1073741824
-  # Repeat for all 5 pipeline topics
+  for topic in raw_orders validated_orders risk_approved_orders risk_rejected_orders matched_trades compliance_results market_data; do
+    kubectl exec -n fixflux redpanda-0 -- rpk topic alter-config $topic \
+      --set retention.ms=86400000 --set retention.bytes=1073741824
+  done
+  # 7 pipeline topics: validated_orders → risk-service → risk_approved_orders / risk_rejected_orders → matching-engine
   ```
 
 ---
@@ -769,14 +778,14 @@ Deploy stateful services and wait for them to be fully Ready before deploying ap
   kubectl apply -k k8s/
 
   # Or via Helm (preferred for cloud - parameterized):
-  helm upgrade --install fix-simulator ./helm/fixflux \
-    --namespace fix-simulator \
+  helm upgrade --install fixflux ./helm/fixflux \
+    --namespace fixflux \
     -f helm/values-digitalocean.yaml \
     --wait --timeout 5m
   ```
 - [ ] Watch pod startup:
   ```bash
-  kubectl get pods -n fix-simulator -w
+  kubectl get pods -n fixflux -w
   ```
 - [ ] Expected final state (all `1/1 Running`):
   ```
@@ -784,6 +793,7 @@ Deploy stateful services and wait for them to be fully Ready before deploying ap
   redpanda-0              1/1 Running
   fix-gateway-xxx         1/1 Running
   order-service-xxx       1/1 Running
+  risk-service-xxx        1/1 Running
   matching-engine-xxx     1/1 Running
   trade-store-api-xxx     1/1 Running
   trade-store-consumer-xxx 1/1 Running
@@ -799,14 +809,14 @@ Deploy stateful services and wait for them to be fully Ready before deploying ap
 - [ ] Deploy Prometheus and Grafana (included in Helm chart):
   ```bash
   # Already deployed with Phase 5 if monitoring is not in a separate profile
-  kubectl get pods -n fix-simulator | grep -E "prometheus|grafana"
+  kubectl get pods -n fixflux | grep -E "prometheus|grafana"
   ```
 - [ ] Verify Prometheus targets are all `UP`:
   ```bash
-  kubectl port-forward -n fix-simulator svc/prometheus 9090:9090
+  kubectl port-forward -n fixflux svc/prometheus 9090:9090
   # Open http://localhost:9090/targets
   ```
-- [ ] Access Grafana via domain: `https://monitor.fix-sim.yourdomain.com`
+- [ ] Access Grafana via domain: `https://monitor.fixflux.yourdomain.com`
 - [ ] Confirm `fix_simulator_overview` dashboard loads and panels show data
 - [ ] Configure Grafana alert contact point with email (Section 3.4)
 - [ ] Apply PrometheusRule for memory alert (Section 3.4)
@@ -825,18 +835,18 @@ Deploy stateful services and wait for them to be fully Ready before deploying ap
   ```
 - [ ] Confirm trade appears in Trade Store API:
   ```bash
-  curl https://fix-sim.yourdomain.com/trades | python -m json.tool
+  curl https://fixflux.yourdomain.com/trades | python -m json.tool
   ```
 - [ ] Confirm compliance violation appears:
   ```bash
-  curl https://fix-sim.yourdomain.com/violations | python -m json.tool
+  curl https://fixflux.yourdomain.com/violations | python -m json.tool
   ```
 - [ ] Confirm Grafana dashboard shows non-zero order throughput
 - [ ] Run integration tests against cloud endpoints:
   ```bash
   # In tests/integration/, update env vars to point to cloud
-  TRADE_STORE_URL=https://fix-sim.yourdomain.com \
-  COMPLIANCE_URL=https://fix-sim.yourdomain.com \
+  TRADE_STORE_URL=https://fixflux.yourdomain.com \
+  COMPLIANCE_URL=https://fixflux.yourdomain.com \
   KAFKA_BROKER=<droplet-ip>:30092 \
   DATABASE_URL="postgresql://fixuser:fixpass@<droplet-ip>:..." \
   make test-integration
@@ -869,4 +879,4 @@ The `s-2vcpu-4gb` tier is the minimum viable for this stack. Upgrading to `s-4vc
 
 ---
 
-*This document reflects the state of the codebase as of 2026-06-12. Verify StorageClass names, registry endpoints, and k3s version against current DigitalOcean documentation before executing.*
+*This document reflects the state of the codebase as of 2026-06-15. Verify StorageClass names, registry endpoints, and k3s version against current DigitalOcean documentation before executing.*
