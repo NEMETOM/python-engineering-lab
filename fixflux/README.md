@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/FixFlux-Logo.png" width="120" alt="FIXFlux" />
+  <img src="docs/FixFlux-Logo.png" width="160" alt="FIXFlux" />
 </p>
 
 # FIXFlux | Stateful Low-Latency FIX Protocol Engine
@@ -207,6 +207,7 @@ fixflux/
 │   │   │   └── session_manager.py   # Per-client session state (inc/dec on connect/disconnect)
 │   │   └── tests/                   # unit + BDD tests
 │   ├── order-service/               # Validation, enrichment, UUID assignment
+│   ├── risk-service/                # MiFID II pre-trade risk checks (notional cap, fat-finger, position limits)
 │   ├── matching-engine/             # Price-time priority order book + trade execution
 │   ├── market-data-service/         # Change-detected snapshot publishing
 │   ├── trade-store/                 # Kafka consumer + PostgreSQL + FastAPI REST

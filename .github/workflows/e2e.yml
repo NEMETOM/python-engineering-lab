@@ -1,4 +1,4 @@
-name: FIX Simulator Pro - End-to-End Tests
+name: FIXFlux - End-to-End Tests
 
 on:
   workflow_dispatch:
@@ -36,10 +36,17 @@ jobs:
             fixflux/services/fix-gateway/pyproject.toml
 
       - name: Start full Docker pipeline
+        run: docker compose --profile full up --build -d
+
+      - name: Wait for services to be healthy
         run: |
-          docker compose --profile full up --build -d
-          echo "Waiting for services to be healthy..."
-          sleep 30
+          echo "Waiting for postgres..."
+          timeout 120 bash -c 'until docker compose exec -T postgres pg_isready -U fixuser -d fixdb -q; do sleep 3; done'
+          echo "Waiting for redpanda..."
+          timeout 120 bash -c 'until docker compose exec -T redpanda rpk cluster health 2>/dev/null; do sleep 3; done'
+          echo "Waiting for trade-store API..."
+          timeout 120 bash -c 'until curl -sf http://localhost:8000/health; do sleep 3; done'
+          echo "All services ready"
 
       - name: Install Python test dependencies
         run: |
@@ -52,7 +59,7 @@ jobs:
       - name: Run E2E BDD tests
         env:
           KAFKA_BROKER: localhost:9092
-          DATABASE_URL: postgresql://admin:admin@localhost:5433/tradedb
+          DATABASE_URL: postgresql://fixuser:fixpass@localhost:5433/fixdb
         run: |
           python -m behave tests/integration/features/filedrop_e2e_pipeline.feature \
             --tags="@e2e" \
