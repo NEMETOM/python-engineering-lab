@@ -1,9 +1,13 @@
+import os
 import sys
 import tempfile
 import time
 from pathlib import Path
 
+import httpx
 from behave import then, when
+
+_COMPLIANCE_URL = os.getenv("COMPLIANCE_URL", "http://localhost:8010")
 
 _here = Path(__file__).resolve()
 _repo_root = _here.parent.parent.parent.parent  # fixflux/
@@ -55,6 +59,43 @@ def step_drop_sell(context, symbol, price, qty):
 @when('an invalid FIX message "{raw_line}" is dropped into the filedrop')
 def step_drop_invalid(context, raw_line):
     _write_and_process(raw_line)
+
+
+@then('no trade for "{symbol}" appears in GET /trades within {timeout:d} seconds')
+def step_no_trade_appears(context, symbol, timeout):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        response = context.api_client.get(f"/trades?symbol={symbol}")
+        assert (
+            response.status_code == 200
+        ), f"GET /trades returned HTTP {response.status_code}: {response.text}"
+        if response.json():
+            raise AssertionError(
+                f"Trade for {symbol!r} appeared but should have been rejected by risk-service."
+            )
+        time.sleep(2)
+    # Full timeout elapsed with no trade - assertion passes
+
+
+@then('a compliance violation for rule "{rule}" appears in GET /violations within {timeout:d} seconds')
+def step_violation_appears(context, rule, timeout):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            response = httpx.get(
+                f"{_COMPLIANCE_URL}/violations",
+                params={"rule_name": rule, "limit": 10},
+                timeout=5.0,
+            )
+            if response.status_code == 200 and response.json():
+                return
+        except Exception:
+            pass
+        time.sleep(2)
+    raise AssertionError(
+        f"No violation for rule '{rule}' appeared in GET /violations within {timeout}s.\n"
+        "Is the compliance service running?  docker compose --profile full up"
+    )
 
 
 @then('a trade for "{symbol}" appears in GET /trades within {timeout:d} seconds')

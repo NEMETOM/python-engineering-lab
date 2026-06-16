@@ -17,9 +17,26 @@
 
 ---
 
-An event-driven exchange simulator that models a real-world order flow pipeline using the FIX protocol - from client message ingestion through order validation, price-time priority matching, market data publication, and trade persistence - with a full RegTech compliance and surveillance module running as a parallel observer. Built with Python microservices, Redpanda (Kafka-compatible), PostgreSQL, and Docker, following 12-Factor, Hexagonal Architecture, and Domain-Driven Design principles.
+- Event-driven exchange simulator that models a real-world order flow pipeline using the **FIX protocol**
+- Full pipeline: client message ingestion → order validation → **price-time priority matching** → market data publication → trade persistence
+- Parallel **RegTech compliance and surveillance module** for real-time rule evaluation and audit trail
+- **MiFID II pre-trade risk gate**: notional cap, fat-finger, and position limit checks before orders reach the matching engine
+- Built with Python microservices, Redpanda (Kafka-compatible), PostgreSQL, and Docker
+- Follows 12-Factor App, Hexagonal Architecture, and Domain-Driven Design principles
 
 > Designed to reflect the architecture of production trading systems at firms such as Bloomberg, Fidessa, Coinbase, and Kraken - where FIX protocol ingestion, Kafka-based event routing, and microservice-bounded contexts are standard engineering practice.
+
+---
+
+## Business Value
+
+For decision makers evaluating trading infrastructure:
+
+- **Regulatory compliance out of the box** - MiFID II pre-trade risk checks and a tamper-evident audit trail mean regulators and compliance officers have the evidence they need, without manual record-keeping
+- **Catches costly errors before they execute** - fat-finger and notional cap rules stop erroneous orders at the gate, preventing the kind of trading losses that have cost firms hundreds of millions in publicised incidents
+- **Real-time market surveillance** - wash trading detection, rapid-fire order patterns, and off-hours activity are flagged automatically, reducing the compliance team's manual review burden
+- **No vendor lock-in** - fully open-source stack (Python, Kafka, PostgreSQL) with no per-seat or per-message licensing fees that proprietary FIX engines typically charge
+- **Cloud-ready from day one** - the same codebase runs on a laptop and deploys to Kubernetes with a single Helm command, cutting the gap between development and production
 
 ---
 
