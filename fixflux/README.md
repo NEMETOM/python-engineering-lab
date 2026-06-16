@@ -503,6 +503,43 @@ helm upgrade fix-simulator ./helm/fixflux --namespace fix-simulator --set image.
 helm uninstall fix-simulator --namespace fix-simulator
 ```
 
+**What a single `helm install` provisions**
+
+| Component | Kubernetes resource | Notes |
+|---|---|---|
+| `redpanda` | StatefulSet + headless Service | Kafka-compatible broker, no JVM or Zookeeper |
+| `postgres` | StatefulSet + PersistentVolumeClaim | Durable trade and violation storage |
+| `fix-gateway` | Deployment + Service | FIX ingestion, TCP port 9878 |
+| `order-service` | Deployment | Validation + enrichment, Kafka consumer |
+| `risk-service` | Deployment | MiFID II pre-trade checks |
+| `matching-engine` | Deployment + HPA | Price-time priority matching; autoscales 1-5 replicas at 70% CPU |
+| `trade-store` | 2x Deployment + LoadBalancer | REST API (port 8000) + Kafka consumer, independently scalable |
+| `compliance-service` | 2x Deployment + LoadBalancer + ConfigMap | REST API (port 8010) + observer; compliance rules mounted from ConfigMap |
+| `market-data-service` | Deployment | Change-detected snapshot publisher |
+
+**Key `values.yaml` knobs**
+
+| Key | Default | What it controls |
+|---|---|---|
+| `image.registry` | _(none)_ | Docker registry prefix (e.g. `registry.digitalocean.com/fixflux`) |
+| `image.tag` | `latest` | Image tag applied to all deployments |
+| `matchingEngine.autoscaling.maxReplicas` | `5` | HPA upper bound on the matching engine |
+| `postgres.credentials.password` | `fixpass` | PostgreSQL password - always override in production |
+| `resources.requests.cpu` | `100m` | Per-pod CPU request |
+| `resources.limits.memory` | `256Mi` | Per-pod memory ceiling |
+
+Override any value inline with `--set key=value` or supply an environment-specific values file:
+
+```bash
+# Production deploy targeting DigitalOcean Container Registry
+helm install fixflux ./helm/fixflux \
+  --namespace fixflux --create-namespace \
+  --values helm/values-digitalocean.yaml \
+  --set image.tag=$(git rev-parse --short HEAD)
+```
+
+`helm/values-digitalocean.yaml` overrides the registry URL, storage class, and resource limits for the DigitalOcean environment. See `CLOUD_TRANSITION_PLAN.md` for the full production deployment checklist.
+
 ### 3. Verify
 
 ```bash
