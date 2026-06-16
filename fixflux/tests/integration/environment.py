@@ -44,6 +44,7 @@ def before_feature(context, feature):
 
 def before_scenario(context, scenario):
     _truncate_trades()
+    _truncate_violations()
     all_tags = set(scenario.tags) | set(scenario.feature.tags)
     if "needs_kafka" in all_tags:
         _init_kafka_consumer(context)
@@ -71,6 +72,19 @@ def _truncate_trades():
     try:
         session.query(TradeModel).delete()
         session.commit()
+    finally:
+        session.close()
+
+
+def _truncate_violations():
+    from shared.infrastructure.db import SessionLocal
+
+    session = SessionLocal()
+    try:
+        session.execute(text("DELETE FROM compliance_violations"))
+        session.commit()
+    except Exception:
+        session.rollback()
     finally:
         session.close()
 

@@ -32,3 +32,52 @@ Feature: End-to-End FIX Filedrop Pipeline
       | raw_line                                      | symbol | price  | qty |
       | 8=FIX.4.2\|35=D\|49=BAD\|55=EURUSD\|54=2\|   | EURUSD | 1.0900 | 200 |
       | NOT_A_FIX_MESSAGE                             | AAPL   | 176.00 | 25  |
+
+  # ---------------------------------------------------------------------------
+  # Risk-service gate: orders that exceed pre-trade limits are rejected
+  # ---------------------------------------------------------------------------
+
+  @needs_risk_service
+  Scenario Outline: An order pair exceeding the notional cap is rejected before matching
+    # Notional = price * qty; default cap is 1,000,000
+    # Both sides exceed the cap so risk-service rejects them; no match occurs
+    When a buy FIX order for "<symbol>" at price <price> qty <qty> is dropped into the filedrop
+    And a sell FIX order for "<symbol>" at price <price> qty <qty> is dropped into the filedrop
+    Then no trade for "<symbol>" appears in GET /trades within 15 seconds
+
+    Examples:
+      | symbol | price   | qty     |
+      | AAPL   | 175.00  | 6000    |
+      | EURUSD | 1.09000 | 1000000 |
+
+  # ---------------------------------------------------------------------------
+  # Compliance-service: trade size violations flagged by the observer
+  # ---------------------------------------------------------------------------
+
+  Scenario Outline: An order with excessive quantity triggers a trade size compliance violation
+    # TradeSizeRule per-symbol limits: BTCUSD <= 100, default <= 10,000
+    # Notional stays below 1,000,000 so risk-service approves the order
+    When a buy FIX order for "<symbol>" at price <price> qty <qty> is dropped into the filedrop
+    Then a compliance violation for rule "TradeSizeRule" appears in GET /violations within 20 seconds
+
+    Examples:
+      | symbol | price   | qty   |
+      | BTCUSD | 1000.00 | 200   |
+      | AAPL   | 5.00    | 15000 |
+
+  # ---------------------------------------------------------------------------
+  # Compliance-service: wash trading surveillance
+  # ---------------------------------------------------------------------------
+
+  Scenario Outline: Buy and sell from the same client on the same symbol triggers wash trading detection
+    # WashTradingRule fires when the same client_id (E2E_CLIENT) submits
+    # opposing sides for the same symbol within the 300-second window
+    When a buy FIX order for "<symbol>" at price <price> qty <qty> is dropped into the filedrop
+    And a sell FIX order for "<symbol>" at price <price> qty <qty> is dropped into the filedrop
+    Then a trade for "<symbol>" appears in GET /trades within 30 seconds
+    And a compliance violation for rule "WashTradingRule" appears in GET /violations within 20 seconds
+
+    Examples:
+      | symbol | price   | qty |
+      | GBPUSD | 1.27000 | 50  |
+      | MSFT   | 415.00  | 10  |
