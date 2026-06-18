@@ -81,3 +81,18 @@ Feature: End-to-End FIX Filedrop Pipeline
       | symbol | price   | qty |
       | GBPUSD | 1.27000 | 50  |
       | MSFT   | 415.00  | 10  |
+
+  # ---------------------------------------------------------------------------
+  # Volume: prove the pipeline handles high-throughput order flow without loss
+  # ---------------------------------------------------------------------------
+
+  @volume
+  Scenario Outline: FIXFlux processes high volumes of orders without message loss
+    When <count> buy FIX orders for "<symbol>" at price <price> qty <qty> are dropped into the filedrop
+    And <count> sell FIX orders for "<symbol>" at price <price> qty <qty> are dropped into the filedrop
+    Then <count> trades for "<symbol>" appear in GET /trades within 120 seconds
+
+    Examples:
+      | symbol | count | price   | qty |
+      | EURUSD | 1000  | 1.09000 | 100 |
+      | AAPL   |  500  | 175.00  |  50 |

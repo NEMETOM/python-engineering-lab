@@ -915,6 +915,45 @@ The pre-provisioned dashboard (`fix_simulator_overview`) has four rows:
 | **Trade Store API** | Request rate (time series), API Latency P99 (gauge), 5xx Error Rate (stat), Latency percentile trends p50/p95/p99 |
 | **Kafka Throughput** | Messages consumed/sec (time series), Messages produced/sec (time series) |
 
+### Dashboard Queries
+
+The exact PromQL expressions used in each panel - useful for reuse, alerting, and understanding what each panel actually measures:
+
+| Row | Panel | PromQL |
+|---|---|---|
+| **FIX Gateway** | Messages/sec by type | `rate(fix_messages_received_total[1m])` |
+| **FIX Gateway** | Active sessions | `fix_sessions_active` |
+| **FIX Gateway** | Parse errors/min | `rate(fix_messages_parse_errors_total[1m]) * 60` |
+| **FIX Gateway** | Message type distribution | `sum by(msg_type)(increase(fix_messages_received_total[5m]))` |
+| **Matching Engine** | Trades executed/sec by symbol | `rate(trades_executed_total[1m])` |
+| **Matching Engine** | Matching latency P99 | `histogram_quantile(0.99, rate(order_matching_latency_seconds_bucket[5m]))` |
+| **Matching Engine** | Matching latency P50 | `histogram_quantile(0.50, rate(order_matching_latency_seconds_bucket[5m]))` |
+| **Matching Engine** | Order book depth (buy vs sell) | `orders_in_book` |
+| **Trade Store API** | Request rate | `rate(api_requests_total[1m])` |
+| **Trade Store API** | API latency P99 | `histogram_quantile(0.99, rate(api_request_latency_seconds_bucket[5m]))` |
+| **Trade Store API** | 5xx error rate/min | `rate(api_requests_total{status_code=~"5.."}[1m]) * 60` |
+| **Trade Store API** | Latency percentiles (P50/P95/P99) | `histogram_quantile(0.50\|0.95\|0.99, rate(api_request_latency_seconds_bucket[5m]))` |
+| **Kafka Throughput** | Messages consumed/sec | `rate(kafka_messages_consumed_total[1m])` |
+| **Kafka Throughput** | Messages produced/sec | `rate(kafka_messages_produced_total[1m])` |
+
+All counters use `rate()` rather than raw values so Grafana handles counter resets on pod restarts correctly. Latency panels use `histogram_quantile()` over a 5-minute window - long enough to smooth noise, short enough to catch latency spikes within a few scrape intervals.
+
+### Instrumentation Gaps
+
+Honest coverage status - metrics defined in `shared/observability/metrics.py` but not yet wired up, and services with no instrumentation at all:
+
+| Service / Metric | Status | Notes |
+|---|---|---|
+| `fix-gateway` | Fully instrumented | 4 metrics: sessions, message counts, parse errors, reconnects |
+| `matching-engine` | Fully instrumented | 3 metrics: trades, latency histogram, order book depth |
+| `trade-store` | Partially instrumented | API layer covered via middleware; `trades_stored_total` Counter defined but never called in the consumer |
+| `order-service` | Not instrumented | `orders_processed_total{status}` Counter defined in shared but never incremented |
+| `market-data-service` | Not instrumented | No metrics calls anywhere in the service |
+| `compliance-service` | Not instrumented | No custom metrics; violations/risk scores are only queryable via REST |
+| `kafka_messages_produced_total` | Defined, unused | Defined in shared with `topic`/`service` labels but no service calls `.inc()` on it |
+
+The three highest-value gaps for an SRE: `orders_processed_total` (would let you detect validation rejection spikes without reading logs), `trades_stored_total` (would make the consumer lag visible as a rate divergence from `trades_executed_total`), and compliance violation rate (currently requires polling the REST API rather than a Prometheus alert).
+
 ### Recommended Screenshots for Portfolio
 
 1. **Grafana overview** - Dashboard with all 4 rows expanded, live data flowing after dropping a batch of sample orders
