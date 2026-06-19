@@ -798,7 +798,7 @@ python -m behave features/ --tags="@needs_kafka"
 
 ### End-to-End BDD Tests
 
-The E2E suite (`@e2e`) exercises the complete pipeline in a single test: a FIX file is dropped into the filedrop client, flows through Kafka → order-service → matching-engine → trade-store, and the resulting trade is asserted via `GET /trades`. The full Docker stack must be running.
+The E2E suite (`@e2e`) exercises the complete pipeline: a FIX file is dropped into the filedrop client, flows through Kafka → order-service → risk-service → matching-engine → trade-store, and the resulting trade is asserted via `GET /trades`. The full Docker stack must be running.
 
 ```bash
 # Start the full pipeline
@@ -806,21 +806,38 @@ docker compose --profile full up -d
 
 # Install test dependencies (once)
 pip install -e shared && pip install -e services/fix-gateway && pip install -e services/trade-store
-pip install behave kafka-python sqlalchemy psycopg2-binary
+pip install behave kafka-python httpx sqlalchemy psycopg2-binary
 
-# Run E2E tests
+# Run the full E2E suite (pretty output + step timings configured in behave.ini)
 cd tests/integration
-python -m behave features/filedrop_e2e_pipeline.feature --tags="@e2e" -v
+python -m behave features/filedrop_e2e_pipeline.feature --tags="@e2e" --tags="~@volume"
+
+# Run the golden path only (fastest demo of the core flow)
+python -m behave features/filedrop_e2e_pipeline.feature --tags="@golden-path"
+
+# Run the volume test (manual - takes up to 4 minutes)
+python -m behave features/filedrop_e2e_pipeline.feature --tags="@volume"
 ```
 
-Two scenarios are covered:
+Six scenarios are covered across five distinct pipeline behaviours:
 
-| Scenario | What it verifies |
-|---|---|
-| Crossing FIX pair | Buy + sell at the same price produces a matched trade visible in the REST API within 30 s |
-| Invalid message resilience | A bad FIX line is dead-lettered and does not block a subsequent valid crossing pair |
+| Tag | Scenario | What it verifies |
+|---|---|---|
+| `@golden-path` | A buy and sell order cross - trade flows end-to-end and appears via REST | Happy path: one crossing pair produces a matched trade visible in `GET /trades` within 30 s |
+| _(none)_ | A malformed FIX message is quarantined without blocking valid orders | Resilience: a bad FIX line goes to the dead-letter topic; subsequent valid orders are unaffected |
+| `@needs_risk_service` | An oversized order is blocked by the MiFID II notional cap | Risk gate: `price × qty > 1,000,000` is rejected before matching; no trade is produced |
+| _(none)_ | An order breaching the per-symbol size limit triggers a compliance violation | Compliance observer: `TradeSizeRule` flags the order in `GET /violations` within 20 s |
+| _(none)_ | Opposing orders from the same client trigger wash trading surveillance | Surveillance: `WashTradingRule` fires when the same client submits both sides within the 300 s window |
+| `@volume` | The pipeline processes high-volume order flow without message loss | Throughput: 1,000 crossing pairs all matched and persisted within 120 s |
 
-In CI, E2E tests run in a dedicated workflow (`e2e.yml`) triggered manually or on a weekly schedule - not on every push, because they require Docker infrastructure and take longer than unit tests.
+**Output format** - `behave.ini` configures `pretty` format with step timings (`show_timings = true`) and no source file references (`show_source = false`), giving clean, audience-friendly output during demos.
+
+In CI, the E2E workflow (`e2e.yml`) runs as two separate jobs:
+
+| Job | Trigger | Tag filter | Purpose |
+|---|---|---|---|
+| `e2e` | Weekly schedule (Mon 07:00 UTC) + manual dispatch | `@e2e` excluding `@volume` | Correctness - fast, runs on every scheduled and manual trigger |
+| `volume` | Manual dispatch only | `@volume` | Throughput proof - skipped on the weekly schedule to avoid flaky long-running failures on shared CI runners |
 
 ---
 
