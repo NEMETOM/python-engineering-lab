@@ -137,18 +137,22 @@ def step_trade_appears(context, symbol, timeout):
 
 @when('{count:d} buy FIX orders for "{symbol}" at price {price:f} qty {qty:d} are dropped into the filedrop')
 def step_drop_bulk_buy(context, count, symbol, price, qty):
+    # Each order gets a unique client ID so no single client ever accumulates
+    # more than one open order, staying well clear of RISK_MAX_OPEN_ORDERS=10.
     lines = [
-        f"8=FIX.4.2|35=D|49=E2E_CLIENT|55={symbol}|54=1|40=2|44={price:.5f}|38={qty}|"
-        for _ in range(count)
+        f"8=FIX.4.2|35=D|49=E2E_VOL_B{i:04d}|55={symbol}|54=1|40=2|44={price:.5f}|38={qty}|"
+        for i in range(count)
     ]
     _write_batch_and_process(lines)
 
 
 @when('{count:d} sell FIX orders for "{symbol}" at price {price:f} qty {qty:d} are dropped into the filedrop')
 def step_drop_bulk_sell(context, count, symbol, price, qty):
+    # Sell-side client IDs are distinct from buy-side to avoid WashTradingRule
+    # detections; matching engine pairs orders by symbol+price, not client ID.
     lines = [
-        f"8=FIX.4.2|35=D|49=E2E_CLIENT|55={symbol}|54=2|40=2|44={price:.5f}|38={qty}|"
-        for _ in range(count)
+        f"8=FIX.4.2|35=D|49=E2E_VOL_S{i:04d}|55={symbol}|54=2|40=2|44={price:.5f}|38={qty}|"
+        for i in range(count)
     ]
     _write_batch_and_process(lines)
 

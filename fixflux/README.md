@@ -1014,6 +1014,9 @@ The order-service and market-data-service follow the identical pattern:
 | Schema registry | Confluent Schema Registry for Avro/Protobuf event versioning |
 | Async I/O | Replace blocking Kafka consumers with asyncio-based consumers (aiokafka) |
 | FIX replay | Ability to replay historical FIX message files for backtesting and regression |
+| Alerting rules | `PrometheusRule` CRDs and AlertManager config for actionable on-call alerts (e.g. P99 matching latency > 10 ms for 5 min, 5xx error rate > 1/min, Kafka consumer lag > 1000); currently monitoring is purely observational |
+| SLIs / SLOs | Formal SLI definitions (e.g. 99.9% of `GET /trades` requests < 200 ms) with Grafana-rendered error budget burn-rate panels; prerequisite for meaningful on-call escalation policy |
+| Runbooks | Per-alert runbook stubs linked from AlertManager annotations - signals operational maturity and makes the monitoring story complete for SRE interviews |
 
 ---
 
