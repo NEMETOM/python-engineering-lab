@@ -42,6 +42,16 @@ jobs:
           ssh -i ~/.ssh/fixflux_do root@${{ secrets.DO_DROPLET_IP }} \
             "timeout 60 bash -c 'until curl -sf http://localhost:8000/health; do sleep 3; done' && echo OK"
 
+      - name: Install Python test dependencies on Droplet
+        run: |
+          ssh -i ~/.ssh/fixflux_do root@${{ secrets.DO_DROPLET_IP }} "
+            cd ~/python-engineering-lab/fixflux
+            pip install -q behave kafka-python httpx sqlalchemy psycopg2-binary
+            pip install -q -e ./shared
+            pip install -q -e ./services/trade-store
+            pip install -q -e ./services/fix-gateway
+          "
+
       - name: Run ${{ github.event.inputs.test_suite }} tests
         env:
           SUITE: ${{ github.event.inputs.test_suite }}
