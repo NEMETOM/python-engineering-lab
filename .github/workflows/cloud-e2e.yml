@@ -46,10 +46,10 @@ jobs:
         run: |
           ssh -i ~/.ssh/fixflux_do root@${{ secrets.DO_DROPLET_IP }} "
             cd ~/python-engineering-lab/fixflux
-            pip install -q behave kafka-python httpx sqlalchemy psycopg2-binary
-            pip install -q -e ./shared
-            pip install -q -e ./services/trade-store
-            pip install -q -e ./services/fix-gateway
+            pip3 install -q behave kafka-python httpx sqlalchemy psycopg2-binary
+            pip3 install -q -e ./shared
+            pip3 install -q -e ./services/trade-store
+            pip3 install -q -e ./services/fix-gateway
           "
 
       - name: Run ${{ github.event.inputs.test_suite }} tests
