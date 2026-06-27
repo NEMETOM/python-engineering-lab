@@ -1,0 +1,59 @@
+name: FIXFlux - Cloud E2E Tests (DigitalOcean)
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_suite:
+        description: 'Test suite to run on the live Droplet'
+        required: true
+        default: 'e2e'
+        type: choice
+        options:
+          - e2e           # Full suite excluding volume (~2 min)
+          - golden-path   # Happy path only - fastest demo (~30 sec)
+          - volume        # 1000 order throughput test (~4 min)
+
+permissions:
+  contents: read
+
+jobs:
+  cloud-e2e:
+    name: E2E on DigitalOcean (${{ github.event.inputs.test_suite }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DO_SSH_KEY }}" > ~/.ssh/fixflux_do
+          chmod 600 ~/.ssh/fixflux_do
+          ssh-keyscan -H ${{ secrets.DO_DROPLET_IP }} >> ~/.ssh/known_hosts
+
+      - name: Pull latest code and ensure stack is running
+        run: |
+          ssh -i ~/.ssh/fixflux_do root@${{ secrets.DO_DROPLET_IP }} "
+            cd ~/python-engineering-lab && git pull origin main
+            cd fixflux && docker compose --profile full up -d
+          "
+
+      - name: Wait for Trade Store API to be healthy
+        run: |
+          ssh -i ~/.ssh/fixflux_do root@${{ secrets.DO_DROPLET_IP }} \
+            "timeout 60 bash -c 'until curl -sf http://localhost:8000/health; do sleep 3; done' && echo OK"
+
+      - name: Run ${{ github.event.inputs.test_suite }} tests
+        env:
+          SUITE: ${{ github.event.inputs.test_suite }}
+        run: |
+          case "$SUITE" in
+            e2e)          TAGS="--tags=@e2e --tags=~@volume" ;;
+            golden-path)  TAGS="--tags=@golden-path" ;;
+            volume)       TAGS="--tags=@volume" ;;
+          esac
+          ssh -i ~/.ssh/fixflux_do root@${{ secrets.DO_DROPLET_IP }} \
+            "cd ~/python-engineering-lab/fixflux && \
+             KAFKA_BROKER=localhost:9092 \
+             DATABASE_URL=postgresql://fixuser:fixpass@localhost:5433/fixdb \
+             python3 -m behave tests/integration/features/filedrop_e2e_pipeline.feature \
+             $TAGS --no-capture"
