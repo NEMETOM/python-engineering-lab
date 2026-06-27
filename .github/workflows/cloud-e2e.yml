@@ -49,9 +49,6 @@ jobs:
             apt-get install -y -q python3-pip python3-dev libpq-dev 2>/dev/null
             python3 -m pip install -q --upgrade pip
             python3 -m pip install -q behave kafka-python httpx sqlalchemy psycopg2-binary
-            python3 -m pip install -q ./shared
-            python3 -m pip install -q ./services/trade-store
-            python3 -m pip install -q ./services/fix-gateway
           "
 
       - name: Run ${{ github.event.inputs.test_suite }} tests
