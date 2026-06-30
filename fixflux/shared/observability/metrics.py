@@ -33,7 +33,7 @@ order_matching_latency = Histogram(
 orders_in_book = Gauge(
     "orders_in_book",
     "Orders currently resting in the order book",
-    ["side"],
+    ["side", "symbol"],
 )
 
 # Order Processing
