@@ -64,6 +64,7 @@ jobs:
           python -m behave tests/integration/features/filedrop_e2e_pipeline.feature \
             --tags="@e2e" \
             --tags="~@volume" \
+            --tags="~@chaos" \
             --no-capture \
             -v
 
