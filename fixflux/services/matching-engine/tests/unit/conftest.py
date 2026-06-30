@@ -11,8 +11,8 @@ def empty_book():
 
 
 @pytest.fixture
-def engine(empty_book):
-    return MatchingEngine(empty_book)
+def engine():
+    return MatchingEngine()
 
 
 @pytest.fixture

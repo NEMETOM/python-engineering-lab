@@ -5,7 +5,6 @@ from prometheus_client import start_http_server
 from matching_engine.engine import MatchingEngine
 from matching_engine.infrastructure.kafka_client import create_consumer
 from matching_engine.models import Order
-from matching_engine.order_book import OrderBook
 from matching_engine.producer import Producer
 from matching_engine.utils.logger import configure_logging, get_logger
 from shared.observability.metrics import (
@@ -26,8 +25,7 @@ def run():
     start_http_server(_METRICS_PORT)
     logger.info(f"metrics server started on :{_METRICS_PORT}")
     consumer = create_consumer("risk_approved_orders", "matching-engine")
-    book = OrderBook()
-    engine = MatchingEngine(book)
+    engine = MatchingEngine()
     producer = Producer()
     for msg in consumer:
         kafka_messages_consumed.labels(
@@ -45,8 +43,9 @@ def run():
         t0 = time.perf_counter()
         trades = engine.process(order)
         order_matching_latency.observe(time.perf_counter() - t0)
-        orders_in_book.labels(side="buy").set(len(book.buys))
-        orders_in_book.labels(side="sell").set(len(book.sells))
+        book = engine.books[order.symbol]
+        orders_in_book.labels(side="buy", symbol=order.symbol).set(len(book.buys))
+        orders_in_book.labels(side="sell", symbol=order.symbol).set(len(book.sells))
         if trades:
             for trade in trades:
                 logger.info(f"trade executed {trade}")

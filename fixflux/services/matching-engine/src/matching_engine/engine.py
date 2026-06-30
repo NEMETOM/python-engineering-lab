@@ -1,23 +1,24 @@
 import uuid
+from collections import defaultdict
 
 from matching_engine.models import Trade
+from matching_engine.order_book import OrderBook
 
 
 class MatchingEngine:
 
-    def __init__(self, book):
-
-        self.book = book
+    def __init__(self):
+        self.books: dict[str, OrderBook] = defaultdict(OrderBook)
 
     def process(self, order):
-
+        book = self.books[order.symbol]
         trades = []
 
         if order.side == "BUY":
 
-            while self.book.sells and order.price >= self.book.best_ask().price:
+            while book.sells and order.price >= book.best_ask().price:
 
-                best_sell = self.book.sells.pop(0)
+                best_sell = book.sells.pop(0)
 
                 trade_qty = min(order.quantity, best_sell.quantity)
 
@@ -39,9 +40,9 @@ class MatchingEngine:
 
         else:
 
-            while self.book.buys and order.price <= self.book.best_bid().price:
+            while book.buys and order.price <= book.best_bid().price:
 
-                best_buy = self.book.buys.pop(0)
+                best_buy = book.buys.pop(0)
 
                 trade_qty = min(order.quantity, best_buy.quantity)
 
@@ -62,7 +63,6 @@ class MatchingEngine:
                     break
 
         if order.quantity > 0:
-
-            self.book.add_order(order)
+            book.add_order(order)
 
         return trades
