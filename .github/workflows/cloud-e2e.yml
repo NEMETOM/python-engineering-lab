@@ -16,6 +16,7 @@ on:
 
 permissions:
   contents: read
+  checks: write
 
 jobs:
   cloud-e2e:
@@ -64,7 +65,26 @@ jobs:
           esac
           ssh -i ~/.ssh/fixflux_do root@${{ secrets.DO_DROPLET_IP }} \
             "cd ~/python-engineering-lab/fixflux && \
+             mkdir -p /tmp/fixflux-reports && \
              KAFKA_BROKER=localhost:9092 \
              DATABASE_URL=postgresql://fixuser:fixpass@localhost:5433/fixdb \
              python3 -m behave $FEATURE \
-             $TAGS --no-capture"
+             $TAGS --no-capture \
+             --junit --junit-directory /tmp/fixflux-reports/"
+
+      - name: Fetch test report from Droplet
+        if: always()
+        run: |
+          mkdir -p reports
+          scp -i ~/.ssh/fixflux_do \
+            "root@${{ secrets.DO_DROPLET_IP }}:/tmp/fixflux-reports/*.xml" \
+            ./reports/ || true
+
+      - name: Publish test report
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Cloud E2E BDD Tests (${{ github.event.inputs.test_suite }})
+          path: reports/*.xml
+          reporter: java-junit
+          fail-on-error: false
