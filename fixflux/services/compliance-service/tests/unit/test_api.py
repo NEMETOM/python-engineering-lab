@@ -47,9 +47,19 @@ class TestHealthEndpoint:
 
 
 _VIOLATION_FIELDS = {
-    "id", "rule_name", "rule_category", "client_id", "symbol", "order_id",
-    "severity", "description", "status", "risk_contribution",
-    "detected_at", "reviewed_at", "reviewed_by",
+    "id",
+    "rule_name",
+    "rule_category",
+    "client_id",
+    "symbol",
+    "order_id",
+    "severity",
+    "description",
+    "status",
+    "risk_contribution",
+    "detected_at",
+    "reviewed_at",
+    "reviewed_by",
 }
 
 
@@ -152,8 +162,11 @@ class TestViolationsFilters:
             response = client.get("/violations?rule_name=TradeSizeRule")
         assert response.status_code == 200
         mock_repo_cls.return_value.list_violations.assert_called_once_with(
-            client_id=None, severity=None, status=None,
-            rule_name="TradeSizeRule", limit=50,
+            client_id=None,
+            severity=None,
+            status=None,
+            rule_name="TradeSizeRule",
+            limit=50,
         )
 
     def test_filter_by_severity_passes_to_repo(self, client):
