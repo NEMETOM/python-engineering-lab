@@ -9,9 +9,10 @@ on:
         default: 'e2e'
         type: choice
         options:
-          - e2e           # Full suite excluding volume (~2 min)
+          - e2e           # Full suite excluding volume and chaos (~2 min)
           - golden-path   # Happy path only - fastest demo (~30 sec)
           - volume        # 1000 order throughput test (~4 min)
+          - chaos         # Service kill + recovery scenarios (~5 min)
 
 permissions:
   contents: read
@@ -56,13 +57,14 @@ jobs:
           SUITE: ${{ github.event.inputs.test_suite }}
         run: |
           case "$SUITE" in
-            e2e)          TAGS="--tags=@e2e --tags=~@volume" ;;
-            golden-path)  TAGS="--tags=@golden-path" ;;
-            volume)       TAGS="--tags=@volume" ;;
+            e2e)          FEATURE="tests/integration/features/filedrop_e2e_pipeline.feature" ; TAGS="--tags=@e2e --tags=~@volume" ;;
+            golden-path)  FEATURE="tests/integration/features/filedrop_e2e_pipeline.feature" ; TAGS="--tags=@golden-path" ;;
+            volume)       FEATURE="tests/integration/features/filedrop_e2e_pipeline.feature" ; TAGS="--tags=@volume" ;;
+            chaos)        FEATURE="tests/integration/features/chaos_recovery.feature"        ; TAGS="--tags=@chaos" ;;
           esac
           ssh -i ~/.ssh/fixflux_do root@${{ secrets.DO_DROPLET_IP }} \
             "cd ~/python-engineering-lab/fixflux && \
              KAFKA_BROKER=localhost:9092 \
              DATABASE_URL=postgresql://fixuser:fixpass@localhost:5433/fixdb \
-             python3 -m behave tests/integration/features/filedrop_e2e_pipeline.feature \
+             python3 -m behave $FEATURE \
              $TAGS --no-capture"

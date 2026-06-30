@@ -62,6 +62,24 @@ def after_scenario(context, scenario):
     if hasattr(context, "risk_rejected_consumer"):
         context.risk_rejected_consumer.close()
         del context.risk_rejected_consumer
+    _restart_chaos_services(context)
+
+
+def _restart_chaos_services(context):
+    """Restart any containers left stopped by a chaos scenario that failed mid-way."""
+    import subprocess
+
+    stopped = getattr(context, "chaos_stopped_services", set())
+    if not stopped:
+        return
+    compose_dir = Path(__file__).resolve().parent.parent.parent
+    for service in list(stopped):
+        subprocess.run(
+            ["docker", "compose", "start", service],
+            cwd=str(compose_dir),
+            capture_output=True,
+        )
+    context.chaos_stopped_services.clear()
 
 
 def _truncate_trades():

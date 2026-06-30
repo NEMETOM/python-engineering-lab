@@ -123,6 +123,36 @@ Ordered roughly by effort, with hedge fund / institutional trading relevance in 
 
 ---
 
+## 9. Chaos Engineering E2E Tests
+
+**Why:** SRE interviews consistently test for chaos engineering knowledge. A suite that deliberately breaks individual services and asserts recovery demonstrates you think about failure modes, not just happy paths. Combined with the existing Grafana stack, it gives a visible story: "I injected fault X, monitored the system on Grafana, and verified recovery with automated assertions."
+
+**What to build:**
+
+Four scenarios, each as a `@chaos` Scenario Outline in a new `chaos_recovery.feature`:
+
+**Scenario A - Matching engine kill + recovery**
+Kill the `matching-engine` container while 10 orders are queued in Kafka. Wait for the container to restart. Assert all expected trades eventually appear in the trade store. Tests Kafka consumer offset replay - the most critical durability guarantee in the pipeline.
+
+**Scenario B - Risk service outage**
+Bring down `risk-service`, submit 5 orders, assert they are held or rejected cleanly (not silently dropped). Restart risk-service. Assert the system either processes the queued orders or returns clear rejection reason codes. Tests graceful degradation under dependency outage - an SRE signal.
+
+**Scenario C - Database failover (PostgreSQL)**
+Kill the PostgreSQL container while trades are being written. Restart it. Assert trade-store reconnects automatically and all trades are queryable with no data loss. Tests connection pool recovery and write-ahead durability.
+
+**Scenario D - Cascade restart**
+`docker compose --profile full restart` all services simultaneously. Run the full golden path scenario and assert it completes within a generous timeout (60s). Coarser but realistic - tests startup ordering and container readiness probe correctness.
+
+**Implementation notes:**
+- Chaos steps SSH into the Droplet and run `docker kill` / `docker start` - needs a `chaos_helper.py` in `tests/integration/`
+- Recovery assertions use a long polling timeout (30-60s) with a short interval (3s) - different from normal e2e polling
+- `environment.py` needs an `after_scenario` hook that restarts any killed container even on test failure, otherwise subsequent tests inherit broken state
+- Tag the whole feature `@chaos` and add `--tags=~@chaos` to the regular e2e CI job so chaos tests never run automatically
+
+**Signals it sends:** Chaos engineering is a defining SRE competency (Netflix Chaos Monkey, AWS GameDay). Most candidates describe it; showing a working implementation with assertions and recovery verification is unusual and very memorable in interviews.
+
+---
+
 ## Priority Recommendation
 
 | Priority | Item | Effort | Signal strength |
@@ -131,7 +161,8 @@ Ordered roughly by effort, with hedge fund / institutional trading relevance in 
 | 2 | Pre-trade risk limits | Medium | High - directly relevant to trading risk roles |
 | 3 | Per-symbol order book | Low-medium | Medium - correctness fix with visible architecture impact |
 | 4 | OpenTelemetry tracing | Medium | High - completes the three-pillar observability story |
-| 5 | Execution algorithms | Medium-hard | Very high - direct quant fund relevance |
-| 6 | WebSocket streaming | Medium | Medium - good portfolio demo material |
-| 7 | FIX Execution Reports | Hard | High - demonstrates real FIX protocol depth |
-| 8 | Backtesting replay | Hard | Very high for quant research roles |
+| 5 | Chaos engineering tests | Medium | Very high for SRE roles - most candidates only talk about it |
+| 6 | Execution algorithms | Medium-hard | Very high - direct quant fund relevance |
+| 7 | WebSocket streaming | Medium | Medium - good portfolio demo material |
+| 8 | FIX Execution Reports | Hard | High - demonstrates real FIX protocol depth |
+| 9 | Backtesting replay | Hard | Very high for quant research roles |
