@@ -21,7 +21,7 @@ def _wait_for_running(service: str, timeout: int = 60) -> None:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         result = _compose("ps", service)
-        if result.returncode == 0 and "running" in result.stdout.lower():
+        if result.returncode == 0 and "up" in result.stdout.lower():
             time.sleep(3)  # grace period for Kafka consumer to initialise
             return
         time.sleep(3)
