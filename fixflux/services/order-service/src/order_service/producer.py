@@ -1,4 +1,5 @@
 from order_service.infrastructure.kafka_client import create_producer
+from shared.observability.tracing import inject_ctx
 
 
 class Producer:
@@ -9,4 +10,6 @@ class Producer:
 
     def send(self, event):
 
-        self.producer.send("validated_orders", event.model_dump(mode="json"))
+        data = event.model_dump(mode="json")
+        inject_ctx(data)
+        self.producer.send("validated_orders", data)

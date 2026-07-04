@@ -13,12 +13,14 @@ from shared.observability.metrics import (
     orders_in_book,
     trades_executed,
 )
+from shared.observability.tracing import extract_ctx, init_tracer
 
 configure_logging()
 
 logger = get_logger(__name__)
 
 _METRICS_PORT = 8003
+_tracer = init_tracer("matching-engine")
 
 
 def run():
@@ -32,26 +34,32 @@ def run():
             topic="risk_approved_orders", service="matching-engine"
         ).inc()
         event = msg.value
-        logger.debug(f"received order {event}")
-        order = Order(
-            order_id=event["order_id"],
-            side=event["side"],
-            price=float(event["price"]),
-            quantity=int(event["quantity"]),
-            symbol=event.get("symbol", ""),
-        )
-        t0 = time.perf_counter()
-        trades = engine.process(order)
-        order_matching_latency.observe(time.perf_counter() - t0)
-        book = engine.books[order.symbol]
-        orders_in_book.labels(side="buy", symbol=order.symbol).set(len(book.buys))
-        orders_in_book.labels(side="sell", symbol=order.symbol).set(len(book.sells))
-        if trades:
-            for trade in trades:
-                logger.info(f"trade executed {trade}")
-                trades_executed.labels(symbol=trade.symbol).inc()
-                producer.send_trade(trade)
-            producer.send_book(book)
+        ctx = extract_ctx(event)
+        with _tracer.start_as_current_span(
+            "matching-engine.process", context=ctx
+        ) as span:
+            span.set_attribute("order.id", str(event.get("order_id", "")))
+            span.set_attribute("order.symbol", str(event.get("symbol", "")))
+            logger.debug(f"received order {event}")
+            order = Order(
+                order_id=event["order_id"],
+                side=event["side"],
+                price=float(event["price"]),
+                quantity=int(event["quantity"]),
+                symbol=event.get("symbol", ""),
+            )
+            t0 = time.perf_counter()
+            trades = engine.process(order)
+            order_matching_latency.observe(time.perf_counter() - t0)
+            book = engine.books[order.symbol]
+            orders_in_book.labels(side="buy", symbol=order.symbol).set(len(book.buys))
+            orders_in_book.labels(side="sell", symbol=order.symbol).set(len(book.sells))
+            if trades:
+                for trade in trades:
+                    logger.info(f"trade executed {trade}")
+                    trades_executed.labels(symbol=trade.symbol).inc()
+                    producer.send_trade(trade)
+                producer.send_book(book)
 
 
 if __name__ == "__main__":

@@ -183,6 +183,29 @@ Every service follows the same pipeline:
 | Post Checkout repository | ✅ |
 | Complete job | ✅ |
 
+### Continuous Deployment (`deploy.yml`)
+
+A dedicated deployment workflow fires automatically on every push to `main` that touches any file under `fixflux/`. It SSHs into the DigitalOcean Droplet and performs a zero-downtime rolling update:
+
+```
+push to main (fixflux/** path filter)
+  └─ git pull origin main          # fetch latest code onto Droplet
+  └─ docker compose build          # rebuild only changed layers (Docker cache)
+  └─ docker compose up -d          # recreate containers with new images; new
+  │                                #   services (e.g. Tempo) start alongside existing ones
+  └─ curl health check             # wait up to 60 s for trade-store /health
+```
+
+**Profiles used:** `--profile full --profile monitoring` - the full trading pipeline plus Prometheus, Grafana, and Tempo are all included in every deploy.
+
+**What makes it safe:**
+- `up -d` only recreates containers whose image changed - unaffected services stay running
+- PostgreSQL and Redpanda data volumes are never touched
+- The health check step fails the workflow if the stack doesn't come up within 60 s, making the failure visible in GitHub Actions before anyone notices in production
+- Path filter (`paths: fixflux/**`) means a README-only commit or a change to another project in the monorepo does not trigger a Droplet restart
+
+**Required GitHub secrets:** `DO_SSH_KEY` (private key content) and `DO_DROPLET_IP` - set once in repository Settings → Secrets → Actions.
+
 ---
 
 ## Design Standards
@@ -322,7 +345,7 @@ Services are grouped into profiles:
 | _(none)_ | `redpanda`, `postgres` only |
 | `pipeline` | + `fix-gateway`, `order-service`, `matching-engine`, `trade-store`, `compliance-api`, `compliance-consumer` |
 | `full` | + all of the above + `market-data-service` |
-| `monitoring` | + `prometheus`, `grafana` (combine with pipeline or full) |
+| `monitoring` | + `prometheus`, `grafana`, `tempo` (combine with pipeline or full) |
 
 ```bash
 # Full stack + monitoring (Prometheus + Grafana)
@@ -358,6 +381,7 @@ docker compose ps
 | compliance-consumer | Up | - |
 | prometheus | Up (monitoring profile) | 9090 |
 | grafana | Up (monitoring profile) | 3000 |
+| tempo | Up (monitoring profile) | 3200 (query), 4318 (OTLP) |
 
 ### 4. Trade Store REST API
 
@@ -855,36 +879,44 @@ In CI, the E2E workflow (`e2e.yml`) runs as two separate jobs:
 | `RISK_GROSS_POSITION_LIMIT` | `10000` | risk-service - max absolute position per client per symbol |
 | `RISK_NET_POSITION_LIMIT` | `5000` | risk-service - max net long or short per client per symbol |
 | `RISK_MAX_OPEN_ORDERS` | `10` | risk-service - max unmatched open orders per client |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | _(unset)_ | order-service, risk-service, matching-engine, trade-store-consumer - traces exported to Tempo when set; spans dropped silently when unset |
 
 ---
 
 ## Monitoring & Observability
 
-The simulator ships with a full Prometheus + Grafana monitoring stack, reflecting production observability practice in trading systems.
+The simulator ships with a full three-pillar observability stack (metrics, logs, traces), reflecting production observability practice in trading systems.
 
 ### Stack
 
 | Component | Role |
 |---|---|
 | **Prometheus** `v2.51` | Scrapes metrics from each service every 15 s; retains time-series data |
-| **Grafana** `v10.4` | Pre-provisioned dashboard with 4 collapsible rows and 14 panels |
+| **Grafana** `v10.4` | Pre-provisioned dashboard with 4 collapsible rows and 14 panels; also the UI for traces via Explore |
+| **Tempo** `v2.4` | Distributed trace backend; receives OTLP spans from all services, queryable via Grafana Explore |
 | **prometheus-client** `>=0.20` | Python library; embedded HTTP server (fix-gateway, matching-engine) and ASGI endpoint (trade-store) |
+| **OpenTelemetry SDK** `>=1.24` | Instruments each Kafka consumer; propagates trace context as `_trace_id`/`_span_id` fields through Kafka message payloads |
 
 ### Monitoring Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     Docker Network                          │
-│                                                             │
-│  fix-gateway:8001/metrics  ──────────┐                      │
-│  matching-engine:8003/metrics ───────┼──► Prometheus:9090   │
-│  trade-store:8000/metrics ───────────┘        │             │
-│                                               │             │
-│                                          Grafana:3000        │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                        Docker Network                           │
+│                                                                 │
+│  fix-gateway:8001/metrics  ──────────┐                          │
+│  matching-engine:8003/metrics ───────┼──► Prometheus:9090 ──┐  │
+│  trade-store:8000/metrics ───────────┘                       │  │
+│                                                               ▼  │
+│  order-service ──────────────────────┐                  Grafana:3000
+│  risk-service  ──────────────────────┤                       ▲  │
+│  matching-engine ────────────────────┼──► Tempo:4318 (OTLP) ─┘  │
+│  trade-store-consumer ───────────────┘        :3200 (query)     │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-Prometheus scrapes all three targets inside the Docker network. Grafana reads Prometheus as its datasource (auto-provisioned - no manual setup).
+**Metrics path:** Prometheus scrapes fix-gateway, matching-engine, and trade-store every 15 s. Grafana reads Prometheus as its primary datasource (auto-provisioned).
+
+**Traces path:** Each of the four pipeline consumers emits OpenTelemetry spans to Tempo via OTLP HTTP (`port 4318`). Grafana's Tempo datasource (auto-provisioned) makes traces queryable from Explore.
 
 ### Start the monitoring stack
 
@@ -899,7 +931,9 @@ docker compose --profile monitoring up
 | UI | URL | Credentials |
 |---|---|---|
 | Grafana | `http://localhost:3000` | admin / admin |
+| Grafana Explore (traces) | `http://localhost:3000/explore` - select **Tempo** datasource | admin / admin |
 | Prometheus | `http://localhost:9090` | - |
+| Tempo | `http://localhost:3200` | - |
 | Raw metrics (trade-store) | `http://localhost:8000/metrics` | - |
 | Raw metrics (fix-gateway) | `http://localhost:8001/metrics` | - |
 | Raw metrics (matching-engine) | `http://localhost:8003/metrics` | - |
@@ -914,7 +948,7 @@ docker compose --profile monitoring up
 | `fix_reconnect_attempts_total` | Counter | - | fix-gateway |
 | `trades_executed_total` | Counter | `symbol` | matching-engine |
 | `order_matching_latency_seconds` | Histogram | - | matching-engine |
-| `orders_in_book` | Gauge | `side` (buy, sell) | matching-engine |
+| `orders_in_book` | Gauge | `side` (buy, sell), `symbol` | matching-engine |
 | `kafka_messages_consumed_total` | Counter | `topic`, `service` | matching-engine |
 | `api_requests_total` | Counter | `endpoint`, `method`, `status_code` | trade-store |
 | `api_request_latency_seconds` | Histogram | `endpoint` | trade-store |
@@ -955,6 +989,39 @@ The exact PromQL expressions used in each panel - useful for reuse, alerting, an
 
 All counters use `rate()` rather than raw values so Grafana handles counter resets on pod restarts correctly. Latency panels use `histogram_quantile()` over a 5-minute window - long enough to smooth noise, short enough to catch latency spikes within a few scrape intervals.
 
+### Distributed Traces
+
+Every order flowing through the pipeline produces one distributed trace spanning four services. Trace context is propagated as `_trace_id` and `_span_id` fields injected directly into Kafka message payloads - no sidecar or agent required.
+
+**Trace chain per order:**
+
+```
+[order-service.process]
+    └─ [risk-service.validated_orders]
+           └─ [matching-engine.process]
+                  └─ [trade-store.persist]
+```
+
+**Span attributes:**
+
+| Service | Span name | Attributes |
+|---|---|---|
+| order-service | `order-service.process` | `order.id`, `order.symbol` |
+| risk-service | `risk-service.validated_orders` | `order.id`, `order.symbol`, `kafka.topic` |
+| matching-engine | `matching-engine.process` | `order.id`, `order.symbol` |
+| trade-store | `trade-store.persist` | `trade.id` |
+
+**How to view traces:**
+
+1. `docker compose --profile full --profile monitoring up -d`
+2. Open `http://localhost:3000` → Explore → select **Tempo** datasource
+3. Search tab → filter by `service.name = order-service`
+4. Click any trace row to expand the span waterfall
+
+**Trace-to-metrics:** The Tempo datasource is linked to Prometheus. Clicking the Prometheus icon on any span navigates directly to the corresponding `kafka_messages_consumed_total` metric for that service.
+
+**Without monitoring profile:** Services have `OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4318` set in docker-compose.yml. When Tempo is not running the `BatchSpanProcessor` drops spans silently - no error, no service impact.
+
 ### Instrumentation Gaps
 
 Honest coverage status - metrics defined in `shared/observability/metrics.py` but not yet wired up, and services with no instrumentation at all:
@@ -978,6 +1045,7 @@ The three highest-value gaps for an SRE: `orders_processed_total` (would let you
 3. **Trade execution spike** - `trades_executed_total` rate climbing when a crossing pair is dropped
 4. **Order book depth** - buy/sell gauge showing resting orders accumulate then clear on a match
 5. **Prometheus targets** - `http://localhost:9090/targets` showing all 3 scrape targets green (`UP`)
+6. **Distributed trace waterfall** - Grafana Explore → Tempo, a single order's four-service span chain with `order.id` and `order.symbol` attributes visible
 
 ### Extending to Other Services
 
@@ -1014,7 +1082,7 @@ The order-service and market-data-service follow the identical pattern:
 
 **Dead letter queue** - The filedrop client publishes any FIX message that fails parsing or validation to a `dead_letter_orders` Kafka topic (`{ source_file, raw_line, error, timestamp }`) before moving the file to `rejected/`. This makes failures observable, replayable, and alertable without manual log trawling - the same pattern used for error handling in production event-driven systems.
 
-**Production-style observability** - Structured JSON logging throughout (INFO for business events, DEBUG for infrastructure noise). Prometheus metrics instrumented across three services; Grafana dashboard auto-provisioned with 14 panels covering FIX message rates, matching latency (P50/P99), order book depth, and API error rates. Monitoring profile starts Prometheus + Grafana alongside the application stack via a single compose command.
+**Three-pillar observability** - Structured JSON logging throughout (INFO for business events, DEBUG for infrastructure noise). Prometheus metrics instrumented across three services; Grafana dashboard auto-provisioned with 14 panels covering FIX message rates, matching latency (P50/P99), order book depth, and API error rates. Distributed tracing via OpenTelemetry SDK + Tempo: every order generates a four-service trace (`order-service → risk-service → matching-engine → trade-store`) with context propagated through Kafka message payloads and queryable from Grafana Explore. All three pillars - metrics, logs, traces - are wired from a single `docker compose --profile monitoring` flag.
 
 **Shared internal library pattern** - Cross-cutting concerns (Pydantic schemas, Kafka factory, SQLAlchemy session, exception hierarchy) are extracted into a versioned internal package, mirroring how platform teams in larger engineering organisations manage shared infrastructure.
 
@@ -1025,9 +1093,7 @@ The order-service and market-data-service follow the identical pattern:
 | Area | Detail |
 |---|---|
 | FIX TCP session | Full logout (`35=5`) handling and session expiry via heartbeat timeout; Logon + TCP disconnect lifecycle is already implemented |
-| Multi-symbol order book | Per-symbol book isolation - currently all symbols share one book |
 | WebSocket market data | Push-based streaming of market data snapshots to connected clients |
-| OpenTelemetry traces | Distributed tracing across services; correlate a single order through all 4 hops |
 | Schema registry | Confluent Schema Registry for Avro/Protobuf event versioning |
 | Async I/O | Replace blocking Kafka consumers with asyncio-based consumers (aiokafka) |
 | FIX replay | Ability to replay historical FIX message files for backtesting and regression |

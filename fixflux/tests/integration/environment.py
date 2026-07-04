@@ -45,6 +45,10 @@ def before_feature(context, feature):
 def before_scenario(context, scenario):
     _truncate_trades()
     _truncate_violations()
+    # Fresh client ID per scenario so unmatched orders from TradeSizeRule
+    # scenarios don't accumulate in the risk-service's in-memory PositionStore
+    # across runs and eventually hit RISK_MAX_OPEN_ORDERS=10.
+    context.e2e_client_id = f"E2E_{uuid.uuid4().hex[:8].upper()}"
     all_tags = set(scenario.tags) | set(scenario.feature.tags)
     if "needs_kafka" in all_tags:
         _init_kafka_consumer(context)

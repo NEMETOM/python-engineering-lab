@@ -9,9 +9,12 @@ from risk_service.models import RejectedOrderEvent, TradeEvent, ValidatedOrder
 from risk_service.position_store import PositionStore
 from risk_service.producer import RiskProducer
 from risk_service.utils.logger import configure_logging, get_logger
+from shared.observability.tracing import extract_ctx, init_tracer
 
 configure_logging()
 logger = get_logger(__name__)
+
+_tracer = init_tracer("risk-service")
 
 
 def _build_checker() -> RiskChecker:
@@ -93,10 +96,16 @@ def run() -> None:
     logger.info("risk-service started")
 
     for msg in consumer:
-        if msg.topic == config.TRADES_TOPIC:
-            handle_trade(msg.value, store, last_prices)
-        else:
-            handle_order(msg.value, checker, store, last_prices, producer)
+        ctx = extract_ctx(msg.value)
+        span_name = f"risk-service.{msg.topic}"
+        with _tracer.start_as_current_span(span_name, context=ctx) as span:
+            span.set_attribute("kafka.topic", msg.topic)
+            if msg.topic == config.TRADES_TOPIC:
+                handle_trade(msg.value, store, last_prices)
+            else:
+                span.set_attribute("order.id", str(msg.value.get("order_id", "")))
+                span.set_attribute("order.symbol", str(msg.value.get("symbol", "")))
+                handle_order(msg.value, checker, store, last_prices, producer)
 
 
 if __name__ == "__main__":
