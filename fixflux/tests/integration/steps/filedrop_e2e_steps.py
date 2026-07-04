@@ -61,14 +61,14 @@ def _write_batch_and_process(lines: list) -> None:
 @when('a trader submits a buy order for {qty:d} units of "{symbol}" at a limit price of {price:f}')
 def step_golden_path_buy(context, qty, symbol, price):
     _write_and_process(
-        f"8=FIX.4.2|35=D|49=E2E_CLIENT|55={symbol}|54=1|40=2|44={price:.5f}|38={qty}|"
+        f"8=FIX.4.2|35=D|49={context.e2e_client_id}|55={symbol}|54=1|40=2|44={price:.5f}|38={qty}|"
     )
 
 
 @when('a matching sell order for {qty:d} units of "{symbol}" at {price:f} enters the pipeline')
 def step_golden_path_sell(context, qty, symbol, price):
     _write_and_process(
-        f"8=FIX.4.2|35=D|49=E2E_CLIENT|55={symbol}|54=2|40=2|44={price:.5f}|38={qty}|"
+        f"8=FIX.4.2|35=D|49={context.e2e_client_id}|55={symbol}|54=2|40=2|44={price:.5f}|38={qty}|"
     )
 
 
@@ -82,7 +82,7 @@ def step_golden_path_trade_appears(context, symbol, timeout):
 )
 def step_drop_buy(context, symbol, price, qty):
     _write_and_process(
-        f"8=FIX.4.2|35=D|49=E2E_CLIENT|55={symbol}|54=1|40=2|44={price:.5f}|38={qty}|"
+        f"8=FIX.4.2|35=D|49={context.e2e_client_id}|55={symbol}|54=1|40=2|44={price:.5f}|38={qty}|"
     )
 
 
@@ -91,7 +91,7 @@ def step_drop_buy(context, symbol, price, qty):
 )
 def step_drop_sell(context, symbol, price, qty):
     _write_and_process(
-        f"8=FIX.4.2|35=D|49=E2E_CLIENT|55={symbol}|54=2|40=2|44={price:.5f}|38={qty}|"
+        f"8=FIX.4.2|35=D|49={context.e2e_client_id}|55={symbol}|54=2|40=2|44={price:.5f}|38={qty}|"
     )
 
 

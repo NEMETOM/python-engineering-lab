@@ -1,0 +1,43 @@
+name: FIXFlux - Deploy to DigitalOcean
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'fixflux/**'
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Sync & restart on Droplet
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DO_SSH_KEY }}" > ~/.ssh/fixflux_do
+          chmod 600 ~/.ssh/fixflux_do
+          ssh-keyscan -H ${{ secrets.DO_DROPLET_IP }} >> ~/.ssh/known_hosts
+
+      - name: Pull latest code
+        run: |
+          ssh -i ~/.ssh/fixflux_do root@${{ secrets.DO_DROPLET_IP }} "
+            cd ~/python-engineering-lab && git pull origin main
+          "
+
+      - name: Rebuild and restart changed services
+        run: |
+          ssh -i ~/.ssh/fixflux_do root@${{ secrets.DO_DROPLET_IP }} "
+            cd ~/python-engineering-lab/fixflux
+            docker compose --profile full --profile monitoring build
+            docker compose --profile full --profile monitoring up -d
+          "
+
+      - name: Verify stack is healthy
+        run: |
+          ssh -i ~/.ssh/fixflux_do root@${{ secrets.DO_DROPLET_IP }} \
+            "timeout 60 bash -c 'until curl -sf http://localhost:8000/health; do sleep 3; done' && echo Deployment OK"

@@ -1,4 +1,5 @@
 from matching_engine.infrastructure.kafka_client import create_producer
+from shared.observability.tracing import inject_ctx
 
 
 class Producer:
@@ -9,7 +10,9 @@ class Producer:
 
     def send_trade(self, trade):
 
-        self.producer.send("trades", trade.__dict__)
+        data = {**trade.__dict__}
+        inject_ctx(data)
+        self.producer.send("trades", data)
 
     def send_book(self, book):
 

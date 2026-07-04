@@ -4,10 +4,13 @@ from order_service.schemas import RawOrderEvent
 from order_service.transformer import OrderTransformer
 from order_service.utils.logger import configure_logging, get_logger
 from order_service.validator import OrderValidator
+from shared.observability.tracing import extract_ctx, init_tracer
 
 configure_logging()
 
 logger = get_logger(__name__)
+
+_tracer = init_tracer("order-service")
 
 
 def run():
@@ -22,21 +25,29 @@ def run():
 
     for msg in consumer:
 
-        try:
+        ctx = extract_ctx(msg.value)
 
-            raw_event = RawOrderEvent(**msg.value)
+        with _tracer.start_as_current_span("order-service.process", context=ctx) as span:
 
-            validator.validate(raw_event)
+            span.set_attribute("order.id", str(msg.value.get("order_id", "")))
+            span.set_attribute("order.symbol", str(msg.value.get("symbol", "")))
 
-            validated = transformer.transform(raw_event)
+            try:
 
-            logger.info(f"validated order {validated}")
+                raw_event = RawOrderEvent(**msg.value)
 
-            producer.send(validated)
+                validator.validate(raw_event)
 
-        except Exception as e:
+                validated = transformer.transform(raw_event)
 
-            logger.error(f"invalid order {msg.value} reason={e}")
+                logger.info(f"validated order {validated}")
+
+                producer.send(validated)
+
+            except Exception as e:
+
+                span.record_exception(e)
+                logger.error(f"invalid order {msg.value} reason={e}")
 
 
 if __name__ == "__main__":

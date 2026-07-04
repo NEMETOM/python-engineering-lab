@@ -5,7 +5,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "shared"
 version = "0.1.0"
-dependencies = ["prometheus-client>=0.20"]
+dependencies = [
+    "prometheus-client>=0.20",
+    "opentelemetry-api>=1.24",
+    "opentelemetry-sdk>=1.24",
+    "opentelemetry-exporter-otlp-proto-http>=1.24",
+]
 
 [tool.setuptools]
 package-dir = {"" = ".."}

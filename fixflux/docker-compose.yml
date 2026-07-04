@@ -80,6 +80,7 @@ services:
     environment:
       KAFKA_BROKER: redpanda:9092
       LOG_LEVEL: WARNING
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
     logging: *default-logging
     restart: on-failure
     profiles: [pipeline, full]
@@ -99,6 +100,7 @@ services:
       RISK_GROSS_POSITION_LIMIT: "10000"
       RISK_NET_POSITION_LIMIT: "5000"
       RISK_MAX_OPEN_ORDERS: "10"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
     logging: *default-logging
     restart: on-failure
     profiles: [pipeline, full]
@@ -113,6 +115,7 @@ services:
     environment:
       KAFKA_BROKER: redpanda:9092
       LOG_LEVEL: INFO
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
     ports:
       - "8003:8003"
     logging: *default-logging
@@ -166,6 +169,7 @@ services:
       KAFKA_BROKER: redpanda:9092
       DATABASE_URL: postgresql://fixuser:fixpass@postgres:5432/fixdb
       LOG_LEVEL: INFO
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
     logging: *default-logging
     restart: on-failure
     profiles: [pipeline, full]
@@ -226,6 +230,7 @@ services:
     image: grafana/grafana:10.4.2
     depends_on:
       - prometheus
+      - tempo
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
@@ -240,8 +245,21 @@ services:
     logging: *default-logging
     profiles: [monitoring]
 
+  tempo:
+    image: grafana/tempo:2.4.1
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./infrastructure/monitoring/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo_data:/var/tempo
+    ports:
+      - "3200:3200"
+      - "4318:4318"
+    logging: *default-logging
+    profiles: [monitoring]
+
 volumes:
   postgres_data:
   redpanda_data:
   prometheus_data:
   grafana_data:
+  tempo_data:

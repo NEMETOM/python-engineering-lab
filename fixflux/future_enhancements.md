@@ -20,7 +20,7 @@ Ordered roughly by effort, with hedge fund / institutional trading relevance in 
 
 ---
 
-## 2. Per-Symbol Order Book Isolation
+## 2. Per-Symbol Order Book Isolation ✅ Done
 
 **Why:** Currently all symbols share one in-memory `OrderBook` instance. Real matching engines shard by symbol (or instrument group). This means a EURUSD order and a BTCUSD order compete for the same book state - functionally wrong for a multi-asset simulator.
 
@@ -34,7 +34,7 @@ Ordered roughly by effort, with hedge fund / institutional trading relevance in 
 
 ---
 
-## 3. Pre-Trade Risk Limits
+## 3. Pre-Trade Risk Limits ✅ Done
 
 **Why:** Hedge funds care more about preventing bad trades than detecting them after the fact. The compliance module catches violations retrospectively. Pre-trade risk is the upstream gate that never lets a violating order reach the matching engine.
 
@@ -51,7 +51,7 @@ Ordered roughly by effort, with hedge fund / institutional trading relevance in 
 
 ---
 
-## 4. OpenTelemetry Distributed Tracing
+## 4. OpenTelemetry Distributed Tracing ✅ Done
 
 **Why:** The current observability stack (Prometheus + structured logging) covers metrics and logs. The third pillar - traces - is missing. A single order touches 4 services; without trace context you cannot correlate what happened to order `O-123` across all hops.
 
@@ -123,7 +123,7 @@ Ordered roughly by effort, with hedge fund / institutional trading relevance in 
 
 ---
 
-## 9. Chaos Engineering E2E Tests
+## 9. Chaos Engineering E2E Tests 🔲 Partial (Scenario A done)
 
 **Why:** SRE interviews consistently test for chaos engineering knowledge. A suite that deliberately breaks individual services and asserts recovery demonstrates you think about failure modes, not just happy paths. Combined with the existing Grafana stack, it gives a visible story: "I injected fault X, monitored the system on Grafana, and verified recovery with automated assertions."
 
@@ -155,14 +155,14 @@ Kill the PostgreSQL container while trades are being written. Restart it. Assert
 
 ## Priority Recommendation
 
-| Priority | Item | Effort | Signal strength |
-|---|---|---|---|
-| 1 | Kubernetes + Helm | Medium | Very high - every infra conversation starts here |
-| 2 | Pre-trade risk limits | Medium | High - directly relevant to trading risk roles |
-| 3 | Per-symbol order book | Low-medium | Medium - correctness fix with visible architecture impact |
-| 4 | OpenTelemetry tracing | Medium | High - completes the three-pillar observability story |
-| 5 | Chaos engineering tests | Medium | Very high for SRE roles - most candidates only talk about it |
-| 6 | Execution algorithms | Medium-hard | Very high - direct quant fund relevance |
-| 7 | WebSocket streaming | Medium | Medium - good portfolio demo material |
-| 8 | FIX Execution Reports | Hard | High - demonstrates real FIX protocol depth |
-| 9 | Backtesting replay | Hard | Very high for quant research roles |
+| Priority | Item | Effort | Signal strength | Status |
+|---|---|---|---|---|
+| 1 | Kubernetes + Helm | Medium | Very high - every infra conversation starts here | 🔲 Pending |
+| 2 | Pre-trade risk limits | Medium | High - directly relevant to trading risk roles | ✅ Done |
+| 3 | Per-symbol order book | Low-medium | Medium - correctness fix with visible architecture impact | ✅ Done |
+| 4 | OpenTelemetry tracing | Medium | High - completes the three-pillar observability story | ✅ Done |
+| 5 | Chaos engineering tests | Medium | Very high for SRE roles - most candidates only talk about it | 🔲 Partial (Scenario A) |
+| 6 | Execution algorithms | Medium-hard | Very high - direct quant fund relevance | 🔲 Pending |
+| 7 | WebSocket streaming | Medium | Medium - good portfolio demo material | 🔲 Pending |
+| 8 | FIX Execution Reports | Hard | High - demonstrates real FIX protocol depth | 🔲 Pending |
+| 9 | Backtesting replay | Hard | Very high for quant research roles | 🔲 Pending |
