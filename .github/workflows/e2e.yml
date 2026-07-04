@@ -6,7 +6,7 @@ on:
     - cron: '0 7 * * 1'  # Every Monday 07:00 UTC (after daily service CIs)
 
 permissions:
-  contents: read
+  contents: write   # needed to push Allure report to gh-pages branch
   checks: write
 
 concurrency:
@@ -55,7 +55,7 @@ jobs:
           pip install -e ./shared
           pip install -e ./services/trade-store
           pip install -e ./services/fix-gateway
-          pip install behave kafka-python httpx sqlalchemy psycopg2-binary
+          pip install behave allure-behave kafka-python httpx sqlalchemy psycopg2-binary
 
       - name: Run E2E BDD tests
         env:
@@ -68,6 +68,8 @@ jobs:
             --tags="~@chaos" \
             --no-capture \
             --junit --junit-directory reports/ \
+            -f pretty \
+            -f allure_behave.formatter:AllureFormatter -o allure-results/ \
             -v
 
       - name: Publish E2E test report
@@ -78,6 +80,32 @@ jobs:
           path: fixflux/reports/*.xml
           reporter: java-junit
           fail-on-error: false
+
+      - name: Restore previous Allure history
+        if: always()
+        working-directory: ${{ github.workspace }}
+        run: |
+          git fetch origin gh-pages --depth=1 2>/dev/null || true
+          mkdir -p fixflux/allure-results/history
+          git checkout origin/gh-pages -- history 2>/dev/null \
+            && cp -r history/. fixflux/allure-results/history/ \
+            || echo "No previous Allure history (first run)"
+
+      - name: Install Allure CLI
+        if: always()
+        run: npm install -g allure-commandline
+        working-directory: ${{ github.workspace }}
+
+      - name: Generate Allure HTML report
+        if: always()
+        run: allure generate allure-results/ -o allure-report/ --clean
+
+      - name: Deploy Allure report to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3  # v3.9.3
+        if: always()
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: fixflux/allure-report
 
       - name: Print container logs on failure
         if: failure()
