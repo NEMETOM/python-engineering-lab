@@ -27,7 +27,9 @@ def run():
 
         ctx = extract_ctx(msg.value)
 
-        with _tracer.start_as_current_span("order-service.process", context=ctx) as span:
+        with _tracer.start_as_current_span(
+            "order-service.process", context=ctx
+        ) as span:
 
             span.set_attribute("order.id", str(msg.value.get("order_id", "")))
             span.set_attribute("order.symbol", str(msg.value.get("symbol", "")))

@@ -35,7 +35,9 @@ def run():
         ).inc()
         event = msg.value
         ctx = extract_ctx(event)
-        with _tracer.start_as_current_span("matching-engine.process", context=ctx) as span:
+        with _tracer.start_as_current_span(
+            "matching-engine.process", context=ctx
+        ) as span:
             span.set_attribute("order.id", str(event.get("order_id", "")))
             span.set_attribute("order.symbol", str(event.get("symbol", "")))
             logger.debug(f"received order {event}")
