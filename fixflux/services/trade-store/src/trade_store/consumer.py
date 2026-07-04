@@ -1,8 +1,8 @@
+from shared.observability.tracing import extract_ctx, init_tracer
 from trade_store.infrastructure.kafka_client import create_consumer
 from trade_store.repository import TradeRepository
 from trade_store.schemas import TradeEvent
 from trade_store.utils.logger import configure_logging, get_logger
-from shared.observability.tracing import extract_ctx, init_tracer
 
 configure_logging()
 
