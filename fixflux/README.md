@@ -892,31 +892,37 @@ The simulator ships with a full three-pillar observability stack (metrics, logs,
 | Component | Role |
 |---|---|
 | **Prometheus** `v2.51` | Scrapes metrics from each service every 15 s; retains time-series data |
-| **Grafana** `v10.4` | Pre-provisioned dashboard with 4 collapsible rows and 14 panels; also the UI for traces via Explore |
+| **Grafana** `v10.4` | Pre-provisioned dashboard with 4 collapsible rows and 15 panels; also the UI for traces and logs via Explore |
 | **Tempo** `v2.4` | Distributed trace backend; receives OTLP spans from all services, queryable via Grafana Explore |
+| **Loki** `v2.9` | Log aggregation backend; stores log streams indexed by container and log level |
+| **Promtail** `v2.9` | Log collector; reads Docker container stdout via the Docker socket and ships to Loki; parses the `TIMESTAMP \| LEVEL \| module \| message` format into labels |
 | **prometheus-client** `>=0.20` | Python library; embedded HTTP server (fix-gateway, matching-engine) and ASGI endpoint (trade-store) |
 | **OpenTelemetry SDK** `>=1.24` | Instruments each Kafka consumer; propagates trace context as `_trace_id`/`_span_id` fields through Kafka message payloads |
 
 ### Monitoring Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Docker Network                           │
-│                                                                 │
-│  fix-gateway:8001/metrics  ──────────┐                          │
-│  matching-engine:8003/metrics ───────┼──► Prometheus:9090 ──┐  │
-│  trade-store:8000/metrics ───────────┘                       │  │
-│                                                               ▼  │
-│  order-service ──────────────────────┐                  Grafana:3000
-│  risk-service  ──────────────────────┤                       ▲  │
-│  matching-engine ────────────────────┼──► Tempo:4318 (OTLP) ─┘  │
-│  trade-store-consumer ───────────────┘        :3200 (query)     │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                           Docker Network                             │
+│                                                                      │
+│  fix-gateway:8001/metrics  ──────────┐                               │
+│  matching-engine:8003/metrics ───────┼──► Prometheus:9090 ────────┐ │
+│  trade-store:8000/metrics ───────────┘                             │ │
+│                                                                    ▼ │
+│  order-service ──────────────────────┐                       Grafana:3000
+│  risk-service  ──────────────────────┤                            ▲ │
+│  matching-engine ────────────────────┼──► Tempo:4318 (OTLP) ──────┤ │
+│  trade-store-consumer ───────────────┘       :3200 (query)        │ │
+│                                                                    │ │
+│  all services (stdout) ──► Promtail ──► Loki:3100 ────────────────┘ │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 **Metrics path:** Prometheus scrapes fix-gateway, matching-engine, and trade-store every 15 s. Grafana reads Prometheus as its primary datasource (auto-provisioned).
 
 **Traces path:** Each of the four pipeline consumers emits OpenTelemetry spans to Tempo via OTLP HTTP (`port 4318`). Grafana's Tempo datasource (auto-provisioned) makes traces queryable from Explore.
+
+**Logs path:** Promtail reads Docker container stdout via the Docker socket and ships all log streams to Loki. The pipeline stage parses the `TIMESTAMP | LEVEL | module | message` format, promoting `level` and `module` to indexed Loki labels. Grafana's Loki datasource (auto-provisioned) makes logs queryable from Explore with LogQL.
 
 ### Start the monitoring stack
 
@@ -931,8 +937,10 @@ docker compose --profile monitoring up
 | UI | URL | Credentials |
 |---|---|---|
 | Grafana | `http://localhost:3000` | admin / admin |
+| Grafana Explore (logs) | `http://localhost:3000/explore` - select **Loki** datasource | admin / admin |
 | Grafana Explore (traces) | `http://localhost:3000/explore` - select **Tempo** datasource | admin / admin |
 | Prometheus | `http://localhost:9090` | - |
+| Loki | `http://localhost:3100` | - |
 | Tempo | `http://localhost:3200` | - |
 | Raw metrics (trade-store) | `http://localhost:8000/metrics` | - |
 | Raw metrics (fix-gateway) | `http://localhost:8001/metrics` | - |
@@ -957,18 +965,38 @@ All metric definitions live in [`shared/observability/metrics.py`](shared/observ
 
 ### Grafana Dashboard
 
-The pre-provisioned dashboard (`fix_simulator_overview`) has four rows:
+The pre-provisioned dashboard (`fix_simulator_overview`) has four rows, 15 panels:
 
 | Row | Panels |
 |---|---|
-| **FIX Gateway** | Messages/sec by type (time series), Active Sessions (stat), Parse Errors/min (stat), Message type distribution (donut) |
-| **Matching Engine** | Trades/sec by symbol (time series), Latency P99 (gauge), Latency P50 (gauge), Order book depth - buy vs sell (time series) |
-| **Trade Store API** | Request rate (time series), API Latency P99 (gauge), 5xx Error Rate (stat), Latency percentile trends p50/p95/p99 |
-| **Kafka Throughput** | Messages consumed/sec (time series), Messages produced/sec (time series) |
+| **FIX Gateway** | Messages/sec by type, Active Sessions, Parse Errors/min, Message type distribution |
+| **Matching Engine** | Trades/sec by symbol, Latency P99, Latency P50, Order Book Depth (buy/sell per symbol), Cumulative Trades Matched |
+| **Trade Store API** | Request rate, API Latency P99, 5xx Error Rate, Latency percentiles p50/p95/p99 |
+| **Kafka Throughput** | Messages consumed/sec, Messages produced/sec |
+
+#### Panel Descriptions
+
+| Row | Panel | Type | What it tells you |
+|---|---|---|---|
+| FIX Gateway | Messages/sec by type | Time series | Throughput split by `logon`, `heartbeat`, `new_order`. A spike in `heartbeat` with no `new_order` activity means a connected but idle client. Flat line overall means no new orders are arriving. |
+| FIX Gateway | Active Sessions | Stat | Count of currently live FIX TCP connections. Drops to 0 if the gateway loses its accept loop or a client disconnects without a Logon. |
+| FIX Gateway | Parse Errors/min | Stat | Rate of messages that failed FIX tag=value parsing. Any non-zero value warrants investigation - valid clients do not send malformed frames. |
+| FIX Gateway | Message type distribution | Donut | Cumulative share of each message type over the panel window. Useful for understanding the order-to-heartbeat ratio in a load test. |
+| Matching Engine | Trades executed/sec by symbol | Time series | Matching throughput per instrument. Staircase pattern during a volume test (batch burst), flat after. Zero for a symbol means no crossing orders have arrived. |
+| Matching Engine | Matching latency P99 | Gauge | 99th-percentile time from order arrival to trade event emission. Sub-millisecond in normal operation. Spikes above 10 ms suggest GIL contention or Kafka producer backpressure. |
+| Matching Engine | Matching latency P50 | Gauge | Median matching latency. Divergence between P50 and P99 reveals tail-latency outliers rather than a general slowdown. |
+| Matching Engine | Order Book Depth (buy/sell) | Time series | Current resting order count per side and symbol (legend: `BTCUSD buy`, `BTCUSD sell`). Non-zero sell side confirms non-crossing limit orders are queuing. Zero sell-side with a rising trade counter is expected when sells match immediately - see Cumulative Trades panel for confirmation. |
+| Matching Engine | Cumulative Trades Matched | Time series | Raw `trades_executed_total` counter per symbol - monotonically rising during active matching, plateau after. Complements Order Book Depth: a flat sell line there plus a rising counter here means sells are matching immediately rather than resting in the book. |
+| Trade Store API | Request rate | Time series | Inbound `GET /trades` request rate. Sustained rate indicates active consumers polling results. |
+| Trade Store API | API Latency P99 | Gauge | PostgreSQL-backed read latency at the 99th percentile. Values above 100 ms typically indicate a missing index or connection pool exhaustion. |
+| Trade Store API | 5xx Error Rate | Stat | Server-side errors per minute. Any non-zero value is a failure - the trade store has no expected error conditions once the database is up. |
+| Trade Store API | Latency percentiles (P50/P95/P99) | Time series | Three latency quantiles on one panel. Parallel lines mean uniform latency; diverging P99 signals occasional slow queries. |
+| Kafka Throughput | Messages consumed/sec | Time series | Messages read from Kafka per second, labelled by `service` and `topic`. Divergence between produced and consumed rates signals consumer lag building up. |
+| Kafka Throughput | Messages produced/sec | Time series | Messages written to Kafka per second. Currently shows zero - metric is defined but no service increments it yet (see Instrumentation Gaps). |
 
 ### Dashboard Queries
 
-The exact PromQL expressions used in each panel - useful for reuse, alerting, and understanding what each panel actually measures:
+The exact PromQL expressions used in each panel - useful for reuse, alerting rules, and understanding what each panel measures:
 
 | Row | Panel | PromQL |
 |---|---|---|
@@ -979,7 +1007,8 @@ The exact PromQL expressions used in each panel - useful for reuse, alerting, an
 | **Matching Engine** | Trades executed/sec by symbol | `rate(trades_executed_total[1m])` |
 | **Matching Engine** | Matching latency P99 | `histogram_quantile(0.99, rate(order_matching_latency_seconds_bucket[5m]))` |
 | **Matching Engine** | Matching latency P50 | `histogram_quantile(0.50, rate(order_matching_latency_seconds_bucket[5m]))` |
-| **Matching Engine** | Order book depth (buy vs sell) | `orders_in_book` |
+| **Matching Engine** | Order book depth (buy/sell per symbol) | `orders_in_book` (legend: `{{symbol}} {{side}}`) |
+| **Matching Engine** | Cumulative trades matched | `trades_executed_total` (legend: `{{symbol}}`) |
 | **Trade Store API** | Request rate | `rate(api_requests_total[1m])` |
 | **Trade Store API** | API latency P99 | `histogram_quantile(0.99, rate(api_request_latency_seconds_bucket[5m]))` |
 | **Trade Store API** | 5xx error rate/min | `rate(api_requests_total{status_code=~"5.."}[1m]) * 60` |
@@ -987,7 +1016,7 @@ The exact PromQL expressions used in each panel - useful for reuse, alerting, an
 | **Kafka Throughput** | Messages consumed/sec | `rate(kafka_messages_consumed_total[1m])` |
 | **Kafka Throughput** | Messages produced/sec | `rate(kafka_messages_produced_total[1m])` |
 
-All counters use `rate()` rather than raw values so Grafana handles counter resets on pod restarts correctly. Latency panels use `histogram_quantile()` over a 5-minute window - long enough to smooth noise, short enough to catch latency spikes within a few scrape intervals.
+All counters use `rate()` rather than raw values so Grafana handles counter resets on pod restarts correctly. Latency panels use `histogram_quantile()` over a 5-minute window - long enough to smooth noise, short enough to catch spikes within a few scrape intervals.
 
 ### Distributed Traces
 
@@ -1021,6 +1050,98 @@ Every order flowing through the pipeline produces one distributed trace spanning
 **Trace-to-metrics:** The Tempo datasource is linked to Prometheus. Clicking the Prometheus icon on any span navigates directly to the corresponding `kafka_messages_consumed_total` metric for that service.
 
 **Without monitoring profile:** Services have `OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo:4318` set in docker-compose.yml. When Tempo is not running the `BatchSpanProcessor` drops spans silently - no error, no service impact.
+
+### Accessing Logs
+
+All services log to **stdout** in `TIMESTAMP | LEVEL | module | message` format. Docker captures this via its default `json-file` driver so logs are available immediately without any additional setup.
+
+#### Log format
+
+```
+2026-07-05 10:23:44,901 | INFO  | risk_service.consumer     | pre_trade_decision | order=abc123 client=E2E_ABC symbol=BTCUSD side=BUY qty=200 price=1000.00 notional=200000.00 last_price=0.0 decision=APPROVED
+2026-07-05 10:23:45,123 | INFO  | compliance_service.consumer | compliance_decision | client=E2E_ABC symbol=BTCUSD qty=200 price=1000.0 status=VIOLATIONS_DETECTED violations=1 rules=['TradeSizeRule']
+2026-07-05 10:23:45,200 | WARN  | risk_service.consumer     | pre_trade_decision | order=def456 client=E2E_XYZ symbol=AAPL side=BUY qty=6000 price=175.00 notional=1050000.00 last_price=175.0 decision=REJECTED reason='notional 1050000.00 exceeds limit 1000000.00'
+```
+
+The two structured decision log events:
+
+| Keyword | Service | Level | When emitted |
+|---|---|---|---|
+| `pre_trade_decision` | risk-service | INFO (approved) / WARN (rejected) | Once per order, after all pre-trade checks complete |
+| `compliance_decision` | compliance-service | INFO | Once per order, after all compliance rules evaluated |
+
+#### Docker Compose (local or Droplet)
+
+```bash
+# Stream logs from all services live
+docker compose logs -f
+
+# Stream logs from specific services only
+docker compose logs -f risk-service compliance-service
+
+# All pre-trade decisions (live)
+docker compose logs -f risk-service | grep pre_trade_decision
+
+# All compliance decisions (live)
+docker compose logs -f compliance-service | grep compliance_decision
+
+# Only rejections
+docker compose logs risk-service | grep "decision=REJECTED"
+
+# All violations detected (non-compliant orders)
+docker compose logs compliance-service | grep "status=VIOLATIONS_DETECTED"
+
+# Specific rule triggered
+docker compose logs compliance-service | grep "TradeSizeRule"
+
+# Trace a single order by ID across both services
+docker compose logs risk-service compliance-service | grep "order=<order_id>"
+
+# Save to file for offline analysis
+docker compose logs --no-log-prefix risk-service > risk_decisions.log
+```
+
+#### Remote access on a Digital Ocean Droplet
+
+SSH into the Droplet, then use the same `docker compose logs` commands above. To follow logs without keeping the SSH session open:
+
+```bash
+# Write to a rotating file on the Droplet (runs in background)
+docker compose logs -f risk-service compliance-service >> /var/log/fixflux-decisions.log &
+
+# Or use tmux to keep a live tail session persistent across SSH disconnects
+tmux new-session -d -s logs "docker compose logs -f risk-service compliance-service"
+tmux attach -t logs   # reconnect later
+```
+
+Docker's `json-file` log files are stored on the host at `/var/lib/docker/containers/<container-id>/<container-id>-json.log`. They persist across container restarts but are cleared on `docker compose down -v`.
+
+#### Loki + Grafana (included in monitoring profile)
+
+Loki and Promtail are part of the `monitoring` profile. When the monitoring stack is up, logs from all containers are automatically collected and queryable from Grafana Explore - no extra steps needed.
+
+**Open Grafana Explore → select Loki datasource**, then use LogQL:
+
+```logql
+# All pre-trade decisions
+{container=~".*risk-service.*"} |= "pre_trade_decision"
+
+# Only rejections
+{container=~".*risk-service.*"} | level="WARNING" |= "decision=REJECTED"
+
+# Compliance violations for a specific rule
+{container=~".*compliance-consumer.*"} |= "VIOLATIONS_DETECTED" |= "TradeSizeRule"
+
+# Trace a single order across both services
+{container=~".*(risk-service|compliance-consumer).*"} |= "order=<order_id>"
+
+# All WARNING or ERROR level logs across all services
+{logstream="stderr"} | level=~"WARNING|ERROR"
+```
+
+Promtail parses the `TIMESTAMP | LEVEL | module | message` log format and promotes `level` and `module` to indexed Loki labels, so label-based filtering (`level="WARNING"`) is fast (index lookup) while content filtering (`|= "TradeSizeRule"`) does a line scan.
+
+**Windows / Docker Desktop note:** Promtail uses the Docker socket (`/var/run/docker.sock`) to read logs. This works on the Droplet (Linux) and on Docker Desktop for Windows/Mac. If Promtail fails to start locally, verify Docker Desktop has the socket enabled under Settings → Advanced → "Allow the default Docker socket to be used".
 
 ### Instrumentation Gaps
 
@@ -1082,7 +1203,7 @@ The order-service and market-data-service follow the identical pattern:
 
 **Dead letter queue** - The filedrop client publishes any FIX message that fails parsing or validation to a `dead_letter_orders` Kafka topic (`{ source_file, raw_line, error, timestamp }`) before moving the file to `rejected/`. This makes failures observable, replayable, and alertable without manual log trawling - the same pattern used for error handling in production event-driven systems.
 
-**Three-pillar observability** - Structured JSON logging throughout (INFO for business events, DEBUG for infrastructure noise). Prometheus metrics instrumented across three services; Grafana dashboard auto-provisioned with 14 panels covering FIX message rates, matching latency (P50/P99), order book depth, and API error rates. Distributed tracing via OpenTelemetry SDK + Tempo: every order generates a four-service trace (`order-service → risk-service → matching-engine → trade-store`) with context propagated through Kafka message payloads and queryable from Grafana Explore. All three pillars - metrics, logs, traces - are wired from a single `docker compose --profile monitoring` flag.
+**Three-pillar observability** - Structured log lines to stdout with `pre_trade_decision` and `compliance_decision` decision events emitted by risk-service and compliance-service on every order; Loki + Promtail collect all container logs and make them queryable from Grafana Explore with LogQL. Prometheus metrics instrumented across three services; Grafana dashboard auto-provisioned with 15 panels covering FIX message rates, matching latency (P50/P99), order book depth, cumulative trade counts, and API error rates. Distributed tracing via OpenTelemetry SDK + Tempo: every order generates a four-service trace (`order-service → risk-service → matching-engine → trade-store`) with context propagated through Kafka message payloads and queryable from Grafana Explore. All three pillars - metrics, logs, traces - are wired from a single `docker compose --profile monitoring` flag.
 
 **Shared internal library pattern** - Cross-cutting concerns (Pydantic schemas, Kafka factory, SQLAlchemy session, exception hierarchy) are extracted into a versioned internal package, mirroring how platform teams in larger engineering organisations manage shared infrastructure.
 
@@ -1090,16 +1211,18 @@ The order-service and market-data-service follow the identical pattern:
 
 ## Future Improvements
 
-| Area | Detail |
-|---|---|
-| FIX TCP session | Full logout (`35=5`) handling and session expiry via heartbeat timeout; Logon + TCP disconnect lifecycle is already implemented |
-| WebSocket market data | Push-based streaming of market data snapshots to connected clients |
-| Schema registry | Confluent Schema Registry for Avro/Protobuf event versioning |
-| Async I/O | Replace blocking Kafka consumers with asyncio-based consumers (aiokafka) |
-| FIX replay | Ability to replay historical FIX message files for backtesting and regression |
-| Alerting rules | `PrometheusRule` CRDs and AlertManager config for actionable on-call alerts (e.g. P99 matching latency > 10 ms for 5 min, 5xx error rate > 1/min, Kafka consumer lag > 1000); currently monitoring is purely observational |
-| SLIs / SLOs | Formal SLI definitions (e.g. 99.9% of `GET /trades` requests < 200 ms) with Grafana-rendered error budget burn-rate panels; prerequisite for meaningful on-call escalation policy |
-| Runbooks | Per-alert runbook stubs linked from AlertManager annotations - signals operational maturity and makes the monitoring story complete for SRE interviews |
+| Area | Complexity | Detail |
+|---|---|---|
+| Wire `trades_stored_total` | Low | Add a single `.inc()` call inside the trade-store consumer loop. When graphed against `trades_executed_total` from the matching engine, the gap between the two lines is real-time Kafka consumer lag - instantly alertable without any extra instrumentation. |
+| Instrument order-service & compliance-service | Low | Add `orders_processed_total{status="approved\|rejected"}` to order-service and `violations_detected_total{rule, severity}` to compliance-service. Enables Grafana panels and alert rules for validation rejection spikes and compliance rule hit rates without log mining. |
+| FIX TCP session | Medium | Full logout (`35=5`) handling and session expiry via heartbeat timeout; Logon + TCP disconnect lifecycle is already implemented. |
+| WebSocket market data | Medium | Add an async FastAPI WebSocket endpoint to market-data-service that broadcasts change-detected snapshots to connected clients in real time. Removes the need for algorithmic trading stubs to poll a REST endpoint, and demonstrates async server-push over a persistent connection. |
+| Prometheus alerting rules | Medium | Write a `prometheus_alerts.yml` defining real thresholds: P99 matching latency > 10 ms for 2 min, trade-store 5xx rate > 5/min, Kafka consumer lag > 1000 messages, compliance violation rate spike. Wire into AlertManager for notification routing. Currently all monitoring is purely observational. |
+| SLIs / SLOs | Medium | Formal SLI definitions (e.g. 99.9% of `GET /trades` requests < 200 ms) with Grafana error budget burn-rate panels. Prerequisite for meaningful on-call escalation policy and production readiness review. |
+| OPERATIONS.md runbooks | Medium | Create `OPERATIONS.md` with a runbook per alert: symptoms, diagnosis steps, remediation, and rollback. Linked from AlertManager annotations. Demonstrates the ability to debug your own architecture under simulated stress - a strong differentiator in SRE and production engineering interviews. |
+| FIX replay | Medium | Ability to replay historical FIX message files against the live pipeline for backtesting and regression testing. |
+| Schema registry | High | Confluent Schema Registry for Avro/Protobuf event versioning with schema evolution enforcement at the producer and consumer boundary. |
+| Async I/O (aiokafka) | High | Replace blocking Kafka consumers in order-service and market-data-service with `aiokafka` async consumers. Allows each service to handle concurrent I/O, metrics scraping, and health endpoints in a single event loop without blocking the primary consumption thread. Required groundwork before horizontal scaling removes GIL contention as the bottleneck. |
 
 ---
 

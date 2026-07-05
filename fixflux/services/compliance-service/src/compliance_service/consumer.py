@@ -36,6 +36,13 @@ def _process_event(
     )
 
     violations = rules_engine.evaluate(event)
+    rule_names = [v.rule_name for v in violations]
+    status = "VIOLATIONS_DETECTED" if violations else "COMPLIANT"
+    logger.info(
+        f"compliance_decision | client={client_id}"
+        f" symbol={event.get('symbol')} qty={event.get('quantity')} price={event.get('price')}"
+        f" status={status} violations={len(violations)} rules={rule_names}"
+    )
     for violation in violations:
         score = risk_scorer.score(violation)
         violation_id = repo.save(violation, risk_contribution=score)

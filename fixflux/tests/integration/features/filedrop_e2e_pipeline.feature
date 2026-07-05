@@ -86,14 +86,18 @@ Feature: FIXFlux End-to-End Order Pipeline
     The compliance service passively observes every order. When a quantity
     exceeds the per-symbol limit (BTCUSD: 100, default: 10,000) a TradeSizeRule
     violation is recorded - even if risk-service approved the order on notional.
+    A non-crossing sell at a higher price is submitted alongside the buy so that
+    both sides of the order book carry resting orders (visible in Grafana's
+    Order Book Depth panel for symbols where qty passes the risk position limit).
 
     When a buy FIX order for "<symbol>" at price <price> qty <qty> is dropped into the filedrop
+    And a sell FIX order for "<symbol>" at price <sell_price> qty <qty> is dropped into the filedrop
     Then a compliance violation for rule "TradeSizeRule" appears in GET /violations within 20 seconds
 
     Examples:
-      | symbol | price   | qty   |
-      | BTCUSD | 1000.00 | 200   |
-      | MSFT   | 50.00   | 15000 |
+      | symbol | price   | sell_price | qty   |
+      | BTCUSD | 1000.00 | 1040.00    | 200   |
+      | MSFT   | 50.00   | 52.00      | 15000 |
 
   # ---------------------------------------------------------------------------
   # Compliance surveillance - wash trading detection

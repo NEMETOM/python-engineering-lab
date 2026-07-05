@@ -51,6 +51,8 @@ def handle_order(
     try:
         order = ValidatedOrder(**value)
         decision = checker.check_all(order, store, last_prices)
+        notional = float(order.price) * int(order.quantity)
+        last_price = last_prices.get(order.symbol, 0.0)
         if decision.approved:
             store.record_open_order(
                 order.order_id,
@@ -60,7 +62,12 @@ def handle_order(
                 order.quantity,
             )
             producer.approve(value)
-            logger.info(f"approved order {order.order_id} client={order.client_id}")
+            logger.info(
+                f"pre_trade_decision | order={order.order_id} client={order.client_id}"
+                f" symbol={order.symbol} side={order.side} qty={order.quantity}"
+                f" price={order.price} notional={notional:.2f} last_price={last_price}"
+                f" decision=APPROVED"
+            )
         else:
             rejection = RejectedOrderEvent(
                 order_id=order.order_id,
@@ -73,7 +80,12 @@ def handle_order(
                 timestamp=datetime.now(timezone.utc),
             )
             producer.reject(rejection.model_dump(mode="json"))
-            logger.warning(f"rejected order {order.order_id}: {decision.reason}")
+            logger.warning(
+                f"pre_trade_decision | order={order.order_id} client={order.client_id}"
+                f" symbol={order.symbol} side={order.side} qty={order.quantity}"
+                f" price={order.price} notional={notional:.2f} last_price={last_price}"
+                f" decision=REJECTED reason={decision.reason!r}"
+            )
     except Exception as e:
         logger.error(f"error processing order: {e}")
 
