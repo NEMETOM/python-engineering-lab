@@ -30,8 +30,12 @@ Feature: FIXFlux End-to-End Order Pipeline
     A trader submits a buy and a matching sell for the same instrument at the
     same price. The pipeline validates, risk-checks, matches, and persists the
     resulting trade - which immediately becomes queryable via the Trade Store API.
+    A logon and heartbeat are sent first to mirror a realistic FIX session lifecycle
+    and populate all three message types in the Grafana message distribution panel.
 
-    When a trader submits a buy order for <qty> units of "<symbol>" at a limit price of <price>
+    When a FIX logon is dropped into the filedrop
+    And a FIX heartbeat is dropped into the filedrop
+    And a trader submits a buy order for <qty> units of "<symbol>" at a limit price of <price>
     And  a matching sell order for <qty> units of "<symbol>" at <price> enters the pipeline
     Then the matched trade for "<symbol>" is recorded and visible in the Trade Store within 30 seconds
 

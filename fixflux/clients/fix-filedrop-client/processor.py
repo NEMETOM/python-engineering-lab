@@ -48,6 +48,11 @@ class FileProcessor:
                         success += 1
                         continue
 
+                    if msg_type == "0":
+                        fix_messages_received.labels(msg_type="heartbeat").inc()
+                        success += 1
+                        continue
+
                     validate_fix(msg)
 
                     event = {

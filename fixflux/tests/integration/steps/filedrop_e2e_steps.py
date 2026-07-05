@@ -77,6 +77,16 @@ def step_golden_path_trade_appears(context, symbol, timeout):
     step_trade_appears(context, symbol, timeout)
 
 
+@when('a FIX logon is dropped into the filedrop')
+def step_drop_logon(context):
+    _write_and_process(f"8=FIX.4.2|35=A|49={context.e2e_client_id}|")
+
+
+@when('a FIX heartbeat is dropped into the filedrop')
+def step_drop_heartbeat(context):
+    _write_and_process(f"8=FIX.4.2|35=0|49={context.e2e_client_id}|")
+
+
 @when(
     'a buy FIX order for "{symbol}" at price {price:f} qty {qty:d} is dropped into the filedrop'
 )
