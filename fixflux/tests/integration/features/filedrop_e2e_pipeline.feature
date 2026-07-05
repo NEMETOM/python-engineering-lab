@@ -93,7 +93,7 @@ Feature: FIXFlux End-to-End Order Pipeline
     Examples:
       | symbol | price   | qty   |
       | BTCUSD | 1000.00 | 200   |
-      | AAPL   | 5.00    | 15000 |
+      | MSFT   | 50.00   | 15000 |
 
   # ---------------------------------------------------------------------------
   # Compliance surveillance - wash trading detection
