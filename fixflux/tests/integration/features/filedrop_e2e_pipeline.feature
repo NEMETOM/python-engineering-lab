@@ -124,6 +124,60 @@ Feature: FIXFlux End-to-End Order Pipeline
       | MSFT   | 415.00  | 10  |
 
   # ---------------------------------------------------------------------------
+  # Compliance - missing client ID
+  # ---------------------------------------------------------------------------
+
+  Scenario: An order with no client ID triggers a MissingClientIdRule compliance violation
+    The compliance service applies MissingClientIdRule first in its chain.
+    Any order where the sender comp ID (tag 49) is absent is flagged immediately.
+    The order still flows through the pipeline - compliance is a passive observer.
+
+    When a buy FIX order with no client ID for "USDJPY" at price 149.50 qty 100 is dropped into the filedrop
+    Then a compliance violation for rule "MissingClientIdRule" appears in GET /violations within 20 seconds
+
+  # ---------------------------------------------------------------------------
+  # Compliance - invalid symbol
+  # ---------------------------------------------------------------------------
+
+  Scenario: An order for an unrecognised instrument triggers an InvalidSymbolRule compliance violation
+    The compliance service checks every order against the configured symbol allowlist.
+    An unknown instrument is flagged - the order still reaches the matching engine
+    (compliance observes but does not block), but it will never match a counterpart.
+
+    When a buy FIX order for "UNKNWN" at price 100.00 qty 10 is dropped into the filedrop
+    Then a compliance violation for rule "InvalidSymbolRule" appears in GET /violations within 20 seconds
+
+  # ---------------------------------------------------------------------------
+  # Compliance - duplicate order detection
+  # ---------------------------------------------------------------------------
+
+  Scenario: Submitting the same order twice triggers a DuplicateOrderRule compliance violation
+    The compliance service uses client_id + symbol + side + price + quantity as the
+    deduplication key. Resending an identical order within the detection window is
+    flagged as a potential operational error or replay attack.
+
+    When a buy FIX order for "NFLX" at price 600.00 qty 5 is dropped into the filedrop
+    And  a buy FIX order for "NFLX" at price 600.00 qty 5 is dropped into the filedrop
+    Then a compliance violation for rule "DuplicateOrderRule" appears in GET /violations within 20 seconds
+
+  # ---------------------------------------------------------------------------
+  # Pre-trade - fat-finger check
+  # ---------------------------------------------------------------------------
+
+  @needs_risk_service
+  Scenario: A price deviating more than 10% from the last matched trade is blocked by the fat-finger check
+    The risk service tracks the last trade price per symbol. Any new order priced
+    more than 10% away from that reference is rejected before reaching the matching
+    engine. A crossing pair is submitted first to establish the reference price,
+    then a buy at 3400 is sent - 13% above the 3000 reference - triggering the check.
+
+    When a buy FIX order for "ETHUSD" at price 3000.00 qty 1 is dropped into the filedrop
+    And  a sell FIX order for "ETHUSD" at price 3000.00 qty 1 is dropped into the filedrop
+    Then the matched trade for "ETHUSD" is recorded and visible in the Trade Store within 30 seconds
+    When a buy FIX order for "ETHUSD" at price 3400.00 qty 1 is dropped into the filedrop
+    Then a risk rejection for "ETHUSD" appears within 15 seconds
+
+  # ---------------------------------------------------------------------------
   # Volume - prove the pipeline handles high-throughput order flow without loss
   # ---------------------------------------------------------------------------
 
