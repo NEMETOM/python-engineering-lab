@@ -14,7 +14,16 @@ for _p in (str(_repo_root), str(_trade_store_src)):
         sys.path.insert(0, _p)
 
 
+def _start_metrics_server():
+    try:
+        from prometheus_client import start_http_server
+        start_http_server(8005)
+    except OSError:
+        pass  # port already bound if the test process is reused across runs
+
+
 def before_all(context):
+    _start_metrics_server()
     from shared.infrastructure.db import Base, engine
     from trade_store.models import TradeModel  # noqa: F401 - registers with Base
 
