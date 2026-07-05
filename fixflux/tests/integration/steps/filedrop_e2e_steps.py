@@ -77,6 +77,29 @@ def step_golden_path_trade_appears(context, symbol, timeout):
     step_trade_appears(context, symbol, timeout)
 
 
+@when('a buy FIX order with no client ID for "{symbol}" at price {price:f} qty {qty:d} is dropped into the filedrop')
+def step_drop_buy_no_client(context, symbol, price, qty):
+    # 49= (empty value) parses to client_id="" which is falsy → MissingClientIdRule fires.
+    # Omitting tag 49 entirely would default to "UNKNOWN" in processor.py, which is truthy.
+    _write_and_process(
+        f"8=FIX.4.2|35=D|49=|55={symbol}|54=1|40=2|44={price:.5f}|38={qty}|"
+    )
+
+
+@then('a risk rejection for "{symbol}" appears within {timeout:d} seconds')
+def step_risk_rejection_appears(context, symbol, timeout):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        records = context.risk_rejected_consumer.poll(timeout_ms=2000)
+        for _, msgs in records.items():
+            for msg in msgs:
+                if msg.value.get("symbol") == symbol:
+                    return
+    raise AssertionError(
+        f"No risk rejection for {symbol!r} appeared in risk_rejected_orders within {timeout}s"
+    )
+
+
 @when('a FIX logon is dropped into the filedrop')
 def step_drop_logon(context):
     _write_and_process(f"8=FIX.4.2|35=A|49={context.e2e_client_id}|")
