@@ -169,7 +169,7 @@ Feature: FIXFlux End-to-End Order Pipeline
     The risk service tracks the last trade price per symbol. Any new order priced
     more than 10% away from that reference is rejected before reaching the matching
     engine. A crossing pair is submitted first to establish the reference price,
-    then a buy at 3400 is sent - 13% above the 3000 reference - triggering the check.
+    finally a buy at 3400 is sent - 13% above the 3000 reference - triggering the check.
 
     When a buy FIX order for "ETHUSD" at price 3000.00 qty 1 is dropped into the filedrop
     And  a sell FIX order for "ETHUSD" at price 3000.00 qty 1 is dropped into the filedrop
