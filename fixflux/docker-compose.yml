@@ -226,11 +226,34 @@ services:
     logging: *default-logging
     profiles: [monitoring]
 
+  loki:
+    image: grafana/loki:2.9.8
+    command: -config.file=/etc/loki/loki-config.yaml
+    volumes:
+      - ./infrastructure/monitoring/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - loki_data:/loki
+    ports:
+      - "3100:3100"
+    logging: *default-logging
+    profiles: [monitoring]
+
+  promtail:
+    image: grafana/promtail:2.9.8
+    command: -config.file=/etc/promtail/promtail-config.yaml
+    volumes:
+      - ./infrastructure/monitoring/promtail-config.yaml:/etc/promtail/promtail-config.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - loki
+    logging: *default-logging
+    profiles: [monitoring]
+
   grafana:
     image: grafana/grafana:10.4.2
     depends_on:
       - prometheus
       - tempo
+      - loki
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
@@ -263,3 +286,4 @@ volumes:
   prometheus_data:
   grafana_data:
   tempo_data:
+  loki_data:

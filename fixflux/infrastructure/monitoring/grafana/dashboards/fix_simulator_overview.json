@@ -265,11 +265,11 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "sell" },
+            "matcher": { "id": "byRegexp", "options": ".*sell" },
             "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
           },
           {
-            "matcher": { "id": "byName", "options": "buy" },
+            "matcher": { "id": "byRegexp", "options": ".*buy" },
             "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
           }
         ]
@@ -282,7 +282,37 @@
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "expr": "orders_in_book",
-          "legendFormat": "{{side}}",
+          "legendFormat": "{{symbol}} {{side}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "type": "timeseries",
+      "title": "Cumulative Trades Matched by Symbol",
+      "description": "Raw counter showing total matched orders over time. Complements the resting-orders panel: a flat sell line there plus a rising line here means sells are matching immediately rather than queuing.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 12, "x": 0, "y": 18 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10, "spanNulls": false },
+          "unit": "short",
+          "decimals": 0,
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "right" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "trades_executed_total",
+          "legendFormat": "{{symbol}}",
           "refId": "A"
         }
       ]
