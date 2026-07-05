@@ -212,6 +212,8 @@ services:
 
   prometheus:
     image: prom/prometheus:v2.51.0
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
