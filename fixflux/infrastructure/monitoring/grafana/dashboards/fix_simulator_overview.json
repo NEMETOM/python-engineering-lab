@@ -35,6 +35,7 @@
       "id": 2,
       "type": "timeseries",
       "title": "FIX Messages / sec by Type",
+      "description": "Rate of incoming trading messages per second, broken down by type.\n\n- **new_order** – a trader is submitting a buy or sell instruction\n- **logon** – a trading client has connected to the system\n- **heartbeat** – a keep-alive ping confirming the connection is still live\n\nSpikes in new_order indicate bursts of trading activity. Zero values mean no clients are currently connected.",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
       "fieldConfig": {
@@ -62,6 +63,7 @@
       "id": 3,
       "type": "stat",
       "title": "Active FIX Sessions",
+      "description": "Number of trading clients currently connected to the gateway.\n\nIn a real exchange each session represents a broker, market-maker, or algorithmic trading system. The colour threshold is illustrative:\n- **Green** – normal load\n- **Yellow** – 10+ concurrent sessions\n- **Red** – 50+ sessions (high load)\n\nThe counter increments on every logon message received and does not decrement automatically — it reflects the total number of logons seen since the system started.",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
       "fieldConfig": {
@@ -96,6 +98,7 @@
       "id": 4,
       "type": "stat",
       "title": "Parse Errors / min",
+      "description": "Number of messages per minute that the gateway could not understand.\n\nA message fails to parse when it is malformed — missing required fields, wrong format, or corrupted data. Every such message is safely quarantined to a dead-letter queue so the rest of the pipeline is never blocked.\n\n**Ideal value: 0.** Any non-zero reading means a client sent a badly formatted order that was rejected before it could cause harm.",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
       "fieldConfig": {
@@ -130,6 +133,7 @@
       "id": 5,
       "type": "piechart",
       "title": "Message Type Distribution (5 min window)",
+      "description": "Share of each message type received in the last 5 minutes.\n\nShows what kind of activity is happening right now:\n- A large **new_order** slice means traders are actively placing orders\n- A large **heartbeat** slice means sessions are connected but quiet\n- A **logon** slice appears when new clients connect\n\nUseful for quickly seeing whether the system is processing real trade flow or is simply idle with connected clients.",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "h": 4, "w": 12, "x": 12, "y": 5 },
       "fieldConfig": {
@@ -161,6 +165,7 @@
       "id": 7,
       "type": "timeseries",
       "title": "Trades Executed / sec",
+      "description": "Rate of successful trade matches per second, broken down by trading instrument (symbol).\n\nA trade is created when a buy order and a sell order for the same instrument meet at a matching price. Each line represents one instrument (e.g. EURUSD, AAPL, BTCUSD).\n\n**Rising lines** = active trading. **Flat at zero** = no crossing orders in the book right now.",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 10 },
       "fieldConfig": {
@@ -188,6 +193,7 @@
       "id": 8,
       "type": "gauge",
       "title": "Matching Latency P99",
+      "description": "The time taken to match the slowest 1% of orders.\n\n99% of all trades complete faster than this value. Think of it as the \"worst case you'll see in normal operation.\"\n\n- **Green (< 10 ms)** – excellent, sub-millisecond exchange-grade performance\n- **Yellow (10–50 ms)** – acceptable under load\n- **Red (> 50 ms)** – the engine is struggling; investigate queue depth or CPU",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "h": 4, "w": 6, "x": 12, "y": 10 },
       "fieldConfig": {
@@ -221,6 +227,7 @@
       "id": 9,
       "type": "gauge",
       "title": "Matching Latency P50",
+      "description": "The typical (median) time to match an order — half of all trades complete faster than this value.\n\nThis is the number most traders would experience on an average interaction. A low, stable median combined with a low P99 (see the gauge to the left) means consistently fast performance with no hidden outliers.\n\n- **Green (< 5 ms)** – excellent\n- **Yellow (5–20 ms)** – acceptable\n- **Red (> 20 ms)** – degraded; the matching engine may be overloaded",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "h": 4, "w": 6, "x": 18, "y": 10 },
       "fieldConfig": {
@@ -254,6 +261,7 @@
       "id": 10,
       "type": "timeseries",
       "title": "Order Book Depth (resting orders)",
+      "description": "Number of unmatched buy (green) and sell (red) orders waiting in the queue for each instrument.\n\nThink of the order book as a marketplace notice board: buy orders on one side, sell orders on the other. When a buyer and seller agree on a price, their orders are removed and a trade is created.\n\n**Balanced depth** (similar buy and sell counts) indicates a healthy, liquid market. **One-sided depth** means orders on that side are not finding counterparts — possibly because prices are too far apart.",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
       "fieldConfig": {
@@ -291,7 +299,7 @@
       "id": 19,
       "type": "timeseries",
       "title": "Cumulative Trades Matched by Symbol",
-      "description": "Raw counter showing total matched orders over time. Complements the resting-orders panel: a flat sell line there plus a rising line here means sells are matching immediately rather than queuing.",
+      "description": "Running total of all successfully matched trades since the system started, per instrument.\n\nThis is an ever-increasing counter — it never resets. A steadily rising line confirms the full pipeline (gateway → risk check → matching engine → trade store) is working correctly end to end.\n\nPair this with the Order Book Depth panel: if buy/sell queues are filling up but this counter stays flat, orders are arriving but not crossing — likely a price mismatch between buyers and sellers.",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "h": 4, "w": 12, "x": 0, "y": 18 },
       "fieldConfig": {
@@ -328,6 +336,7 @@
       "id": 12,
       "type": "timeseries",
       "title": "API Request Rate",
+      "description": "How frequently the Trade Store REST API is being called, broken down by HTTP method, endpoint, and response code.\n\nThe Trade Store exposes completed trades via a REST API (e.g. GET /trades). External systems — dashboards, reporting tools, downstream consumers — query it here.\n\n**Green 2xx codes** = successful responses. **Red 5xx codes** = server errors that need attention. A sustained rise in request rate can indicate high downstream demand or a monitoring loop running frequently.",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 23 },
       "fieldConfig": {
@@ -355,6 +364,7 @@
       "id": 13,
       "type": "gauge",
       "title": "API Latency P99",
+      "description": "How long the slowest 1% of Trade Store API requests take to respond.\n\n99% of all API calls complete faster than this. It is the \"ceiling\" a downstream consumer can expect under real conditions.\n\n- **Green (< 100 ms)** – excellent for a database-backed REST API\n- **Yellow (100–500 ms)** – acceptable, but worth monitoring\n- **Red (> 500 ms)** – the database or network may be under stress; users will notice slow responses",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "h": 4, "w": 6, "x": 12, "y": 23 },
       "fieldConfig": {
@@ -388,6 +398,7 @@
       "id": 14,
       "type": "stat",
       "title": "5xx Error Rate / min",
+      "description": "Number of internal server errors returned by the Trade Store API per minute.\n\nHTTP 5xx responses mean the server encountered an unexpected problem — a database failure, a crashed service, or an unhandled exception. These are distinct from 4xx client errors (bad requests from callers).\n\n**Ideal value: 0.** Any reading above zero means something failed on the server side and should be investigated immediately.",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "h": 4, "w": 6, "x": 18, "y": 23 },
       "fieldConfig": {
@@ -422,6 +433,7 @@
       "id": 15,
       "type": "timeseries",
       "title": "API Latency Percentiles (p50 / p95 / p99)",
+      "description": "Three latency percentiles shown together over time, giving a full picture of API response speed:\n\n- **p50** – the typical experience: half of all requests are faster than this\n- **p95** – the near-worst case: 95% of requests are faster than this\n- **p99** – the ceiling: only 1 in 100 requests is slower\n\nIf p50 is low but p99 is high, there are occasional slow outliers worth investigating. If all three rise together, the system is under general load.",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "h": 4, "w": 12, "x": 12, "y": 27 },
       "fieldConfig": {
@@ -468,6 +480,7 @@
       "id": 17,
       "type": "timeseries",
       "title": "Kafka Messages Consumed / sec",
+      "description": "How fast each microservice is reading messages off the internal message queue (Kafka), broken down by topic and service.\n\nKafka is the backbone connecting all services: orders flow from the gateway through risk checks to the matching engine via these topics. Each service reads from the topic relevant to its role.\n\n**A drop in this rate** means a service has slowed down, restarted, or stopped processing — messages will pile up in the queue and trades will be delayed.",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
       "fieldConfig": {
@@ -495,6 +508,7 @@
       "id": 18,
       "type": "timeseries",
       "title": "Kafka Messages Produced / sec",
+      "description": "How fast messages are being written to the internal message queue (Kafka), broken down by topic and service.\n\nThis should closely mirror the consumed rate (panel to the left). A healthy system produces and consumes at roughly the same pace — messages flow straight through.\n\n**If produced rate exceeds consumed rate**, messages are accumulating in the queue — a downstream service may be overwhelmed or stopped. This is an early warning sign of a processing backlog.",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
       "fieldConfig": {
