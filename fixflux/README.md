@@ -271,20 +271,26 @@ fixflux/
 │       │   └── api/                 # FastAPI: /violations, /risk, /audit, /health
 │       ├── policies/
 │       │   └── compliance_policies.yaml  # All rule thresholds - no code change needed
-│       └── tests/                   # unit + BDD tests (83 tests, 88% coverage)
+│       └── tests/                   # unit + BDD tests
 ├── shared/                          # Internal platform library
 │   ├── schemas/                     # Pydantic v2 event schemas (OrderEvent, TradeEvent, BookEvent)
 │   ├── infrastructure/              # Kafka client factory, SQLAlchemy session, DB setup
-│   ├── observability/               # Structured JSON logging + Prometheus metric definitions
+│   ├── observability/               # Structured logging + Prometheus metric definitions
 │   └── exceptions/                  # Typed exception hierarchy
 ├── infrastructure/
 │   └── monitoring/
 │       ├── prometheus.yml           # Scrape config (fix-gateway, matching-engine, trade-store)
+│       ├── loki-config.yaml         # Loki log aggregation backend
+│       ├── promtail-config.yaml     # Promtail log collector (Docker socket, regex pipeline)
+│       ├── tempo.yaml               # Tempo distributed tracing backend
 │       └── grafana/
-│           ├── provisioning/        # Auto-wired datasource + dashboard provider
-│           └── dashboards/          # fix_simulator_overview.json (14 panels, 4 rows)
+│           ├── provisioning/
+│           │   ├── datasources/     # Auto-provisioned: Prometheus, Loki, Tempo
+│           │   └── dashboards/      # Dashboard provider config
+│           └── dashboards/
+│               └── fix_simulator_overview.json  # 15-panel trading overview (4 rows)
 ├── clients/
-│   └── fix-filedrop-client/         # Local directory watcher - drops FIX files into pipeline
+│   └── fix-filedrop-client/         # Directory watcher - drops FIX files into pipeline
 ├── data/                            # Sample + compliance test FIX files
 ├── k8s/                             # Raw Kubernetes manifests (apply with kubectl or kustomize)
 │   ├── 00-namespace.yaml
@@ -299,13 +305,26 @@ fixflux/
 │   ├── market-data-service.yaml
 │   └── kustomization.yaml           # Apply everything: kubectl apply -k k8s/
 ├── helm/
-│   └── fixflux/           # Helm chart - parameterised for dev/staging/prod
+│   └── fixflux/                     # Helm chart - parameterised for dev/staging/prod
 │       ├── Chart.yaml
 │       ├── values.yaml              # All tuneable knobs (replicas, resources, image registry)
 │       └── templates/               # Go-templated versions of all k8s/ manifests
 ├── tests/
-│   └── integration/                 # BDD integration tests (PostgreSQL + Kafka)
-└── scripts/                         # Local utility scripts (DB connectivity check, etc.)
+│   └── integration/                 # BDD integration tests (PostgreSQL + Kafka required)
+│       ├── environment.py           # Behave hooks: DB truncation, Kafka consumer init
+│       ├── features/
+│       │   ├── filedrop_e2e_pipeline.feature      # Full E2E: filedrop → risk → match → REST
+│       │   ├── risk_pipeline_integration.feature  # Risk service: notional, fat-finger, limits
+│       │   ├── kafka_trade_pipeline.feature       # Kafka → trade-store persistence
+│       │   ├── trade_persistence.feature          # Trade Store REST API + DB assertions
+│       │   └── chaos_recovery.feature             # Service kill + recovery scenarios
+│       └── steps/                   # Step definitions: filedrop, risk, kafka, chaos, trade
+└── scripts/
+    ├── update_status_badge.py       # Queries Prometheus; updates live status badge in README
+    ├── check-observability.sh       # Smoke-tests the full monitoring stack on the Droplet
+    ├── clear_db.py                  # Truncates all tables (dev reset)
+    ├── test_db_connection.py        # Verifies PostgreSQL connectivity
+    └── k8s-*.ps1 / build-images.ps1 # Kubernetes + Docker convenience scripts (Windows)
 ```
 
 ---
