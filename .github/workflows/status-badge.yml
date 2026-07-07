@@ -1,0 +1,57 @@
+name: FIXFlux - Live System Status Badge
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'   # every 15 minutes
+  workflow_dispatch:          # manual trigger for testing
+
+permissions:
+  contents: write             # needed to commit the badge update back to main
+
+jobs:
+  update-badge:
+    name: Query Prometheus & update README badge
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+        with:
+          ref: main
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DO_SSH_KEY }}" > ~/.ssh/fixflux_do
+          chmod 600 ~/.ssh/fixflux_do
+          ssh-keyscan -H ${{ secrets.DO_DROPLET_IP }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Query Prometheus via SSH
+        # SSH to the Droplet and curl Prometheus locally — no need to expose port 9090
+        # publicly. Falls back to '{}' if the Droplet or Prometheus is unreachable,
+        # which the script treats as "Unknown" status.
+        run: |
+          ssh -i ~/.ssh/fixflux_do \
+              -o ConnectTimeout=10 \
+              -o StrictHostKeyChecking=no \
+              root@${{ secrets.DO_DROPLET_IP }} \
+            "curl -sf 'http://localhost:9090/api/v1/query?query=up'" \
+            > prom_data.json 2>/dev/null \
+          || echo '{}' > prom_data.json
+
+      - name: Update status badge in README
+        run: |
+          python3 fixflux/scripts/update_status_badge.py \
+            prom_data.json \
+            fixflux/README.md
+
+      - name: Commit badge update
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git diff --quiet fixflux/README.md && echo "Badge unchanged, skipping commit." || (
+            git add fixflux/README.md
+            git commit -m "chore: update live system status badge [skip ci]"
+            git push origin main
+          )

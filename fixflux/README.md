@@ -14,6 +14,9 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Linting: ruff](https://img.shields.io/badge/linting-ruff-orange.svg)](https://github.com/astral-sh/ruff)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+<!-- STATUS_BADGE_START -->
+[![Live System Status](https://img.shields.io/badge/Live%20System-Unknown-lightgrey?style=flat-square&logo=prometheus)](https://github.com/NEMETOM/python-engineering-lab)  <!-- Awaiting first automated check -->
+<!-- STATUS_BADGE_END -->
 
 ---
 
