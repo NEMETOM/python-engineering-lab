@@ -2,7 +2,7 @@
   <img src="docs/FixFlux-Logo.png" width="160" alt="FIXFlux" />
 </p>
 
-# FIXFlux | Stateful Low-Latency FIX Protocol Engine
+# FIXFlux | Event-Driven Electronic Trading Platform
 
 [![Fix Gateway CI](https://github.com/NEMETOM/python-engineering-lab/actions/workflows/fix-gateway.yml/badge.svg)](https://github.com/NEMETOM/python-engineering-lab/actions/workflows/fix-gateway.yml)
 [![Order Service CI](https://github.com/NEMETOM/python-engineering-lab/actions/workflows/order-service.yml/badge.svg)](https://github.com/NEMETOM/python-engineering-lab/actions/workflows/order-service.yml)
