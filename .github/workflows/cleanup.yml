@@ -1,0 +1,48 @@
+name: FIXFlux - Weekly Disk Cleanup
+
+on:
+  schedule:
+    - cron: '0 2 * * 0'   # Sundays at 02:00 UTC
+  workflow_dispatch:
+    inputs:
+      retain_days:
+        description: 'Days of data to retain (default: 30)'
+        required: false
+        default: '30'
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    name: Clean Droplet disk
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+        with:
+          ref: main
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DO_SSH_KEY }}" > ~/.ssh/fixflux_do
+          chmod 600 ~/.ssh/fixflux_do
+          ssh-keyscan -H ${{ secrets.DO_DROPLET_IP }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Copy cleanup script to Droplet
+        run: |
+          scp -i ~/.ssh/fixflux_do \
+              fixflux/scripts/cleanup.sh \
+              root@${{ secrets.DO_DROPLET_IP }}:/tmp/fixflux_cleanup.sh
+
+      - name: Run cleanup on Droplet
+        run: |
+          RETAIN="${{ github.event.inputs.retain_days || '30' }}"
+          ssh -i ~/.ssh/fixflux_do \
+              -o ConnectTimeout=10 \
+              -o StrictHostKeyChecking=no \
+              root@${{ secrets.DO_DROPLET_IP }} \
+            "chmod +x /tmp/fixflux_cleanup.sh && RETAIN_DAYS=${RETAIN} /tmp/fixflux_cleanup.sh"
