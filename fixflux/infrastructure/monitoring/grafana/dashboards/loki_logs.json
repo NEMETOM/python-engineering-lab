@@ -1,0 +1,176 @@
+{
+  "id": null,
+  "uid": "fixflux-loki-logs",
+  "title": "FIXFlux - Decision & Compliance Logs",
+  "description": "Saved LogQL queries for pre-trade risk decisions, compliance violations, cross-service order tracing, and system-wide error surfacing",
+  "tags": ["fintech", "fix-protocol", "loki", "logs"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "annotations": { "list": [] },
+  "templating": { "list": [] },
+  "panels": [
+
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Risk Service - Pre-trade Decisions",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+
+    {
+      "id": 2,
+      "type": "logs",
+      "title": "All Pre-trade Decisions",
+      "description": "Every order evaluation logged by the risk service — both approvals and rejections.\n\nLook for the `decision=APPROVED` or `decision=REJECTED` field, along with `notional`, `last_price`, and `reason` to understand why each decision was made.\n\nLogQL: `{container=~\".*risk-service.*\"} |= \"pre_trade_decision\"`",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 1 },
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "{container=~\".*risk-service.*\"} |= \"pre_trade_decision\"",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ]
+    },
+
+    {
+      "id": 3,
+      "type": "logs",
+      "title": "Rejected Orders Only",
+      "description": "Orders blocked by the risk service before reaching the matching engine.\n\nFiltered to WARNING level logs containing `decision=REJECTED`. The `reason` field explains which rule fired (e.g. notional cap exceeded, fat-finger threshold, position limit).\n\nLogQL: `{container=~\".*risk-service.*\"} | level=\"WARNING\" |= \"decision=REJECTED\"`",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 9 },
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "{container=~\".*risk-service.*\"} | level=\"WARNING\" |= \"decision=REJECTED\"",
+          "queryType": "range",
+          "refId": "B"
+        }
+      ]
+    },
+
+    {
+      "id": 4,
+      "type": "row",
+      "title": "Compliance Service - Violations",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 }
+    },
+
+    {
+      "id": 5,
+      "type": "logs",
+      "title": "Compliance Violations Detected",
+      "description": "Orders flagged by the compliance service. Defaults to showing all violations — narrow to a specific rule by appending `|= \"RuleName\"` to the query (e.g. `|= \"TradeSizeRule\"`, `|= \"WashTradingRule\"`, `|= \"DuplicateOrderRule\"`).\n\nThe `violations` field shows the count and `rules` lists which rules fired.\n\nLogQL: `{container=~\".*compliance-consumer.*\"} |= \"VIOLATIONS_DETECTED\"`",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 18 },
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "{container=~\".*compliance-consumer.*\"} |= \"VIOLATIONS_DETECTED\"",
+          "queryType": "range",
+          "refId": "C"
+        }
+      ]
+    },
+
+    {
+      "id": 6,
+      "type": "row",
+      "title": "Cross-Service Diagnostics",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 }
+    },
+
+    {
+      "id": 7,
+      "type": "logs",
+      "title": "Order Trace (replace ORDER_ID in query)",
+      "description": "Follows a single order ID across both the risk service and compliance consumer — useful for understanding the full lifecycle of one specific order.\n\nBefore using: click the query editor icon (pencil) and replace `<ORDER_ID>` with the actual order ID from your logs (e.g. `ORD-abc123`).\n\nLogQL: `{container=~\".*(risk-service|compliance-consumer).*\"} |= \"order=<ORDER_ID>\"`",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 27 },
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "{container=~\".*(risk-service|compliance-consumer).*\"} |= \"order=<ORDER_ID>\"",
+          "queryType": "range",
+          "refId": "D"
+        }
+      ]
+    },
+
+    {
+      "id": 8,
+      "type": "logs",
+      "title": "All WARNING / ERROR Logs (system-wide)",
+      "description": "Surfaces WARNING and ERROR level logs from every container in the stack — a fast way to spot problems without knowing which service to look at first.\n\nFiltered to `stderr` stream, which is where Python logging writes WARNING and above by default.\n\nLogQL: `{logstream=\"stderr\"} | level=~\"WARNING|ERROR\"`",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 35 },
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "{logstream=\"stderr\"} | level=~\"WARNING|ERROR\"",
+          "queryType": "range",
+          "refId": "E"
+        }
+      ]
+    }
+
+  ]
+}
