@@ -1,0 +1,155 @@
+{
+  "id": null,
+  "uid": "fixflux-tempo-traces",
+  "title": "FIXFlux - Distributed Traces",
+  "description": "Saved TraceQL queries for tracing single orders across the order-service → risk-service → matching-engine → trade-store pipeline",
+  "tags": ["fintech", "fix-protocol", "tempo", "traces", "opentelemetry"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "annotations": { "list": [] },
+  "templating": { "list": [] },
+  "panels": [
+
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Order Lifecycle",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+
+    {
+      "id": 2,
+      "type": "traces",
+      "title": "Full Order Lifecycle (order-service → trade-store)",
+      "description": "Traces that span the complete happy path: order received, risk-approved, matched, and persisted as a trade.\n\nEach row is one order. Click a row to open the full span waterfall — you will see timing for each service hop.\n\nTraceQL: `{name=\"order-service.process\"} >> {name=\"trade-store.persist\"}`",
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 1 },
+      "targets": [
+        {
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "queryType": "traceql",
+          "query": "{name=\"order-service.process\"} >> {name=\"trade-store.persist\"}",
+          "tableType": "traces",
+          "limit": 20,
+          "refId": "A"
+        }
+      ]
+    },
+
+    {
+      "id": 3,
+      "type": "traces",
+      "title": "Risk-Approved Orders Only",
+      "description": "Traces where risk-service forwarded the order downstream (approved). Structural query: order-service span must be followed by a matching-engine span — rejected orders never reach the matching engine.\n\nTraceQL: `{name=\"order-service.process\"} >> {name=\"matching-engine.process\"}`",
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 11 },
+      "targets": [
+        {
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "queryType": "traceql",
+          "query": "{name=\"order-service.process\"} >> {name=\"matching-engine.process\"}",
+          "tableType": "traces",
+          "limit": 20,
+          "refId": "B"
+        }
+      ]
+    },
+
+    {
+      "id": 4,
+      "type": "traces",
+      "title": "Risk-Rejected Orders Only",
+      "description": "Traces where the order entered risk-service but never reached the matching engine — these are blocked orders.\n\nThe risk-service span topic will be `risk_rejected_orders`. Use this to investigate which risk rule fired.\n\nTraceQL: `{name=\"order-service.process\"} !>> {name=\"matching-engine.process\"}`",
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 11 },
+      "targets": [
+        {
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "queryType": "traceql",
+          "query": "{name=\"order-service.process\"} !>> {name=\"matching-engine.process\"}",
+          "tableType": "traces",
+          "limit": 20,
+          "refId": "C"
+        }
+      ]
+    },
+
+    {
+      "id": 5,
+      "type": "row",
+      "title": "Latency & Performance",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 21 }
+    },
+
+    {
+      "id": 6,
+      "type": "traces",
+      "title": "Slow Matching Engine Spans (> 50 ms)",
+      "description": "Matching-engine spans that took longer than 50 ms to process an order — useful for spotting order book contention or GC pauses under load.\n\nAdjust the threshold in the query editor to tighten or loosen the filter.\n\nTraceQL: `{name=\"matching-engine.process\" && duration > 50ms}`",
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 22 },
+      "targets": [
+        {
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "queryType": "traceql",
+          "query": "{name=\"matching-engine.process\" && duration > 50ms}",
+          "tableType": "traces",
+          "limit": 20,
+          "refId": "D"
+        }
+      ]
+    },
+
+    {
+      "id": 7,
+      "type": "traces",
+      "title": "Slowest End-to-End Traces (all services)",
+      "description": "The 20 slowest traces across all instrumented services, sorted by duration. Useful for finding outliers during load tests or E2E runs.\n\nTraceQL: `{resource.service.name=~\"order-service|risk-service|matching-engine|trade-store\"} | select(duration)` sorted by duration descending.",
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 22 },
+      "targets": [
+        {
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "queryType": "traceql",
+          "query": "{resource.service.name=~\"order-service|risk-service|matching-engine|trade-store\"}",
+          "tableType": "traces",
+          "limit": 20,
+          "refId": "E"
+        }
+      ]
+    },
+
+    {
+      "id": 8,
+      "type": "row",
+      "title": "Error Investigation",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 }
+    },
+
+    {
+      "id": 9,
+      "type": "traces",
+      "title": "Error Spans (any service)",
+      "description": "Any span across all services that finished with status=error. In normal operation this panel should be empty — if rows appear, click through to see the stack trace attached to the failing span.\n\nTraceQL: `{status=error}`",
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 33 },
+      "targets": [
+        {
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "queryType": "traceql",
+          "query": "{status=error}",
+          "tableType": "traces",
+          "limit": 20,
+          "refId": "F"
+        }
+      ]
+    }
+
+  ]
+}

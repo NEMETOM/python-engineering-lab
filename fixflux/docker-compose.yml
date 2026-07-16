@@ -65,6 +65,7 @@ services:
     environment:
       KAFKA_BROKER: redpanda:9092
       LOG_LEVEL: WARNING
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
     ports:
       - "8001:8001"
     logging: *default-logging

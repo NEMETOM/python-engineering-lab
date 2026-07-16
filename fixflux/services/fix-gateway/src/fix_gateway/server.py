@@ -13,12 +13,14 @@ from shared.observability.metrics import (
     fix_messages_received,
     fix_reconnect_attempts,
 )
+from shared.observability.tracing import init_tracer
 
 configure_logging()
 
 logger = get_logger(__name__)
 
 _METRICS_PORT = 8001
+_tracer = init_tracer("fix-gateway")
 
 
 class FixServer:
@@ -69,8 +71,12 @@ class FixServer:
             logger.debug("heartbeat processed")
         elif self.fix_handler.is_new_order(fix_msg):
             fix_messages_received.labels(msg_type="new_order").inc()
-            logger.info("new order received")
-            logger.debug(fix_msg)
+            with _tracer.start_as_current_span("fix-gateway.new_order") as span:
+                span.set_attribute("fix.symbol", fix_msg.get("55", ""))
+                span.set_attribute("fix.side", fix_msg.get("54", ""))
+                span.set_attribute("fix.client_id", fix_msg.get("49", ""))
+                logger.info("new order received")
+                logger.debug(fix_msg)
         else:
             fix_messages_parse_errors.inc()
             logger.warning(
