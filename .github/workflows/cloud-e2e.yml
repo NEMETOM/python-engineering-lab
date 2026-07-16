@@ -53,7 +53,8 @@ jobs:
             cd ~/python-engineering-lab/fixflux
             apt-get install -y -q python3-pip python3-dev libpq-dev 2>/dev/null
             python3 -m pip install -q --upgrade pip
-            python3 -m pip install -q behave kafka-python httpx sqlalchemy psycopg2-binary
+            python3 -m pip install -q behave kafka-python httpx sqlalchemy psycopg2-binary \
+              opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp-proto-http
           "
 
       - name: Run ${{ github.event.inputs.test_suite }} tests
