@@ -41,7 +41,9 @@ class TestProcessEventMetrics:
         violation = _make_violation(rule_name="WashTradingRule", severity="HIGH")
         rules_engine, risk_scorer, repo, auditor = _make_deps(violations=[violation])
         _process_event({}, rules_engine, risk_scorer, repo, auditor, "raw_orders")
-        mock_counter.labels.assert_called_once_with(rule="WashTradingRule", severity="HIGH")
+        mock_counter.labels.assert_called_once_with(
+            rule="WashTradingRule", severity="HIGH"
+        )
         mock_counter.labels.return_value.inc.assert_called_once()
 
     @patch("compliance_service.consumer.violations_detected")
@@ -56,7 +58,9 @@ class TestProcessEventMetrics:
         _process_event({}, rules_engine, risk_scorer, repo, auditor, "raw_orders")
         assert mock_counter.labels.call_count == 2
         mock_counter.labels.assert_any_call(rule="WashTradingRule", severity="HIGH")
-        mock_counter.labels.assert_any_call(rule="DuplicateOrderRule", severity="MEDIUM")
+        mock_counter.labels.assert_any_call(
+            rule="DuplicateOrderRule", severity="MEDIUM"
+        )
 
     @patch("compliance_service.consumer.violations_detected")
     def test_counter_not_incremented_when_rules_engine_raises(self, mock_counter):
