@@ -4,6 +4,7 @@ from order_service.schemas import RawOrderEvent
 from order_service.transformer import OrderTransformer
 from order_service.utils.logger import configure_logging, get_logger
 from order_service.validator import OrderValidator
+from shared.observability.metrics import orders_processed
 from shared.observability.tracing import extract_ctx, init_tracer
 
 configure_logging()
@@ -46,10 +47,13 @@ def run():
 
                 producer.send(validated)
 
+                orders_processed.labels(status="approved").inc()
+
             except Exception as e:
 
                 span.record_exception(e)
                 logger.error(f"invalid order {msg.value} reason={e}")
+                orders_processed.labels(status="rejected").inc()
 
 
 if __name__ == "__main__":
