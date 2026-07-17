@@ -18,7 +18,7 @@ from shared.observability.metrics import (
     fix_messages_received,
     fix_sessions_active,
 )
-from shared.observability.tracing import init_tracer, inject_ctx
+from shared.observability.tracing import init_tracer
 from validator import validate_fix
 
 logger = get_logger(__name__)
@@ -66,12 +66,7 @@ class FileProcessor:
                         "client_id": msg.get("49", "UNKNOWN"),
                     }
 
-                    with _tracer.start_as_current_span("fix-filedrop-client.publish") as span:
-                        span.set_attribute("fix.symbol", event["symbol"])
-                        span.set_attribute("fix.side", event["side"])
-                        span.set_attribute("fix.client_id", event["client_id"])
-                        inject_ctx(event)
-                        self.producer.send("raw_orders", event)
+                    self.producer.send("raw_orders", event)
                     fix_messages_received.labels(msg_type="new_order").inc()
                     success += 1
 
