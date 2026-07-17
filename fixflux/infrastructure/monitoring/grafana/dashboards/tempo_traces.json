@@ -62,15 +62,15 @@
     {
       "id": 4,
       "type": "traces",
-      "title": "Risk-Rejected Orders Only",
-      "description": "Traces where the order entered risk-service but never reached the matching engine — these are blocked orders.\n\nThe risk-service span topic will be `risk_rejected_orders`. Use this to investigate which risk rule fired.\n\nTraceQL: `{name=\"order-service.process\"} !>> {name=\"matching-engine.process\"}`",
+      "title": "All Risk Evaluations (approved + rejected)",
+      "description": "All risk-service spans — each row is one order evaluated. The span name is `risk-service.validated_orders` for every order regardless of outcome, because risk-service consumes from the `validated_orders` topic.\n\nTo filter only rejected orders, cross-reference with the Loki 'Rejected Orders Only' panel using the order ID from the span attributes.\n\nTraceQL: `{name=\"risk-service.validated_orders\"}`",
       "datasource": { "type": "tempo", "uid": "tempo" },
       "gridPos": { "h": 10, "w": 12, "x": 12, "y": 11 },
       "targets": [
         {
           "datasource": { "type": "tempo", "uid": "tempo" },
           "queryType": "traceql",
-          "query": "{name=\"order-service.process\"} !>> {name=\"matching-engine.process\"}",
+          "query": "{name=\"risk-service.validated_orders\"}",
           "tableType": "traces",
           "limit": 20,
           "refId": "C"
