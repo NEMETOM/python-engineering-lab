@@ -1,3 +1,4 @@
+from shared.observability.metrics import trades_stored
 from shared.observability.tracing import extract_ctx, init_tracer
 from trade_store.infrastructure.kafka_client import create_consumer
 from trade_store.repository import TradeRepository
@@ -32,6 +33,8 @@ def run():
                 logger.info(f"storing trade {event.trade_id}")
 
                 repo.save(event)
+
+                trades_stored.labels(symbol=event.symbol).inc()
 
             except Exception as e:
 

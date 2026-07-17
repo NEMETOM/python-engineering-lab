@@ -1179,7 +1179,7 @@ Honest coverage status - metrics defined in `shared/observability/metrics.py` bu
 | `compliance-service` | Not instrumented | No custom metrics; violations/risk scores are only queryable via REST |
 | `kafka_messages_produced_total` | Defined, unused | Defined in shared with `topic`/`service` labels but no service calls `.inc()` on it |
 
-The three highest-value gaps for an SRE: `orders_processed_total` (would let you detect validation rejection spikes without reading logs), `trades_stored_total` (would make the consumer lag visible as a rate divergence from `trades_executed_total`), and compliance violation rate (currently requires polling the REST API rather than a Prometheus alert).
+The two remaining highest-value gaps for an SRE: `orders_processed_total` (would let you detect validation rejection spikes without reading logs), and compliance violation rate (currently requires polling the REST API rather than a Prometheus alert). `trades_stored_total` is now wired - graph it against `trades_executed_total` to see Kafka consumer lag as a live rate divergence.
 
 ### Recommended Screenshots for Portfolio
 
@@ -1235,7 +1235,7 @@ The order-service and market-data-service follow the identical pattern:
 
 | Area | Complexity | Detail |
 |---|---|---|
-| Wire `trades_stored_total` | Low | Add a single `.inc()` call inside the trade-store consumer loop. When graphed against `trades_executed_total` from the matching engine, the gap between the two lines is real-time Kafka consumer lag - instantly alertable without any extra instrumentation. |
+| ~~Wire `trades_stored_total`~~ | ~~Low~~ | **Done.** `trades_stored.labels(symbol=...).inc()` is called in `trade-store/consumer.py` after each successful `repo.save()`. Graph `rate(trades_stored_total[1m])` against `rate(trades_executed_total[1m])` in Grafana to see consumer lag as a live rate divergence. |
 | Instrument order-service & compliance-service | Low | Add `orders_processed_total{status="approved\|rejected"}` to order-service and `violations_detected_total{rule, severity}` to compliance-service. Enables Grafana panels and alert rules for validation rejection spikes and compliance rule hit rates without log mining. |
 | FIX TCP session | Medium | Full logout (`35=5`) handling and session expiry via heartbeat timeout; Logon + TCP disconnect lifecycle is already implemented. |
 | WebSocket market data | Medium | Add an async FastAPI WebSocket endpoint to market-data-service that broadcasts change-detected snapshots to connected clients in real time. Removes the need for algorithmic trading stubs to poll a REST endpoint, and demonstrates async server-push over a persistent connection. |
