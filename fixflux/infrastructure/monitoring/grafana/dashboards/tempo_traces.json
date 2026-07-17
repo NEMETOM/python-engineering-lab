@@ -2,11 +2,11 @@
   "id": null,
   "uid": "fixflux-tempo-traces",
   "title": "FIXFlux - Distributed Traces",
-  "description": "Saved TraceQL queries for tracing single orders across the order-service → risk-service → matching-engine → trade-store pipeline",
+  "description": "Saved TraceQL queries for tracing single orders across the order-service to trade-store pipeline",
   "tags": ["fintech", "fix-protocol", "tempo", "traces", "opentelemetry"],
   "timezone": "browser",
   "schemaVersion": 38,
-  "version": 2,
+  "version": 5,
   "refresh": "30s",
   "time": { "from": "now-1h", "to": "now" },
   "annotations": { "list": [] },
@@ -23,16 +23,18 @@
 
     {
       "id": 2,
-      "type": "traces",
-      "title": "Full Order Lifecycle (reached trade-store)",
-      "description": "Orders that completed the full happy path and were persisted as a trade. Filtered to `trade-store.persist` spans — if this span exists, the order passed risk, was matched, and is in the database.\n\nClick any row to open the span waterfall and see timing for each service hop.\n\nTraceQL: `{name=\"trade-store.persist\"}`",
+      "type": "table",
+      "title": "All Spans - Full Pipeline",
+      "description": "Every span from every instrumented service. Each row is one span. Click a TraceID to open the full waterfall in Explore.\n\nTraceQL: {resource.service.name=~\"order-service|risk-service|matching-engine|trade-store\"}",
       "datasource": { "type": "tempo", "uid": "tempo" },
       "gridPos": { "h": 10, "w": 24, "x": 0, "y": 1 },
+      "options": { "sortBy": [] },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
       "targets": [
         {
           "datasource": { "type": "tempo", "uid": "tempo" },
           "queryType": "traceql",
-          "query": "{name=\"trade-store.persist\"}",
+          "query": "{resource.service.name=~\"order-service|risk-service|matching-engine|trade-store\"}",
           "limit": 20,
           "refId": "A"
         }
@@ -41,16 +43,18 @@
 
     {
       "id": 3,
-      "type": "traces",
-      "title": "Risk-Approved Orders (reached matching engine)",
-      "description": "Orders that cleared the pre-trade risk check and entered the matching engine. If a `matching-engine.process` span exists, the risk-service approved the order.\n\nTraceQL: `{name=\"matching-engine.process\"}`",
+      "type": "table",
+      "title": "Completed Trades (reached trade-store)",
+      "description": "Spans from trade-store.persist only. If this span exists the order passed risk, was matched, and is in PostgreSQL.\n\nTraceQL: {name=\"trade-store.persist\"}",
       "datasource": { "type": "tempo", "uid": "tempo" },
       "gridPos": { "h": 10, "w": 12, "x": 0, "y": 11 },
+      "options": { "sortBy": [] },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
       "targets": [
         {
           "datasource": { "type": "tempo", "uid": "tempo" },
           "queryType": "traceql",
-          "query": "{name=\"matching-engine.process\"}",
+          "query": "{name=\"trade-store.persist\"}",
           "limit": 20,
           "refId": "B"
         }
@@ -59,11 +63,13 @@
 
     {
       "id": 4,
-      "type": "traces",
-      "title": "All Risk Evaluations (approved + rejected)",
-      "description": "All spans from the risk-service order evaluation. Span name is `risk-service.validated_orders` for every order regardless of outcome — risk-service consumes from `validated_orders` and decides internally whether to approve or reject.\n\nTo see only rejections, cross-reference with the Loki 'Rejected Orders Only' panel using the `order.id` span attribute.\n\nTraceQL: `{name=\"risk-service.validated_orders\"}`",
+      "type": "table",
+      "title": "Risk Evaluations (all orders)",
+      "description": "All risk-service spans. Every order evaluation appears here regardless of outcome - approved and rejected share the same span name risk-service.validated_orders.\n\nTraceQL: {name=\"risk-service.validated_orders\"}",
       "datasource": { "type": "tempo", "uid": "tempo" },
       "gridPos": { "h": 10, "w": 12, "x": 12, "y": 11 },
+      "options": { "sortBy": [] },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
       "targets": [
         {
           "datasource": { "type": "tempo", "uid": "tempo" },
@@ -85,11 +91,13 @@
 
     {
       "id": 6,
-      "type": "traces",
+      "type": "table",
       "title": "Slow Matching Engine Spans (> 50 ms)",
-      "description": "Matching-engine spans that took longer than 50 ms — useful for spotting order book contention or GC pauses under load.\n\nAdjust the threshold in the query editor to tighten or loosen the filter.\n\nTraceQL: `{name=\"matching-engine.process\" && duration > 50ms}`",
+      "description": "Matching-engine spans over 50 ms. Adjust the threshold in the query editor.\n\nTraceQL: {name=\"matching-engine.process\" && duration > 50ms}",
       "datasource": { "type": "tempo", "uid": "tempo" },
       "gridPos": { "h": 10, "w": 12, "x": 0, "y": 22 },
+      "options": { "sortBy": [] },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
       "targets": [
         {
           "datasource": { "type": "tempo", "uid": "tempo" },
@@ -103,24 +111,6 @@
 
     {
       "id": 7,
-      "type": "traces",
-      "title": "All Spans (any instrumented service)",
-      "description": "Every span from every instrumented service — order-service, risk-service, matching-engine, and trade-store. Useful for a broad overview of recent activity or for finding spans when you do not know which service to look at first.\n\nTraceQL: `{resource.service.name=~\"order-service|risk-service|matching-engine|trade-store\"}`",
-      "datasource": { "type": "tempo", "uid": "tempo" },
-      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 22 },
-      "targets": [
-        {
-          "datasource": { "type": "tempo", "uid": "tempo" },
-          "queryType": "traceql",
-          "query": "{resource.service.name=~\"order-service|risk-service|matching-engine|trade-store\"}",
-          "limit": 20,
-          "refId": "E"
-        }
-      ]
-    },
-
-    {
-      "id": 8,
       "type": "row",
       "title": "Error Investigation",
       "collapsed": false,
@@ -128,19 +118,21 @@
     },
 
     {
-      "id": 9,
-      "type": "traces",
+      "id": 8,
+      "type": "table",
       "title": "Error Spans (any service)",
-      "description": "Any span that finished with status=error. In normal operation this panel should be empty — if rows appear, click through to see the exception attached to the failing span.\n\nTraceQL: `{status=error}`",
+      "description": "Spans with status=error across all services. Should be empty in normal operation.\n\nTraceQL: {status=error}",
       "datasource": { "type": "tempo", "uid": "tempo" },
       "gridPos": { "h": 10, "w": 24, "x": 0, "y": 33 },
+      "options": { "sortBy": [] },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
       "targets": [
         {
           "datasource": { "type": "tempo", "uid": "tempo" },
           "queryType": "traceql",
           "query": "{status=error}",
           "limit": 20,
-          "refId": "F"
+          "refId": "E"
         }
       ]
     }
