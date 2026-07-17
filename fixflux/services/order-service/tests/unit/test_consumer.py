@@ -1,6 +1,8 @@
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
+import order_service.consumer  # noqa: F401  # ensure module is in sys.modules before @patch decorators fire
+
 
 def _raw_msg_value(**overrides):
     defaults = dict(
@@ -77,3 +79,48 @@ class TestConsumerRun:
 
         run()
         assert mock_producer.send.call_count == 3
+
+
+class TestConsumerMetrics:
+    @patch("order_service.consumer.orders_processed")
+    @patch("order_service.consumer.Producer")
+    @patch("order_service.consumer.create_consumer")
+    def test_valid_message_increments_approved(
+        self, mock_create_consumer, _mock_producer_cls, mock_counter
+    ):
+        msg = MagicMock()
+        msg.value = _raw_msg_value()
+        mock_create_consumer.return_value = iter([msg])
+        from order_service.consumer import run
+
+        run()
+        mock_counter.labels.assert_called_once_with(status="approved")
+        mock_counter.labels.return_value.inc.assert_called_once()
+
+    @patch("order_service.consumer.orders_processed")
+    @patch("order_service.consumer.Producer")
+    @patch("order_service.consumer.create_consumer")
+    def test_invalid_message_increments_rejected(
+        self, mock_create_consumer, _mock_producer_cls, mock_counter
+    ):
+        msg = MagicMock()
+        msg.value = _raw_msg_value(price=-1.0)
+        mock_create_consumer.return_value = iter([msg])
+        from order_service.consumer import run
+
+        run()
+        mock_counter.labels.assert_called_once_with(status="rejected")
+        mock_counter.labels.return_value.inc.assert_called_once()
+
+    @patch("order_service.consumer.orders_processed")
+    @patch("order_service.consumer.Producer")
+    @patch("order_service.consumer.create_consumer")
+    def test_multiple_valid_messages_each_increment_approved(
+        self, mock_create_consumer, _mock_producer_cls, mock_counter
+    ):
+        msgs = [MagicMock(value=_raw_msg_value()) for _ in range(3)]
+        mock_create_consumer.return_value = iter(msgs)
+        from order_service.consumer import run
+
+        run()
+        assert mock_counter.labels.return_value.inc.call_count == 3

@@ -108,3 +108,45 @@ class TestConsumerErrorHandling:
 
         run()
         mock_repo.save.assert_called_once()
+
+
+class TestConsumerMetrics:
+    @patch("trade_store.consumer.trades_stored")
+    @patch("trade_store.consumer.TradeRepository")
+    @patch("trade_store.consumer.create_consumer")
+    def test_successful_save_increments_counter_with_symbol(
+        self, mock_create, _mock_repo_cls, mock_counter
+    ):
+        mock_create.return_value = iter([_make_msg(symbol="EURUSD")])
+        from trade_store.consumer import run
+
+        run()
+        mock_counter.labels.assert_called_once_with(symbol="EURUSD")
+        mock_counter.labels.return_value.inc.assert_called_once()
+
+    @patch("trade_store.consumer.trades_stored")
+    @patch("trade_store.consumer.TradeRepository")
+    @patch("trade_store.consumer.create_consumer")
+    def test_repo_failure_does_not_increment_counter(
+        self, mock_create, mock_repo_cls, mock_counter
+    ):
+        mock_repo = MagicMock()
+        mock_repo.save.side_effect = Exception("DB down")
+        mock_repo_cls.return_value = mock_repo
+        mock_create.return_value = iter([_make_msg()])
+        from trade_store.consumer import run
+
+        run()
+        mock_counter.labels.return_value.inc.assert_not_called()
+
+    @patch("trade_store.consumer.trades_stored")
+    @patch("trade_store.consumer.TradeRepository")
+    @patch("trade_store.consumer.create_consumer")
+    def test_each_message_increments_counter_once(
+        self, mock_create, _mock_repo_cls, mock_counter
+    ):
+        mock_create.return_value = iter([_make_msg() for _ in range(3)])
+        from trade_store.consumer import run
+
+        run()
+        assert mock_counter.labels.return_value.inc.call_count == 3
