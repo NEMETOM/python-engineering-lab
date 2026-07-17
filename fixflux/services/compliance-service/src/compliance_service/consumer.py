@@ -13,6 +13,7 @@ from compliance_service.rules.loader import (
 )
 from compliance_service.utils.logger import configure_logging, get_logger
 from shared.infrastructure.kafka_client import create_consumer
+from shared.observability.metrics import violations_detected
 
 configure_logging()
 logger = get_logger(__name__)
@@ -44,6 +45,9 @@ def _process_event(
         f" status={status} violations={len(violations)} rules={rule_names}"
     )
     for violation in violations:
+        violations_detected.labels(
+            rule=violation.rule_name, severity=violation.severity.value
+        ).inc()
         score = risk_scorer.score(violation)
         violation_id = repo.save(violation, risk_contribution=score)
 

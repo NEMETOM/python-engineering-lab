@@ -40,7 +40,14 @@ orders_in_book = Gauge(
 orders_processed = Counter(
     "orders_processed_total",
     "Orders processed by the order service",
-    ["status"],  # valid, invalid
+    ["status"],  # approved, rejected
+)
+
+# Compliance Service
+violations_detected = Counter(
+    "violations_detected_total",
+    "Compliance rule violations detected",
+    ["rule", "severity"],
 )
 
 # Kafka

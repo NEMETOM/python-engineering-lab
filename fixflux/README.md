@@ -1179,7 +1179,7 @@ Honest coverage status - metrics defined in `shared/observability/metrics.py` bu
 | `compliance-service` | Not instrumented | No custom metrics; violations/risk scores are only queryable via REST |
 | `kafka_messages_produced_total` | Defined, unused | Defined in shared with `topic`/`service` labels but no service calls `.inc()` on it |
 
-The two remaining highest-value gaps for an SRE: `orders_processed_total` (would let you detect validation rejection spikes without reading logs), and compliance violation rate (currently requires polling the REST API rather than a Prometheus alert). `trades_stored_total` is now wired - graph it against `trades_executed_total` to see Kafka consumer lag as a live rate divergence.
+All three previously-identified metric gaps are now wired: `trades_stored_total` (consumer lag vs matching engine), `orders_processed_total{status="approved|rejected"}` (order validation rejection rate), and `violations_detected_total{rule,severity}` (compliance rule hit rate per rule). Prometheus alerting rules remain the next gap.
 
 ### Recommended Screenshots for Portfolio
 
@@ -1236,7 +1236,7 @@ The order-service and market-data-service follow the identical pattern:
 | Area | Complexity | Detail |
 |---|---|---|
 | ~~Wire `trades_stored_total`~~ | ~~Low~~ | **Done.** `trades_stored.labels(symbol=...).inc()` is called in `trade-store/consumer.py` after each successful `repo.save()`. Graph `rate(trades_stored_total[1m])` against `rate(trades_executed_total[1m])` in Grafana to see consumer lag as a live rate divergence. |
-| Instrument order-service & compliance-service | Low | Add `orders_processed_total{status="approved\|rejected"}` to order-service and `violations_detected_total{rule, severity}` to compliance-service. Enables Grafana panels and alert rules for validation rejection spikes and compliance rule hit rates without log mining. |
+| ~~Instrument order-service & compliance-service~~ | ~~Low~~ | **Done.** `orders_processed.labels(status="approved\|rejected").inc()` wired in order-service consumer; `violations_detected.labels(rule=..., severity=...).inc()` wired in compliance-service consumer for each rule that fires. |
 | FIX TCP session | Medium | Full logout (`35=5`) handling and session expiry via heartbeat timeout; Logon + TCP disconnect lifecycle is already implemented. |
 | WebSocket market data | Medium | Add an async FastAPI WebSocket endpoint to market-data-service that broadcasts change-detected snapshots to connected clients in real time. Removes the need for algorithmic trading stubs to poll a REST endpoint, and demonstrates async server-push over a persistent connection. |
 | Prometheus alerting rules | Medium | Write a `prometheus_alerts.yml` defining real thresholds: P99 matching latency > 10 ms for 2 min, trade-store 5xx rate > 5/min, Kafka consumer lag > 1000 messages, compliance violation rate spike. Wire into AlertManager for notification routing. Currently all monitoring is purely observational. |
