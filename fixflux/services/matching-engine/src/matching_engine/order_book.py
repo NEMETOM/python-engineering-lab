@@ -1,5 +1,4 @@
 class OrderBook:
-
     def __init__(self):
 
         self.buys = []
@@ -8,13 +7,11 @@ class OrderBook:
     def add_order(self, order):
 
         if order.side == "BUY":
-
             self.buys.append(order)
 
             self.buys.sort(key=lambda x: -x.price)
 
         else:
-
             self.sells.append(order)
 
             self.sells.sort(key=lambda x: x.price)

@@ -1,20 +1,55 @@
 from matching_engine.infrastructure.kafka_client import create_producer
+from matching_engine.models import Trade
+from shared.observability.metrics import exec_reports_emitted
 from shared.observability.tracing import inject_ctx
+from shared.schemas.execution_report_event import ExecutionReportEvent
+
+_EXEC_REPORTS_TOPIC = "execution_reports"
 
 
 class Producer:
-
     def __init__(self):
 
         self.producer = create_producer()
 
-    def send_trade(self, trade):
+    def send_trade(self, trade: Trade) -> None:
 
         data = {**trade.__dict__}
         inject_ctx(data)
         self.producer.send("trades", data)
 
-    def send_book(self, book):
+    def send_exec_reports(self, trade: Trade) -> None:
+        """Emit one FIX Execution Report (ExecType=F) per side of the trade."""
+        for order_id, client_id, side, order_qty in [
+            (trade.buy_order_id, trade.buy_client_id, "BUY", trade.buy_order_qty),
+            (trade.sell_order_id, trade.sell_client_id, "SELL", trade.sell_order_qty),
+        ]:
+            try:
+                report = ExecutionReportEvent(
+                    order_id=order_id,
+                    cl_ord_id=order_id,
+                    client_id=client_id,
+                    exec_type="F",
+                    ord_status="2",
+                    symbol=trade.symbol,
+                    side=side,
+                    price=trade.price,
+                    order_qty=order_qty,
+                    last_px=trade.price,
+                    last_qty=trade.quantity,
+                    leaves_qty=0,
+                    cum_qty=trade.quantity,
+                )
+                data = report.model_dump(mode="json")
+                inject_ctx(data)
+                self.producer.send(_EXEC_REPORTS_TOPIC, data)
+                exec_reports_emitted.labels(
+                    exec_type="F", service="matching-engine"
+                ).inc()
+            except Exception:
+                pass  # best-effort; do not block the trade flow
+
+    def send_book(self, book) -> None:
 
         snapshot = {
             "best_bid": book.best_bid().price if book.best_bid() else None,

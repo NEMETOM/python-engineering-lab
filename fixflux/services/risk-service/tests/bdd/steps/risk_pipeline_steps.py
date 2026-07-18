@@ -94,17 +94,17 @@ def step_when_pipeline_processes_trade(context):
 @then("the approved topic receives {count:d} message")
 @then("the approved topic receives {count:d} messages")
 def step_then_approved_count(context, count):
-    assert (
-        context.mock_producer.approve.call_count == count
-    ), f"Expected {count} approve calls, got {context.mock_producer.approve.call_count}"
+    assert context.mock_producer.approve.call_count == count, (
+        f"Expected {count} approve calls, got {context.mock_producer.approve.call_count}"
+    )
 
 
 @then("the rejected topic receives {count:d} message")
 @then("the rejected topic receives {count:d} messages")
 def step_then_rejected_count(context, count):
-    assert (
-        context.mock_producer.reject.call_count == count
-    ), f"Expected {count} reject calls, got {context.mock_producer.reject.call_count}"
+    assert context.mock_producer.reject.call_count == count, (
+        f"Expected {count} reject calls, got {context.mock_producer.reject.call_count}"
+    )
 
 
 @then('the last price for "{symbol}" is {price:f}')

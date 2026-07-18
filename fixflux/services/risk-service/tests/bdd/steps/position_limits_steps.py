@@ -93,6 +93,6 @@ def step_then_can_place(context, client_id, can_place):
     order = _make_order(client_id=client_id)
     decision = context.checker.check_open_orders(order, context.store)
     expected = can_place.lower() == "true"
-    assert (
-        decision.approved == expected
-    ), f"Expected can_place={expected}, got approved={decision.approved}: {decision.reason}"
+    assert decision.approved == expected, (
+        f"Expected can_place={expected}, got approved={decision.approved}: {decision.reason}"
+    )

@@ -10,6 +10,7 @@ from risk_service.position_store import PositionStore
 from risk_service.producer import RiskProducer
 from risk_service.utils.logger import configure_logging, get_logger
 from shared.observability.tracing import extract_ctx, init_tracer
+from shared.schemas.execution_report_event import ExecutionReportEvent
 
 configure_logging()
 logger = get_logger(__name__)
@@ -68,6 +69,26 @@ def handle_order(
                 f" price={order.price} notional={notional:.2f} last_price={last_price}"
                 f" decision=APPROVED"
             )
+            try:
+                producer.send_exec_report(
+                    ExecutionReportEvent(
+                        order_id=order.order_id,
+                        cl_ord_id=order.order_id,
+                        client_id=order.client_id,
+                        exec_type="0",
+                        ord_status="0",
+                        symbol=order.symbol,
+                        side=order.side,
+                        price=float(order.price),
+                        order_qty=int(order.quantity),
+                        leaves_qty=int(order.quantity),
+                        cum_qty=0,
+                    )
+                )
+            except Exception as exc:
+                logger.warning(
+                    f"failed to emit exec report (New) for order {order.order_id}: {exc}"
+                )
         else:
             rejection = RejectedOrderEvent(
                 order_id=order.order_id,
@@ -86,6 +107,27 @@ def handle_order(
                 f" price={order.price} notional={notional:.2f} last_price={last_price}"
                 f" decision=REJECTED reason={decision.reason!r}"
             )
+            try:
+                producer.send_exec_report(
+                    ExecutionReportEvent(
+                        order_id=order.order_id,
+                        cl_ord_id=order.order_id,
+                        client_id=order.client_id,
+                        exec_type="8",
+                        ord_status="8",
+                        symbol=order.symbol,
+                        side=order.side,
+                        price=float(order.price),
+                        order_qty=int(order.quantity),
+                        leaves_qty=0,
+                        cum_qty=0,
+                        reason=decision.reason,
+                    )
+                )
+            except Exception as exc:
+                logger.warning(
+                    f"failed to emit exec report (Rejected) for order {order.order_id}: {exc}"
+                )
     except Exception as e:
         logger.error(f"error processing order: {e}")
 

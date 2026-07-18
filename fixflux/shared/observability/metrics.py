@@ -43,6 +43,13 @@ orders_processed = Counter(
     ["status"],  # approved, rejected
 )
 
+# Execution Reports
+exec_reports_emitted = Counter(
+    "exec_reports_emitted_total",
+    "FIX Execution Reports (35=8) published to Kafka",
+    ["exec_type", "service"],
+)
+
 # Compliance Service
 violations_detected = Counter(
     "violations_detected_total",
