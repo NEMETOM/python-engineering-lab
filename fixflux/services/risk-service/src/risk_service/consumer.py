@@ -162,5 +162,5 @@ def run() -> None:
                 handle_order(msg.value, checker, store, last_prices, producer)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     run()

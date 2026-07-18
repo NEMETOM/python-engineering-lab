@@ -505,6 +505,131 @@
       ]
     },
     {
+      "id": 20,
+      "type": "row",
+      "title": "FIX Execution Reports (35=8)",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 40 }
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "Exec Reports / sec by Type",
+      "description": "Rate of FIX Execution Reports (35=8) emitted per second, broken down by ExecType and originating service.\n\n- **0 (risk-service)** – New: order accepted by the risk check; confirmation wired back to the client\n- **8 (risk-service)** – Rejected: order blocked by a risk rule before reaching the matching engine\n- **F (matching-engine)** – Fill: a trade matched; one report is emitted per side (buy *and* sell), so this rate is 2× the trade rate\n\nIf all three lines are flat at zero, exec report emission has stopped — check for Kafka connectivity issues or look at the Failed Exec Report Emissions panel in the Loki dashboard.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 41 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "unit": "reqps"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byRegexp", "options": "^0 .*" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": "^8 .*" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": "^F .*" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "calcs": ["lastNotNull"], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "rate(exec_reports_emitted_total[$__rate_interval])",
+          "legendFormat": "{{exec_type}} ({{service}})",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "type": "timeseries",
+      "title": "Fill Reports vs Trades (2:1 Ratio Check)",
+      "description": "Structural sanity check: every trade produces exactly two Fill exec reports — one for the buyer, one for the seller. The blue line (Fill reports) should track the orange line (2 × trade rate) exactly.\n\n**Divergence signals a bug:** if Fill reports fall below 2× trades, some exec report sends are silently failing (check the Loki 'Failed Exec Report Emissions' panel). If they exceed 2×, duplicate reports are being emitted.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 41 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "calcs": ["lastNotNull"], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rate(exec_reports_emitted_total{exec_type=\"F\"}[$__rate_interval]))",
+          "legendFormat": "Fill reports/s",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "2 * sum(rate(trades_executed_total[$__rate_interval]))",
+          "legendFormat": "2 × Trades/s (expected)",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "type": "timeseries",
+      "title": "Risk Decisions: Approved vs Rejected (FIX view)",
+      "description": "Approved (ExecType=0) and Rejected (ExecType=8) exec reports from the risk-service, plotted as rates. This is the FIX Protocol view of the same decision the risk-service makes — useful for confirming that approvals and rejections are being wired to clients.\n\nA rising Rejected line with a stable Approved line can indicate a specific risk rule is firing frequently — cross-reference with the Loki 'Rejected Orders Only' panel to find the `reason` field.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 49 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "unit": "reqps"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Approved (ExecType=0)" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Rejected (ExecType=8)" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "calcs": ["lastNotNull"], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rate(exec_reports_emitted_total{exec_type=\"0\"}[$__rate_interval]))",
+          "legendFormat": "Approved (ExecType=0)",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rate(exec_reports_emitted_total{exec_type=\"8\"}[$__rate_interval]))",
+          "legendFormat": "Rejected (ExecType=8)",
+          "refId": "B"
+        }
+      ]
+    },
+    {
       "id": 18,
       "type": "timeseries",
       "title": "Kafka Messages Produced / sec",
