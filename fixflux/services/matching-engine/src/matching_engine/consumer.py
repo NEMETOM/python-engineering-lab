@@ -41,12 +41,15 @@ def run():
             span.set_attribute("order.id", str(event.get("order_id", "")))
             span.set_attribute("order.symbol", str(event.get("symbol", "")))
             logger.debug(f"received order {event}")
+            qty = int(event["quantity"])
             order = Order(
                 order_id=event["order_id"],
                 side=event["side"],
                 price=float(event["price"]),
-                quantity=int(event["quantity"]),
+                quantity=qty,
                 symbol=event.get("symbol", ""),
+                client_id=event.get("client_id", "UNKNOWN"),
+                order_qty=qty,
             )
             t0 = time.perf_counter()
             trades = engine.process(order)
@@ -59,6 +62,7 @@ def run():
                     logger.info(f"trade executed {trade}")
                     trades_executed.labels(symbol=trade.symbol).inc()
                     producer.send_trade(trade)
+                    producer.send_exec_reports(trade)
                 producer.send_book(book)
 
 

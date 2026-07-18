@@ -3,7 +3,6 @@ from risk_service.position_store import PositionStore
 
 
 class RiskChecker:
-
     def __init__(
         self,
         notional_limit: float,
