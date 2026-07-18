@@ -140,6 +140,56 @@
           "refId": "E"
         }
       ]
+    },
+
+    {
+      "id": 9,
+      "type": "row",
+      "title": "FIX Execution Report Spans",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 43 }
+    },
+
+    {
+      "id": 10,
+      "type": "table",
+      "title": "Exec Report Spans - risk-service (New & Rejected)",
+      "description": "Child spans created when risk-service emits a New (ExecType=0) or Rejected (ExecType=8) exec report to Kafka. Each span carries `exec_type`, `order.id`, and `client.id` attributes.\n\nClick a TraceID to open the full waterfall and see the exec report send nested inside the parent `risk-service.validated_orders` span.\n\nAn error status here means the Kafka send failed; the parent order flow still completed (best-effort semantics).\n\nTraceQL: {name=\"risk-service.send_exec_report\"}",
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 44 },
+      "options": { "sortBy": [] },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "targets": [
+        {
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "queryType": "traceql",
+          "query": "{name=\"risk-service.send_exec_report\"}",
+          "tableType": "spans",
+          "limit": 20,
+          "refId": "F"
+        }
+      ]
+    },
+
+    {
+      "id": 11,
+      "type": "table",
+      "title": "Exec Report Spans - matching-engine (Fills)",
+      "description": "Child spans created when matching-engine emits Fill exec reports (ExecType=F) to Kafka — one span per side of the trade, so every matched trade generates two spans here. Each span carries `exec_type=F`, `order.id`, and `order.side` attributes.\n\nClick a TraceID to open the waterfall and see these spans nested inside the parent `matching-engine.process` span.\n\nAn error status here means the Kafka send failed for that side; the trade itself was still published (best-effort semantics).\n\nTraceQL: {name=\"matching-engine.send_exec_reports\"}",
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 44 },
+      "options": { "sortBy": [] },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "targets": [
+        {
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "queryType": "traceql",
+          "query": "{name=\"matching-engine.send_exec_reports\"}",
+          "tableType": "spans",
+          "limit": 20,
+          "refId": "G"
+        }
+      ]
     }
 
   ]

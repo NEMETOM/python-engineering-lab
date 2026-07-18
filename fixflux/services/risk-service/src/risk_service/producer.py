@@ -1,8 +1,12 @@
+from opentelemetry import trace
+
 from risk_service import config
 from shared.infrastructure.kafka_client import create_producer
 from shared.observability.metrics import exec_reports_emitted
 from shared.observability.tracing import inject_ctx
 from shared.schemas.execution_report_event import ExecutionReportEvent
+
+_tracer = trace.get_tracer("risk-service")
 
 
 class RiskProducer:
@@ -20,9 +24,13 @@ class RiskProducer:
         self._producer.send(config.REJECTED_TOPIC, data)
 
     def send_exec_report(self, report: ExecutionReportEvent) -> None:
-        data = report.model_dump(mode="json")
-        inject_ctx(data)
-        self._producer.send(config.EXEC_REPORTS_TOPIC, data)
-        exec_reports_emitted.labels(
-            exec_type=report.exec_type, service="risk-service"
-        ).inc()
+        with _tracer.start_as_current_span("risk-service.send_exec_report") as span:
+            span.set_attribute("exec_type", report.exec_type)
+            span.set_attribute("order.id", report.order_id)
+            span.set_attribute("client.id", report.client_id)
+            data = report.model_dump(mode="json")
+            inject_ctx(data)
+            self._producer.send(config.EXEC_REPORTS_TOPIC, data)
+            exec_reports_emitted.labels(
+                exec_type=report.exec_type, service="risk-service"
+            ).inc()

@@ -1,3 +1,5 @@
+from opentelemetry import trace
+
 from matching_engine.infrastructure.kafka_client import create_producer
 from matching_engine.models import Trade
 from shared.observability.metrics import exec_reports_emitted
@@ -5,6 +7,7 @@ from shared.observability.tracing import inject_ctx
 from shared.schemas.execution_report_event import ExecutionReportEvent
 
 _EXEC_REPORTS_TOPIC = "execution_reports"
+_tracer = trace.get_tracer("matching-engine")
 
 
 class Producer:
@@ -40,12 +43,18 @@ class Producer:
                     leaves_qty=0,
                     cum_qty=trade.quantity,
                 )
-                data = report.model_dump(mode="json")
-                inject_ctx(data)
-                self.producer.send(_EXEC_REPORTS_TOPIC, data)
-                exec_reports_emitted.labels(
-                    exec_type="F", service="matching-engine"
-                ).inc()
+                with _tracer.start_as_current_span(
+                    "matching-engine.send_exec_reports"
+                ) as span:
+                    span.set_attribute("exec_type", "F")
+                    span.set_attribute("order.id", order_id)
+                    span.set_attribute("order.side", side)
+                    data = report.model_dump(mode="json")
+                    inject_ctx(data)
+                    self.producer.send(_EXEC_REPORTS_TOPIC, data)
+                    exec_reports_emitted.labels(
+                        exec_type="F", service="matching-engine"
+                    ).inc()
             except Exception:
                 pass  # best-effort; do not block the trade flow
 

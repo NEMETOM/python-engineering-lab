@@ -111,11 +111,46 @@
     },
 
     {
+      "id": 9,
+      "type": "row",
+      "title": "FIX Execution Reports - Observability",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 }
+    },
+
+    {
+      "id": 10,
+      "type": "logs",
+      "title": "Failed Exec Report Emissions",
+      "description": "WARNING logs from risk-service and matching-engine for exec report sends that failed silently.\n\nExec reports use best-effort semantics: a Kafka failure does not block order approval or trade publication, but it is logged at WARNING level. This panel surfaces those failures — in normal operation it should be empty.\n\nCommon causes: Kafka broker unreachable, topic not yet created, serialisation error in ExecutionReportEvent.\n\nLogQL: `{container=~\".*(risk-service|matching-engine).*\"} |= \"failed to emit exec report\"`",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 27 },
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "{container=~\".*(risk-service|matching-engine).*\"} |= \"failed to emit exec report\"",
+          "queryType": "range",
+          "refId": "F"
+        }
+      ]
+    },
+
+    {
       "id": 6,
       "type": "row",
       "title": "Cross-Service Diagnostics",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 26 }
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 35 }
     },
 
     {
@@ -124,7 +159,7 @@
       "title": "Order Trace (replace ORDER_ID in query)",
       "description": "Follows a single order ID across both the risk service and compliance consumer — useful for understanding the full lifecycle of one specific order.\n\nBefore using: click the query editor icon (pencil) and replace `<ORDER_ID>` with the actual order ID from your logs (e.g. `ORD-abc123`).\n\nLogQL: `{container=~\".*(risk-service|compliance-consumer).*\"} |= \"order=<ORDER_ID>\"`",
       "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 27 },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 36 },
       "options": {
         "dedupStrategy": "none",
         "enableLogDetails": true,
@@ -151,7 +186,7 @@
       "title": "All WARNING / ERROR Logs (system-wide)",
       "description": "Surfaces WARNING and ERROR level logs from every container in the stack — a fast way to spot problems without knowing which service to look at first.\n\nFiltered to `stderr` stream, which is where Python logging writes WARNING and above by default.\n\nLogQL: `{logstream=\"stderr\"} | level=~\"WARNING|ERROR\"`",
       "datasource": { "type": "loki", "uid": "loki" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 35 },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 44 },
       "options": {
         "dedupStrategy": "none",
         "enableLogDetails": true,
