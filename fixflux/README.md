@@ -209,6 +209,49 @@ push to main (fixflux/** path filter)
 
 **Required GitHub secrets:** `DO_SSH_KEY` (private key content) and `DO_DROPLET_IP` - set once in repository Settings → Secrets → Actions.
 
+### Cloud Operations (DigitalOcean Droplet)
+
+**Drop a FIX file from your local `data/` directory into the Droplet filedrop:**
+
+```bash
+scp -i ~/.ssh/fixflux_do \
+  fixflux/data/order_buy_eurusd_002.txt \
+  root@<DROPLET_IP>:~/python-engineering-lab/fixflux/clients/fix-filedrop-client/filedrop/
+```
+
+The watcher picks it up within 2 seconds, publishes to Kafka, and moves the file to `processed/`. Any file from `fixflux/data/` works - see the compliance test file table in the [Quick Start](#quick-start) section for what each one triggers.
+
+**Manage the filedrop watcher on the Droplet:**
+
+The watcher is installed as a systemd service (see `clients/fix-filedrop-client/fixflux-watcher.service`) so it starts automatically on boot and restarts on failure.
+
+```bash
+# One-time install (already done on the Droplet after first deploy)
+scp -i ~/.ssh/fixflux_do \
+  fixflux/clients/fix-filedrop-client/fixflux-watcher.service \
+  root@<DROPLET_IP>:/etc/systemd/system/fixflux-watcher.service
+ssh -i ~/.ssh/fixflux_do root@<DROPLET_IP> \
+  "systemctl daemon-reload && systemctl enable --now fixflux-watcher"
+
+# Check status
+ssh -i ~/.ssh/fixflux_do root@<DROPLET_IP> "systemctl status fixflux-watcher"
+
+# Tail watcher logs
+ssh -i ~/.ssh/fixflux_do root@<DROPLET_IP> "journalctl -u fixflux-watcher -f"
+
+# Restart after a code update
+ssh -i ~/.ssh/fixflux_do root@<DROPLET_IP> "systemctl restart fixflux-watcher"
+```
+
+**Open a terminal on the Droplet from Windows:**
+
+```powershell
+# Windows Terminal / PowerShell (OpenSSH built-in, no extra tools needed)
+ssh -i $env:USERPROFILE\.ssh\fixflux_do root@<DROPLET_IP>
+```
+
+Alternatives: WinSCP (SFTP file browser + built-in terminal via Session → Open Terminal), or the VS Code Remote-SSH extension (`Remote-SSH: Connect to Host` → `root@<DROPLET_IP>`). WinSCP is best for dragging files; VS Code Remote-SSH gives you a full editor on the Droplet.
+
 ---
 
 ## Design Standards

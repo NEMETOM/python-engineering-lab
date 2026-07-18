@@ -1,0 +1,17 @@
+[Unit]
+Description=FIXFlux Filedrop Watcher
+Documentation=https://github.com/your-org/python-engineering-lab
+After=network.target
+
+[Service]
+WorkingDirectory=/root/python-engineering-lab/fixflux/clients/fix-filedrop-client
+ExecStart=/usr/bin/python3 watcher.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=fixflux-watcher
+Environment=KAFKA_BROKER=localhost:9092
+
+[Install]
+WantedBy=multi-user.target
