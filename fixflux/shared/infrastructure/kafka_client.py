@@ -14,6 +14,16 @@ def create_producer():
     )
 
 
+def create_exec_report_producer():
+    # Short max_block_ms so a missing execution_reports topic never stalls
+    # the calling thread (and therefore the consumer loop) for 60 seconds.
+    return KafkaProducer(
+        bootstrap_servers=KAFKA_BROKER,
+        value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+        max_block_ms=1_000,
+    )
+
+
 def create_consumer(topic: str, group_id: str):
 
     return KafkaConsumer(

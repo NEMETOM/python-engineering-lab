@@ -8,7 +8,15 @@ from matching_engine.producer import Producer
 
 
 @pytest.fixture
-def mock_kafka_producer():
+def mock_exec_producer():
+    with patch("matching_engine.producer.create_exec_report_producer") as mock_create:
+        mock_producer = MagicMock()
+        mock_create.return_value = mock_producer
+        yield mock_producer
+
+
+@pytest.fixture
+def mock_kafka_producer(mock_exec_producer):
     with patch("matching_engine.producer.create_producer") as mock_create:
         mock_producer = MagicMock()
         mock_create.return_value = mock_producer

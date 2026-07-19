@@ -86,6 +86,14 @@ services:
     restart: on-failure
     profiles: [pipeline, full]
 
+  init-topics:
+    image: docker.redpanda.com/redpandadata/redpanda:v23.3.21
+    entrypoint: ["/bin/sh", "-c", "rpk topic create execution_reports --brokers redpanda:9092 || true"]
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    profiles: [pipeline, full]
+
   risk-service:
     build:
       context: .
@@ -93,6 +101,8 @@ services:
     depends_on:
       redpanda:
         condition: service_healthy
+      init-topics:
+        condition: service_completed_successfully
     environment:
       KAFKA_BROKER: redpanda:9092
       LOG_LEVEL: WARNING
@@ -113,6 +123,8 @@ services:
     depends_on:
       redpanda:
         condition: service_healthy
+      init-topics:
+        condition: service_completed_successfully
     environment:
       KAFKA_BROKER: redpanda:9092
       LOG_LEVEL: INFO
