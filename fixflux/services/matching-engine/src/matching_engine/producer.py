@@ -16,8 +16,14 @@ class Producer:
         self.producer = create_producer()
 
     def send_trade(self, trade: Trade) -> None:
-
-        data = {**trade.__dict__}
+        data = {
+            "trade_id": trade.trade_id,
+            "symbol": trade.symbol,
+            "buy_order_id": trade.buy_order_id,
+            "sell_order_id": trade.sell_order_id,
+            "price": trade.price,
+            "quantity": trade.quantity,
+        }
         inject_ctx(data)
         self.producer.send("trades", data)
 
