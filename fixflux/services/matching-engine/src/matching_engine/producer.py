@@ -1,6 +1,9 @@
 from opentelemetry import trace
 
-from matching_engine.infrastructure.kafka_client import create_exec_report_producer, create_producer
+from matching_engine.infrastructure.kafka_client import (
+    create_exec_report_producer,
+    create_producer,
+)
 from matching_engine.models import Trade
 from shared.observability.metrics import exec_reports_emitted
 from shared.observability.tracing import inject_ctx

@@ -102,7 +102,9 @@ class TestSendExecReport:
         producer.send_exec_report(_make_report())
         mock_exec_kafka_producer.send.assert_called_once()
 
-    def test_rejected_report_sends_exec_type_8(self, producer, mock_exec_kafka_producer):
+    def test_rejected_report_sends_exec_type_8(
+        self, producer, mock_exec_kafka_producer
+    ):
         producer.send_exec_report(_make_report(exec_type="8", ord_status="8"))
         payload = mock_exec_kafka_producer.send.call_args[0][1]
         assert payload["exec_type"] == "8"

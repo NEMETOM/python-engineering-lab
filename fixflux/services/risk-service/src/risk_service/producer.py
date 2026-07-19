@@ -1,7 +1,10 @@
 from opentelemetry import trace
 
 from risk_service import config
-from shared.infrastructure.kafka_client import create_exec_report_producer, create_producer
+from shared.infrastructure.kafka_client import (
+    create_exec_report_producer,
+    create_producer,
+)
 from shared.observability.metrics import exec_reports_emitted
 from shared.observability.tracing import inject_ctx
 from shared.schemas.execution_report_event import ExecutionReportEvent
