@@ -24,7 +24,15 @@ def _make_report(**overrides):
 
 
 @pytest.fixture
-def mock_kafka_producer():
+def mock_exec_kafka_producer():
+    with patch("risk_service.producer.create_exec_report_producer") as mock_create:
+        mock_kafka = MagicMock()
+        mock_create.return_value = mock_kafka
+        yield mock_kafka
+
+
+@pytest.fixture
+def mock_kafka_producer(mock_exec_kafka_producer):
     with patch("risk_service.producer.create_producer") as mock_create:
         mock_kafka = MagicMock()
         mock_create.return_value = mock_kafka
@@ -70,37 +78,37 @@ class TestReject:
 
 
 class TestSendExecReport:
-    def test_sends_to_exec_reports_topic(self, producer, mock_kafka_producer):
+    def test_sends_to_exec_reports_topic(self, producer, mock_exec_kafka_producer):
         producer.send_exec_report(_make_report())
-        topic = mock_kafka_producer.send.call_args[0][0]
+        topic = mock_exec_kafka_producer.send.call_args[0][0]
         assert topic == "execution_reports"
 
-    def test_payload_contains_exec_type(self, producer, mock_kafka_producer):
+    def test_payload_contains_exec_type(self, producer, mock_exec_kafka_producer):
         producer.send_exec_report(_make_report(exec_type="0"))
-        payload = mock_kafka_producer.send.call_args[0][1]
+        payload = mock_exec_kafka_producer.send.call_args[0][1]
         assert payload["exec_type"] == "0"
 
-    def test_payload_contains_order_id(self, producer, mock_kafka_producer):
+    def test_payload_contains_order_id(self, producer, mock_exec_kafka_producer):
         producer.send_exec_report(_make_report(order_id="O-SENT"))
-        payload = mock_kafka_producer.send.call_args[0][1]
+        payload = mock_exec_kafka_producer.send.call_args[0][1]
         assert payload["order_id"] == "O-SENT"
 
-    def test_payload_contains_client_id(self, producer, mock_kafka_producer):
+    def test_payload_contains_client_id(self, producer, mock_exec_kafka_producer):
         producer.send_exec_report(_make_report(client_id="FIRM-X"))
-        payload = mock_kafka_producer.send.call_args[0][1]
+        payload = mock_exec_kafka_producer.send.call_args[0][1]
         assert payload["client_id"] == "FIRM-X"
 
-    def test_called_once(self, producer, mock_kafka_producer):
+    def test_called_once(self, producer, mock_exec_kafka_producer):
         producer.send_exec_report(_make_report())
-        mock_kafka_producer.send.assert_called_once()
+        mock_exec_kafka_producer.send.assert_called_once()
 
-    def test_rejected_report_sends_exec_type_8(self, producer, mock_kafka_producer):
+    def test_rejected_report_sends_exec_type_8(self, producer, mock_exec_kafka_producer):
         producer.send_exec_report(_make_report(exec_type="8", ord_status="8"))
-        payload = mock_kafka_producer.send.call_args[0][1]
+        payload = mock_exec_kafka_producer.send.call_args[0][1]
         assert payload["exec_type"] == "8"
 
     def test_metric_incremented_with_correct_labels(
-        self, producer, mock_kafka_producer
+        self, producer, mock_exec_kafka_producer
     ):
         with patch("risk_service.producer.exec_reports_emitted") as mock_metric:
             producer.send_exec_report(_make_report(exec_type="0"))
@@ -109,7 +117,7 @@ class TestSendExecReport:
             )
             mock_metric.labels.return_value.inc.assert_called_once()
 
-    def test_metric_label_exec_type_8(self, producer, mock_kafka_producer):
+    def test_metric_label_exec_type_8(self, producer, mock_exec_kafka_producer):
         with patch("risk_service.producer.exec_reports_emitted") as mock_metric:
             producer.send_exec_report(_make_report(exec_type="8", ord_status="8"))
             mock_metric.labels.assert_called_once_with(

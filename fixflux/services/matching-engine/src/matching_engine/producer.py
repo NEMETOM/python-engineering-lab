@@ -1,6 +1,6 @@
 from opentelemetry import trace
 
-from matching_engine.infrastructure.kafka_client import create_producer
+from matching_engine.infrastructure.kafka_client import create_exec_report_producer, create_producer
 from matching_engine.models import Trade
 from shared.observability.metrics import exec_reports_emitted
 from shared.observability.tracing import inject_ctx
@@ -12,8 +12,8 @@ _tracer = trace.get_tracer("matching-engine")
 
 class Producer:
     def __init__(self):
-
         self.producer = create_producer()
+        self._exec_producer = create_exec_report_producer()
 
     def send_trade(self, trade: Trade) -> None:
         data = {
@@ -57,7 +57,7 @@ class Producer:
                     span.set_attribute("order.side", side)
                     data = report.model_dump(mode="json")
                     inject_ctx(data)
-                    self.producer.send(_EXEC_REPORTS_TOPIC, data)
+                    self._exec_producer.send(_EXEC_REPORTS_TOPIC, data)
                     exec_reports_emitted.labels(
                         exec_type="F", service="matching-engine"
                     ).inc()
