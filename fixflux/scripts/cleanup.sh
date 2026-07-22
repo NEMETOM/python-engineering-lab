@@ -55,6 +55,38 @@ else
     log "  client_risk_scores: skipped (stateful, not time-series)"
 fi
 
+# ── Kafka topics ──────────────────────────────────────────────────────────────
+# Pipeline topics accumulate test messages indefinitely. Delete + recreate
+# empties them instantly. Consumer groups reconnect cleanly at offset 0.
+# trades is included: the canonical store is PostgreSQL; the topic is transient.
+PIPELINE_TOPICS=(
+    raw_orders
+    validated_orders
+    risk_approved_orders
+    risk_rejected_orders
+    execution_reports
+    dead_letter_orders
+    order_book_updates
+    trades
+)
+
+if ! docker compose -f "$REPO_DIR/docker-compose.yml" ps redpanda --quiet 2>/dev/null | grep -q .; then
+    warn "redpanda container is not running — skipping Kafka topic purge"
+else
+    rpk() { docker compose -f "$REPO_DIR/docker-compose.yml" exec -T redpanda rpk "$@"; }
+
+    log "Purging pipeline Kafka topics..."
+    if ! rpk topic delete "${PIPELINE_TOPICS[@]}" 2>/dev/null; then
+        warn "  some topics did not exist yet — continuing"
+    else
+        log "  topics deleted: ${PIPELINE_TOPICS[*]}"
+    fi
+
+    rpk topic create "${PIPELINE_TOPICS[@]}" 2>/dev/null \
+        && log "  topics recreated: ${PIPELINE_TOPICS[*]}" \
+        || warn "  topic creation reported warnings"
+fi
+
 # ── Docker images ─────────────────────────────────────────────────────────────
 log "Pruning dangling Docker images..."
 docker image prune -f
