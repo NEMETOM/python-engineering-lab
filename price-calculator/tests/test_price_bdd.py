@@ -24,7 +24,7 @@ def original_price(context, price):
 def apply_discount_step(context, discount):
     try:
         context["result"] = apply_discount(context["price"], discount)
-    except Exception as e:
+    except ValueError as e:
         context["error"] = e
 
 
@@ -32,7 +32,7 @@ def apply_discount_step(context, discount):
 def add_vat_step(context, vat):
     try:
         context["result"] = add_vat(context["price"], vat)
-    except Exception as e:
+    except ValueError as e:
         context["error"] = e
 
 

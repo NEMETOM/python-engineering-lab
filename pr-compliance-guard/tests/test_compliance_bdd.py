@@ -3,9 +3,10 @@
 from pathlib import Path
 
 import pytest
+from pytest_bdd import given, parsers, scenarios, then, when
+
 from compliance.config import load_config
 from compliance.engine import ComplianceEngine
-from pytest_bdd import given, parsers, scenarios, then, when
 
 pytestmark = pytest.mark.bdd
 

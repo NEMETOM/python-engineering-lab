@@ -1,6 +1,7 @@
 # fix-protocol-simulator/tests/test_parser.py
 
 import pytest
+
 from fix_simulator.protocol.fix_constants import (
     EXECUTION_REPORT,
     HEARTBEAT,
