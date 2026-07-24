@@ -3,6 +3,7 @@
 import json
 
 import pytest
+
 from compliance.config import load_config
 from compliance.engine import ComplianceEngine
 

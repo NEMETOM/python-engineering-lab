@@ -1,6 +1,7 @@
 # fix-protocol-simulator/tests/bdd/steps/fix_message_steps.py
 
 from behave import given, then, when  # type: ignore[import-untyped]
+
 from fix_simulator.exchange.execution_reports import ExecutionReportFactory
 from fix_simulator.protocol.fix_constants import (
     MSG_TYPE,

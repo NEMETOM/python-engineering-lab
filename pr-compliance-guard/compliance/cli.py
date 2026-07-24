@@ -1,5 +1,6 @@
 import argparse
 import json
+import sys
 
 from compliance.config import load_config
 from compliance.engine import ComplianceEngine
@@ -27,4 +28,4 @@ def main():
     print(json.dumps(result, indent=2))
 
     if not result["compliant"]:
-        exit(1)
+        sys.exit(1)
