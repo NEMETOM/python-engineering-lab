@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
 from behave import given
@@ -17,17 +17,17 @@ def step_given_trade_event(context, trade_id, symbol, buy, sell, price, quantity
         sell_order_id=sell,
         price=price,
         quantity=quantity,
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(tz=timezone.utc),
     )
-    context.msg_value = dict(
-        trade_id=trade_id,
-        symbol=symbol,
-        buy_order_id=buy,
-        sell_order_id=sell,
-        price=price,
-        quantity=quantity,
-        timestamp=datetime.utcnow().isoformat(),
-    )
+    context.msg_value = {
+        "trade_id": trade_id,
+        "symbol": symbol,
+        "buy_order_id": buy,
+        "sell_order_id": sell,
+        "price": price,
+        "quantity": quantity,
+        "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+    }
     msg = MagicMock()
     msg.value = context.msg_value
     context.messages = [msg]

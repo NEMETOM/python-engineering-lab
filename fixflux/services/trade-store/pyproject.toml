@@ -27,6 +27,9 @@ where = ["src"]
 line-length = 88
 target-version = "py311"
 
+[tool.ruff.lint.isort]
+known-first-party = ["trade_store", "shared"]
+
 [tool.black]
 line-length = 88
 target-version = ["py311"]
