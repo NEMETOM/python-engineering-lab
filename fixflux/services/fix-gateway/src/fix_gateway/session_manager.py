@@ -1,7 +1,7 @@
 # fixflux/services/fix-gateway/src/fix_gateway/session_manager.py
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 # now
 from fix_gateway.utils.logger import get_logger
@@ -17,8 +17,8 @@ class Session:
     def __init__(self, sender_comp_id: str):
         self.session_id = str(uuid.uuid4())
         self.sender_comp_id = sender_comp_id
-        self.created_at = datetime.utcnow()
-        self.last_heartbeat = datetime.utcnow()
+        self.created_at = datetime.now(tz=UTC)
+        self.last_heartbeat = datetime.now(tz=UTC)
         logger.info(f"session created {self.session_id}")
 
 
@@ -45,5 +45,5 @@ class SessionManager:
     def update_heartbeat(self, sender_comp_id: str):
         session = self.get_session(sender_comp_id)
         if session:
-            session.last_heartbeat = datetime.utcnow()
+            session.last_heartbeat = datetime.now(tz=UTC)
             logger.debug(f"heartbeat updated {session.session_id}")
