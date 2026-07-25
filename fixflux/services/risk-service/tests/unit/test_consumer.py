@@ -220,32 +220,44 @@ def _make_trade_msg():
 
 class TestRun:
     def test_run_processes_order_message(self):
-        with patch(
-            "risk_service.consumer.KafkaConsumer", return_value=[_make_order_msg()]
-        ), patch("risk_service.consumer.RiskProducer") as mock_producer_cls:
+        with (
+            patch(
+                "risk_service.consumer.KafkaConsumer", return_value=[_make_order_msg()]
+            ),
+            patch("risk_service.consumer.RiskProducer") as mock_producer_cls,
+        ):
             mock_producer_cls.return_value = MagicMock()
             run()
 
     def test_run_processes_trade_message(self):
-        with patch(
-            "risk_service.consumer.KafkaConsumer", return_value=[_make_trade_msg()]
-        ), patch("risk_service.consumer.RiskProducer") as mock_producer_cls:
+        with (
+            patch(
+                "risk_service.consumer.KafkaConsumer", return_value=[_make_trade_msg()]
+            ),
+            patch("risk_service.consumer.RiskProducer") as mock_producer_cls,
+        ):
             mock_producer_cls.return_value = MagicMock()
             run()
 
     def test_run_calls_handle_order_for_order_topic(self):
-        with patch(
-            "risk_service.consumer.KafkaConsumer", return_value=[_make_order_msg()]
-        ), patch("risk_service.consumer.RiskProducer") as mock_producer_cls:
+        with (
+            patch(
+                "risk_service.consumer.KafkaConsumer", return_value=[_make_order_msg()]
+            ),
+            patch("risk_service.consumer.RiskProducer") as mock_producer_cls,
+        ):
             mock_producer = MagicMock()
             mock_producer_cls.return_value = mock_producer
             run()
             mock_producer.approve.assert_called_once()
 
     def test_run_calls_handle_trade_for_trades_topic(self):
-        with patch(
-            "risk_service.consumer.KafkaConsumer", return_value=[_make_trade_msg()]
-        ), patch("risk_service.consumer.RiskProducer") as mock_producer_cls:
+        with (
+            patch(
+                "risk_service.consumer.KafkaConsumer", return_value=[_make_trade_msg()]
+            ),
+            patch("risk_service.consumer.RiskProducer") as mock_producer_cls,
+        ):
             mock_producer_cls.return_value = MagicMock()
             with patch("risk_service.consumer.handle_trade") as mock_handle_trade:
                 run()
