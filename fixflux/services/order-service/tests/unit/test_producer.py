@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 from order_service.producer import Producer
@@ -6,14 +6,14 @@ from order_service.schemas import ValidatedOrderEvent
 
 
 def _make_validated(**overrides):
-    defaults = dict(
-        order_id="test-uuid",
-        symbol="AAPL",
-        side="BUY",
-        price=100.0,
-        quantity=10,
-        timestamp=datetime.utcnow(),
-    )
+    defaults = {
+        "order_id": "test-uuid",
+        "symbol": "AAPL",
+        "side": "BUY",
+        "price": 100.0,
+        "quantity": 10,
+        "timestamp": datetime.now(tz=UTC),
+    }
     return ValidatedOrderEvent(**{**defaults, **overrides})
 
 

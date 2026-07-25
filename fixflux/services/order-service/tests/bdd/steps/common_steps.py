@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from behave import given
 from pydantic import ValidationError
@@ -17,15 +17,15 @@ def step_given_raw_order(context, symbol, side, price, quantity):
             side=side,
             price=price,
             quantity=quantity,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(tz=UTC),
         )
     except ValidationError as exc:
         context.raw_order = None
         context.validation_error = exc
-    context.msg_value = dict(
-        symbol=symbol,
-        side=side,
-        price=price,
-        quantity=quantity,
-        timestamp=datetime.utcnow().isoformat(),
-    )
+    context.msg_value = {
+        "symbol": symbol,
+        "side": side,
+        "price": price,
+        "quantity": quantity,
+        "timestamp": datetime.now(tz=UTC).isoformat(),
+    }

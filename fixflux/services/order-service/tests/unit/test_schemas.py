@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 import pytest
 from pydantic import ValidationError
@@ -7,7 +7,7 @@ from order_service.schemas import RawOrderEvent, ValidatedOrderEvent
 
 
 def _now():
-    return datetime.utcnow()
+    return datetime.now(tz=UTC)
 
 
 class TestRawOrderEvent:
