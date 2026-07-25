@@ -30,9 +30,7 @@ class ComplianceViolation(Base):
     raw_event = Column(JSON, nullable=False)
     status = Column(String(20), default="OPEN")
     risk_contribution = Column(Float)
-    detected_at = Column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC)
-    )
+    detected_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
     reviewed_at = Column(DateTime(timezone=True))
     reviewed_by = Column(String(100))
 
@@ -45,9 +43,7 @@ class ClientRiskScore(Base):
     violation_count = Column(Integer, nullable=False, default=0)
     last_violation_at = Column(DateTime(timezone=True))
     is_high_risk = Column(Boolean, default=False)
-    updated_at = Column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC)
-    )
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
 
 class ComplianceAuditTrail(Base):
@@ -61,6 +57,4 @@ class ComplianceAuditTrail(Base):
     action = Column(String(100), nullable=False)
     payload = Column(JSON, nullable=False)
     checksum = Column(String(64))
-    recorded_at = Column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC)
-    )
+    recorded_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
