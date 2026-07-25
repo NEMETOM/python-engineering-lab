@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 
 class MarketCache:
@@ -34,5 +34,5 @@ class MarketCache:
             "best_ask": self.best_ask,
             "mid_price": mid,
             "last_trade_price": self.last_trade_price,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(tz=UTC).isoformat(),
         }
