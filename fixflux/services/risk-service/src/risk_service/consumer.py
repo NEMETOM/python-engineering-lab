@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from kafka import KafkaConsumer
 
@@ -38,7 +38,7 @@ def handle_trade(value: dict, store: PositionStore, last_prices: dict) -> None:
             f"trade {trade.trade_id} filled orders "
             f"{trade.buy_order_id}/{trade.sell_order_id}"
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.warning(f"could not process trade: {e}")
 
 
@@ -85,7 +85,7 @@ def handle_order(
                         cum_qty=0,
                     )
                 )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 logger.warning(
                     f"failed to emit exec report (New) for order {order.order_id}: {exc}"
                 )
@@ -98,7 +98,7 @@ def handle_order(
                 price=order.price,
                 quantity=order.quantity,
                 reason=decision.reason or "",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
             )
             producer.reject(rejection.model_dump(mode="json"))
             logger.warning(
@@ -124,11 +124,11 @@ def handle_order(
                         reason=decision.reason,
                     )
                 )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 logger.warning(
                     f"failed to emit exec report (Rejected) for order {order.order_id}: {exc}"
                 )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.error(f"error processing order: {e}")
 
 

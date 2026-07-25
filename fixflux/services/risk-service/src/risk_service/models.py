@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -25,7 +25,7 @@ class TradeEvent(BaseModel):
 
 class RiskDecision(BaseModel):
     approved: bool
-    reason: Optional[str] = None
+    reason: str | None = None
 
 
 class RejectedOrderEvent(BaseModel):

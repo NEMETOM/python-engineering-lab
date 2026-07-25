@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from behave import given, then, when
 
@@ -8,28 +8,28 @@ from risk_service.position_store import PositionStore
 
 
 def _make_checker_with_store(context, **kwargs):
-    defaults = dict(
-        notional_limit=1_000_000.0,
-        fat_finger_pct=10.0,
-        gross_position_limit=100_000,
-        net_position_limit=100_000,
-        max_open_orders=100,
-    )
+    defaults = {
+        "notional_limit": 1_000_000.0,
+        "fat_finger_pct": 10.0,
+        "gross_position_limit": 100_000,
+        "net_position_limit": 100_000,
+        "max_open_orders": 100,
+    }
     defaults.update(kwargs)
     context.checker = RiskChecker(**defaults)
     context.store = PositionStore()
 
 
 def _make_order(**kwargs):
-    defaults = dict(
-        order_id="test-order",
-        symbol="AAPL",
-        side="BUY",
-        price=100.0,
-        quantity=10,
-        timestamp=datetime.now(timezone.utc),
-        client_id="CLIENT1",
-    )
+    defaults = {
+        "order_id": "test-order",
+        "symbol": "AAPL",
+        "side": "BUY",
+        "price": 100.0,
+        "quantity": 10,
+        "timestamp": datetime.now(UTC),
+        "client_id": "CLIENT1",
+    }
     defaults.update(kwargs)
     return ValidatedOrder(**defaults)
 
