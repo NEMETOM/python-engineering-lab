@@ -1,6 +1,6 @@
 """Tests for config, schemas, loader, market_hours, and audit_logger."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -145,7 +145,7 @@ class TestMarketHoursRule:
             "compliance_service.rules.compliance.market_hours.datetime"
         ) as mock_dt:
             mock_now = MagicMock()
-            mock_now.time.return_value = datetime(2026, 1, 1, 12, 0).time()
+            mock_now.time.return_value = datetime(2026, 1, 1, 12, 0, tzinfo=UTC).time()
             mock_now.strftime.return_value = "12:00:00 UTC"
             mock_dt.now.return_value = mock_now
             assert rule.check({"client_id": "C1", "symbol": "EURUSD"}) is None
@@ -156,7 +156,7 @@ class TestMarketHoursRule:
             "compliance_service.rules.compliance.market_hours.datetime"
         ) as mock_dt:
             mock_now = MagicMock()
-            mock_now.time.return_value = datetime(2026, 1, 1, 2, 0).time()
+            mock_now.time.return_value = datetime(2026, 1, 1, 2, 0, tzinfo=UTC).time()
             mock_now.strftime.return_value = "02:00:00 UTC"
             mock_dt.now.return_value = mock_now
             violation = rule.check({"client_id": "C1", "symbol": "EURUSD"})

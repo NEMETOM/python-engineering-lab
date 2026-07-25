@@ -1,5 +1,5 @@
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from compliance_service.rules.base import Rule, Severity, Violation
@@ -18,7 +18,7 @@ class RapidFireRule(Rule):
 
     def check(self, event: dict[str, Any]) -> Violation | None:
         client_id = str(event.get("client_id") or event.get("49", ""))
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         cutoff = now - self._window
 
         history = self._history[client_id]

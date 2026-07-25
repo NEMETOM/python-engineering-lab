@@ -1,5 +1,5 @@
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from compliance_service.rules.base import Rule, Severity, Violation
@@ -26,7 +26,7 @@ class VolumeSpikeRule(Rule):
         except (TypeError, ValueError):
             return None
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         cutoff = now - self._baseline_window
         history = self._history[symbol]
         history[:] = [(ts, q) for ts, q in history if ts > cutoff]
