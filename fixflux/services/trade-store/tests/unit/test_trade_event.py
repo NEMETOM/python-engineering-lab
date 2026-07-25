@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from pydantic import ValidationError
@@ -14,7 +14,7 @@ def _make_event(**overrides):
         "sell_order_id": "S001",
         "price": 150.0,
         "quantity": 10,
-        "timestamp": datetime.now(tz=timezone.utc),
+        "timestamp": datetime.now(tz=UTC),
     }
     return TradeEvent(**{**defaults, **overrides})
 
@@ -36,7 +36,7 @@ class TestValidTradeEvent:
         assert isinstance(event.price, float)
 
     def test_all_fields_stored_correctly(self):
-        ts = datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
+        ts = datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC)
         event = _make_event(
             trade_id="T999",
             symbol="MSFT",
@@ -64,7 +64,7 @@ class TestMissingFields:
                 sell_order_id="S1",
                 price=10.0,
                 quantity=1,
-                timestamp=datetime.now(tz=timezone.utc),
+                timestamp=datetime.now(tz=UTC),
             )
 
     def test_missing_symbol_raises(self):
@@ -75,7 +75,7 @@ class TestMissingFields:
                 sell_order_id="S1",
                 price=10.0,
                 quantity=1,
-                timestamp=datetime.now(tz=timezone.utc),
+                timestamp=datetime.now(tz=UTC),
             )
 
     def test_missing_price_raises(self):
@@ -86,7 +86,7 @@ class TestMissingFields:
                 buy_order_id="B1",
                 sell_order_id="S1",
                 quantity=1,
-                timestamp=datetime.now(tz=timezone.utc),
+                timestamp=datetime.now(tz=UTC),
             )
 
     def test_missing_quantity_raises(self):
@@ -97,7 +97,7 @@ class TestMissingFields:
                 buy_order_id="B1",
                 sell_order_id="S1",
                 price=10.0,
-                timestamp=datetime.now(tz=timezone.utc),
+                timestamp=datetime.now(tz=UTC),
             )
 
 

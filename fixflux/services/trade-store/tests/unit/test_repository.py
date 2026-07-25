@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 from trade_store.repository import TradeRepository
@@ -13,7 +13,7 @@ def _make_event(**overrides):
         "sell_order_id": "S001",
         "price": 150.0,
         "quantity": 10,
-        "timestamp": datetime.now(tz=timezone.utc),
+        "timestamp": datetime.now(tz=UTC),
     }
     return TradeEvent(**{**defaults, **overrides})
 
@@ -49,7 +49,7 @@ class TestRepositorySave:
 
     def test_save_maps_all_fields_to_model(self):
         mock_session = MagicMock()
-        ts = datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
+        ts = datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC)
         event = _make_event(
             trade_id="T999",
             symbol="MSFT",

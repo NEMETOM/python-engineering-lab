@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from behave import given, then
 from pydantic import ValidationError
@@ -14,7 +14,7 @@ def _valid_fields(**overrides):
         "sell_order_id": "S001",
         "price": 150.0,
         "quantity": 10,
-        "timestamp": datetime.now(tz=timezone.utc),
+        "timestamp": datetime.now(tz=UTC),
     }
     return {**base, **overrides}
 
