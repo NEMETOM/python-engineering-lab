@@ -1,6 +1,6 @@
 # fixflux/services/fix-gateway/tests/bdd/steps/fix_gateway_steps.py
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from behave import given, then, when  # type: ignore[import-untyped]
 
@@ -90,5 +90,5 @@ def then_no_session_exists(context, sender):
 def then_heartbeat_is_recent(context, sender):
     session = context.session_manager.get_session(sender)
     assert session is not None, f"No session found for '{sender}'"
-    delta = datetime.utcnow() - session.last_heartbeat
+    delta = datetime.now(tz=UTC) - session.last_heartbeat
     assert delta < timedelta(seconds=5), f"Heartbeat timestamp is not recent: {delta}"
