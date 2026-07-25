@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -13,7 +13,7 @@ class RawOrderEvent(BaseModel):
     quantity: int = 0
     client_id: str = ""
     timestamp: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+        default_factory=lambda: datetime.now(UTC).isoformat()
     )
 
     # Allow extra fields so FIX tag=value pairs passed as dicts are accepted
@@ -33,7 +33,7 @@ class ValidatedOrderEvent(BaseModel):
     quantity: int
     client_id: str = ""
     timestamp: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+        default_factory=lambda: datetime.now(UTC).isoformat()
     )
 
     model_config = {"extra": "allow"}

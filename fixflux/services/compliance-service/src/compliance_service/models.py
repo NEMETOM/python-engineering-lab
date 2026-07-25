@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import (
     BigInteger,
@@ -31,7 +31,7 @@ class ComplianceViolation(Base):
     status = Column(String(20), default="OPEN")
     risk_contribution = Column(Float)
     detected_at = Column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
     reviewed_at = Column(DateTime(timezone=True))
     reviewed_by = Column(String(100))
@@ -46,7 +46,7 @@ class ClientRiskScore(Base):
     last_violation_at = Column(DateTime(timezone=True))
     is_high_risk = Column(Boolean, default=False)
     updated_at = Column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
 
 
@@ -62,5 +62,5 @@ class ComplianceAuditTrail(Base):
     payload = Column(JSON, nullable=False)
     checksum = Column(String(64))
     recorded_at = Column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )

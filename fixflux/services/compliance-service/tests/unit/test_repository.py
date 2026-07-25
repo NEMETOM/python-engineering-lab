@@ -1,6 +1,6 @@
 """Tests for ViolationRepository and AuditRepository using mocked SQLAlchemy sessions."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 from compliance_service.repository.audit_repository import AuditRepository
@@ -9,15 +9,15 @@ from compliance_service.rules.base import Severity, Violation
 
 
 def _make_violation(**kwargs) -> Violation:
-    defaults = dict(
-        rule_name="TradeSizeRule",
-        rule_category="compliance",
-        severity=Severity.HIGH,
-        description="Quantity exceeds limit",
-        raw_event={"symbol": "BTCUSD", "quantity": 500},
-        client_id="CLIENT1",
-        symbol="BTCUSD",
-    )
+    defaults = {
+        "rule_name": "TradeSizeRule",
+        "rule_category": "compliance",
+        "severity": Severity.HIGH,
+        "description": "Quantity exceeds limit",
+        "raw_event": {"symbol": "BTCUSD", "quantity": 500},
+        "client_id": "CLIENT1",
+        "symbol": "BTCUSD",
+    }
     return Violation(**{**defaults, **kwargs})
 
 
@@ -104,7 +104,7 @@ class TestViolationRepositoryListAndGet:
         v.description = "Quantity exceeds limit"
         v.status = "OPEN"
         v.risk_contribution = 20.0
-        v.detected_at = datetime.now(timezone.utc)
+        v.detected_at = datetime.now(UTC)
         v.reviewed_at = None
         v.reviewed_by = None
         for k, val in kwargs.items():
@@ -181,9 +181,9 @@ class TestViolationRepositoryListAndGet:
         score.client_id = "CLIENT1"
         score.risk_score = 100.0
         score.violation_count = 5
-        score.last_violation_at = datetime.now(timezone.utc)
+        score.last_violation_at = datetime.now(UTC)
         score.is_high_risk = False
-        score.updated_at = datetime.now(timezone.utc)
+        score.updated_at = datetime.now(UTC)
         mock_session.query.return_value.order_by.return_value.limit.return_value.all.return_value = [
             score
         ]
@@ -217,7 +217,7 @@ class TestAuditRepository:
         e.action = "raw_orders_consumed"
         e.payload = {"symbol": "EURUSD"}
         e.checksum = "abc123"
-        e.recorded_at = datetime.now(timezone.utc)
+        e.recorded_at = datetime.now(UTC)
         return e
 
     def test_list_entries_returns_dicts(self):

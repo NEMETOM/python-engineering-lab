@@ -96,9 +96,8 @@ def _run_consumer(topic: str, group_id: str, rules_engine: RulesEngine) -> None:
                 event_type=topic,
             )
         except Exception as exc:
-            logger.error(
+            logger.exception(
                 f"Failed to process message from {topic}: {exc} | raw={msg.value}",
-                exc_info=True,
             )
 
 

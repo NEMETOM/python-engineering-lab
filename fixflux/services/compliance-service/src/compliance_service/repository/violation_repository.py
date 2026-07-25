@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from compliance_service.infrastructure.db import SessionLocal
@@ -50,16 +50,16 @@ class ViolationRepository:
                 record.risk_score = float(record.risk_score) + score_delta  # type: ignore[assignment]
                 record.violation_count += 1  # type: ignore[assignment]
                 record.is_high_risk = is_high_risk  # type: ignore[assignment]
-                record.last_violation_at = datetime.now(timezone.utc)  # type: ignore[assignment]
-                record.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
+                record.last_violation_at = datetime.now(UTC)  # type: ignore[assignment]
+                record.updated_at = datetime.now(UTC)  # type: ignore[assignment]
             else:
                 record = ClientRiskScore(
                     client_id=client_id,
                     risk_score=score_delta,
                     violation_count=1,
                     is_high_risk=is_high_risk,
-                    last_violation_at=datetime.now(timezone.utc),
-                    updated_at=datetime.now(timezone.utc),
+                    last_violation_at=datetime.now(UTC),
+                    updated_at=datetime.now(UTC),
                 )
                 session.add(record)
             session.commit()
@@ -111,7 +111,7 @@ class ViolationRepository:
                 return False
             record.status = status.upper()  # type: ignore[assignment]
             record.reviewed_by = reviewed_by  # type: ignore[assignment]
-            record.reviewed_at = datetime.now(timezone.utc)  # type: ignore[assignment]
+            record.reviewed_at = datetime.now(UTC)  # type: ignore[assignment]
             session.commit()
             return True
         finally:

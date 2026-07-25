@@ -71,6 +71,6 @@ class TestProcessEventMetrics:
         _, risk_scorer, repo, auditor = _make_deps()
         try:
             _process_event({}, rules_engine, risk_scorer, repo, auditor, "raw_orders")
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
         mock_counter.labels.assert_not_called()

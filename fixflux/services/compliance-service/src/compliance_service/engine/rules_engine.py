@@ -25,7 +25,7 @@ class RulesEngine:
                         f"{violation.rule_name}: {violation.description}"
                     )
             except Exception as exc:
-                logger.error(
-                    f"Rule {rule.name} raised an exception: {exc}", exc_info=True
+                logger.exception(
+                    f"Rule {rule.name} raised an exception: {exc}"
                 )
         return violations

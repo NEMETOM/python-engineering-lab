@@ -1,6 +1,6 @@
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from compliance_service.infrastructure.db import SessionLocal
@@ -36,13 +36,13 @@ class AuditLogger:
             action=action,
             payload=payload,
             checksum=checksum,
-            recorded_at=datetime.now(timezone.utc),
+            recorded_at=datetime.now(UTC),
         )
         session = SessionLocal()
         try:
             session.add(entry)
             session.commit()
         except Exception as exc:
-            logger.error(f"Failed to write audit trail entry: {exc}", exc_info=True)
+            logger.exception(f"Failed to write audit trail entry: {exc}")
         finally:
             session.close()

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from compliance_service.rules.base import Rule, Severity, Violation
@@ -27,7 +27,7 @@ class DuplicateOrderRule(Rule):
 
     def check(self, event: dict[str, Any]) -> Violation | None:
         key = self._order_key(event)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         self._seen = {
             k: v
