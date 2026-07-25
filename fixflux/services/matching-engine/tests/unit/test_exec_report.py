@@ -7,18 +7,18 @@ from matching_engine.producer import Producer
 
 
 def _make_trade(**overrides):
-    defaults = dict(
-        trade_id="T1",
-        symbol="AAPL",
-        buy_order_id="B1",
-        sell_order_id="S1",
-        price=150.0,
-        quantity=20,
-        buy_client_id="CLIENT-BUY",
-        sell_client_id="CLIENT-SELL",
-        buy_order_qty=20,
-        sell_order_qty=20,
-    )
+    defaults = {
+        "trade_id": "T1",
+        "symbol": "AAPL",
+        "buy_order_id": "B1",
+        "sell_order_id": "S1",
+        "price": 150.0,
+        "quantity": 20,
+        "buy_client_id": "CLIENT-BUY",
+        "sell_client_id": "CLIENT-SELL",
+        "buy_order_qty": 20,
+        "sell_order_qty": 20,
+    }
     return Trade(**{**defaults, **overrides})
 
 

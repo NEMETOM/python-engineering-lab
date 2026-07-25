@@ -64,7 +64,7 @@ class Producer:
                     exec_reports_emitted.labels(
                         exec_type="F", service="matching-engine"
                     ).inc()
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 pass  # best-effort; do not block the trade flow
 
     def send_book(self, book) -> None:
