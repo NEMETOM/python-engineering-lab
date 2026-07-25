@@ -1,17 +1,17 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import order_service.consumer  # noqa: F401  # ensure module is in sys.modules before @patch decorators fire
 
 
 def _raw_msg_value(**overrides):
-    defaults = dict(
-        symbol="AAPL",
-        side="BUY",
-        price=100.0,
-        quantity=10,
-        timestamp=datetime.utcnow().isoformat(),
-    )
+    defaults = {
+        "symbol": "AAPL",
+        "side": "BUY",
+        "price": 100.0,
+        "quantity": 10,
+        "timestamp": datetime.now(tz=UTC).isoformat(),
+    }
     return {**defaults, **overrides}
 
 

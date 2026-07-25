@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 import pytest
@@ -9,9 +9,13 @@ from shared.exceptions import ValidationError
 
 
 def _make_event(**overrides):
-    defaults = dict(
-        symbol="AAPL", side="BUY", price=100.0, quantity=10, timestamp=datetime.utcnow()
-    )
+    defaults = {
+        "symbol": "AAPL",
+        "side": "BUY",
+        "price": 100.0,
+        "quantity": 10,
+        "timestamp": datetime.now(tz=UTC),
+    }
     return RawOrderEvent(**{**defaults, **overrides})
 
 

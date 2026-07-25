@@ -1,14 +1,18 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from order_service.schemas import RawOrderEvent
 from order_service.transformer import OrderTransformer
 
 
 def _make_raw(**overrides):
-    defaults = dict(
-        symbol="AAPL", side="BUY", price=100.0, quantity=10, timestamp=datetime.utcnow()
-    )
+    defaults = {
+        "symbol": "AAPL",
+        "side": "BUY",
+        "price": 100.0,
+        "quantity": 10,
+        "timestamp": datetime.now(tz=UTC),
+    }
     return RawOrderEvent(**{**defaults, **overrides})
 
 

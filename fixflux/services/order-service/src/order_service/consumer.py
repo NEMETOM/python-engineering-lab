@@ -49,7 +49,7 @@ def run():
 
                 orders_processed.labels(status="approved").inc()
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
 
                 span.record_exception(e)
                 logger.error(f"invalid order {msg.value} reason={e}")

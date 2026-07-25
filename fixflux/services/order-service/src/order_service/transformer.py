@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from order_service.schemas import RawOrderEvent, ValidatedOrderEvent
 
@@ -14,6 +14,6 @@ class OrderTransformer:
             side=raw.side,
             price=raw.price,
             quantity=raw.quantity,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(tz=UTC),
             client_id=raw.client_id,
         )
