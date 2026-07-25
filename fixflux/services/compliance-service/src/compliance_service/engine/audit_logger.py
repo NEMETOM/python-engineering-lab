@@ -42,7 +42,7 @@ class AuditLogger:
         try:
             session.add(entry)
             session.commit()
-        except Exception as exc:
-            logger.exception(f"Failed to write audit trail entry: {exc}")
+        except Exception:
+            logger.exception("Failed to write audit trail entry")
         finally:
             session.close()
