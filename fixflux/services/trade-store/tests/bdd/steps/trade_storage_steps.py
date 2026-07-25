@@ -29,7 +29,7 @@ def step_when_repo_attempts(context):
     ):
         try:
             TradeRepository().save(context.trade_event)
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
 
 

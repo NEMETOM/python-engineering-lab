@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from behave import given, then
 from pydantic import ValidationError
@@ -7,15 +7,15 @@ from trade_store.schemas.trade_event import TradeEvent
 
 
 def _valid_fields(**overrides):
-    base = dict(
-        trade_id="T001",
-        symbol="AAPL",
-        buy_order_id="B001",
-        sell_order_id="S001",
-        price=150.0,
-        quantity=10,
-        timestamp=datetime.utcnow(),
-    )
+    base = {
+        "trade_id": "T001",
+        "symbol": "AAPL",
+        "buy_order_id": "B001",
+        "sell_order_id": "S001",
+        "price": 150.0,
+        "quantity": 10,
+        "timestamp": datetime.now(tz=UTC),
+    }
     return {**base, **overrides}
 
 
@@ -26,7 +26,7 @@ def step_given_missing_field(context, field):
     context.error = None
     try:
         context.trade_event = TradeEvent(**data)
-    except (ValidationError, Exception) as e:
+    except ValidationError as e:
         context.error = e
 
 
@@ -36,7 +36,7 @@ def step_given_invalid_field(context, field, value):
     context.error = None
     try:
         context.trade_event = TradeEvent(**data)
-    except (ValidationError, Exception) as e:
+    except ValidationError as e:
         context.error = e
 
 

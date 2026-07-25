@@ -36,7 +36,7 @@ def run():
 
                 trades_stored.labels(symbol=event.symbol).inc()
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
 
                 span.record_exception(e)
                 logger.error(f"failed to store trade {msg.value} reason={e}")
