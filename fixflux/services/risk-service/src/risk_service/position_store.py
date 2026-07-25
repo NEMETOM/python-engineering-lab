@@ -1,5 +1,4 @@
 from collections import defaultdict
-from typing import Dict
 
 
 class PositionStore:
@@ -12,9 +11,9 @@ class PositionStore:
 
     def __init__(self):
         # (client_id, symbol) -> net filled qty
-        self._net: Dict[tuple, int] = defaultdict(int)
+        self._net: dict[tuple, int] = defaultdict(int)
         # order_id -> {client_id, symbol, side, quantity}
-        self._open: Dict[str, dict] = {}
+        self._open: dict[str, dict] = {}
 
     def record_open_order(
         self, order_id: str, client_id: str, symbol: str, side: str, quantity: int

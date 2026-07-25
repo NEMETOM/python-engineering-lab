@@ -7,19 +7,19 @@ from shared.schemas.execution_report_event import ExecutionReportEvent
 
 
 def _make_report(**overrides):
-    defaults = dict(
-        order_id="O1",
-        cl_ord_id="O1",
-        client_id="CLIENT-A",
-        exec_type="0",
-        ord_status="0",
-        symbol="AAPL",
-        side="BUY",
-        price=100.0,
-        order_qty=10,
-        leaves_qty=10,
-        cum_qty=0,
-    )
+    defaults = {
+        "order_id": "O1",
+        "cl_ord_id": "O1",
+        "client_id": "CLIENT-A",
+        "exec_type": "0",
+        "ord_status": "0",
+        "symbol": "AAPL",
+        "side": "BUY",
+        "price": 100.0,
+        "order_qty": 10,
+        "leaves_qty": 10,
+        "cum_qty": 0,
+    }
     return ExecutionReportEvent(**{**defaults, **overrides})
 
 

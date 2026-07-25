@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from risk_service.checker import RiskChecker
 from risk_service.models import ValidatedOrder
@@ -6,27 +6,27 @@ from risk_service.position_store import PositionStore
 
 
 def _checker(**overrides):
-    defaults = dict(
-        notional_limit=1_000_000.0,
-        fat_finger_pct=10.0,
-        gross_position_limit=10_000,
-        net_position_limit=5_000,
-        max_open_orders=10,
-    )
+    defaults = {
+        "notional_limit": 1_000_000.0,
+        "fat_finger_pct": 10.0,
+        "gross_position_limit": 10_000,
+        "net_position_limit": 5_000,
+        "max_open_orders": 10,
+    }
     defaults.update(overrides)
     return RiskChecker(**defaults)
 
 
 def _order(**overrides):
-    defaults = dict(
-        order_id="O1",
-        symbol="AAPL",
-        side="BUY",
-        price=100.0,
-        quantity=10,
-        timestamp=datetime.now(timezone.utc),
-        client_id="C1",
-    )
+    defaults = {
+        "order_id": "O1",
+        "symbol": "AAPL",
+        "side": "BUY",
+        "price": 100.0,
+        "quantity": 10,
+        "timestamp": datetime.now(UTC),
+        "client_id": "C1",
+    }
     defaults.update(overrides)
     return ValidatedOrder(**defaults)
 

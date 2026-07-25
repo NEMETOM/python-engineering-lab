@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 from behave import given, then, when
@@ -9,13 +9,13 @@ from risk_service.position_store import PositionStore
 
 
 def _default_checker(**overrides):
-    params = dict(
-        notional_limit=1_000_000.0,
-        fat_finger_pct=10.0,
-        gross_position_limit=100_000,
-        net_position_limit=50_000,
-        max_open_orders=100,
-    )
+    params = {
+        "notional_limit": 1_000_000.0,
+        "fat_finger_pct": 10.0,
+        "gross_position_limit": 100_000,
+        "net_position_limit": 50_000,
+        "max_open_orders": 100,
+    }
     params.update(overrides)
     return RiskChecker(**params)
 
@@ -45,7 +45,7 @@ def step_given_passing_order(context, symbol):
         "side": "BUY",
         "price": 100.0,
         "quantity": 10,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "client_id": "CLIENT1",
     }
 
@@ -58,7 +58,7 @@ def step_given_order_above_notional(context):
         "side": "BUY",
         "price": 999_999.0,
         "quantity": 999,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "client_id": "CLIENT1",
     }
 

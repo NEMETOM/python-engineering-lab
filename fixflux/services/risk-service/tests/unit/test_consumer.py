@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 from risk_service.checker import RiskChecker
@@ -7,40 +7,40 @@ from risk_service.position_store import PositionStore
 
 
 def _checker(**overrides):
-    defaults = dict(
-        notional_limit=1_000_000.0,
-        fat_finger_pct=10.0,
-        gross_position_limit=10_000,
-        net_position_limit=5_000,
-        max_open_orders=10,
-    )
+    defaults = {
+        "notional_limit": 1_000_000.0,
+        "fat_finger_pct": 10.0,
+        "gross_position_limit": 10_000,
+        "net_position_limit": 5_000,
+        "max_open_orders": 10,
+    }
     defaults.update(overrides)
     return RiskChecker(**defaults)
 
 
 def _order_dict(**overrides):
-    defaults = dict(
-        order_id="O1",
-        symbol="AAPL",
-        side="BUY",
-        price=100.0,
-        quantity=10,
-        timestamp=datetime.now(timezone.utc).isoformat(),
-        client_id="C1",
-    )
+    defaults = {
+        "order_id": "O1",
+        "symbol": "AAPL",
+        "side": "BUY",
+        "price": 100.0,
+        "quantity": 10,
+        "timestamp": datetime.now(UTC).isoformat(),
+        "client_id": "C1",
+    }
     defaults.update(overrides)
     return defaults
 
 
 def _trade_dict(**overrides):
-    defaults = dict(
-        trade_id="T1",
-        symbol="AAPL",
-        buy_order_id="O-BUY",
-        sell_order_id="O-SELL",
-        price=100.0,
-        quantity=50,
-    )
+    defaults = {
+        "trade_id": "T1",
+        "symbol": "AAPL",
+        "buy_order_id": "O-BUY",
+        "sell_order_id": "O-SELL",
+        "price": 100.0,
+        "quantity": 50,
+    }
     defaults.update(overrides)
     return defaults
 
@@ -198,7 +198,7 @@ def _make_order_msg():
         "side": "BUY",
         "price": 100.0,
         "quantity": 10,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "client_id": "CLIENT-A",
     }
     return msg
@@ -222,35 +222,31 @@ class TestRun:
     def test_run_processes_order_message(self):
         with patch(
             "risk_service.consumer.KafkaConsumer", return_value=[_make_order_msg()]
-        ):
-            with patch("risk_service.consumer.RiskProducer") as mock_producer_cls:
-                mock_producer_cls.return_value = MagicMock()
-                run()
+        ), patch("risk_service.consumer.RiskProducer") as mock_producer_cls:
+            mock_producer_cls.return_value = MagicMock()
+            run()
 
     def test_run_processes_trade_message(self):
         with patch(
             "risk_service.consumer.KafkaConsumer", return_value=[_make_trade_msg()]
-        ):
-            with patch("risk_service.consumer.RiskProducer") as mock_producer_cls:
-                mock_producer_cls.return_value = MagicMock()
-                run()
+        ), patch("risk_service.consumer.RiskProducer") as mock_producer_cls:
+            mock_producer_cls.return_value = MagicMock()
+            run()
 
     def test_run_calls_handle_order_for_order_topic(self):
         with patch(
             "risk_service.consumer.KafkaConsumer", return_value=[_make_order_msg()]
-        ):
-            with patch("risk_service.consumer.RiskProducer") as mock_producer_cls:
-                mock_producer = MagicMock()
-                mock_producer_cls.return_value = mock_producer
-                run()
-                mock_producer.approve.assert_called_once()
+        ), patch("risk_service.consumer.RiskProducer") as mock_producer_cls:
+            mock_producer = MagicMock()
+            mock_producer_cls.return_value = mock_producer
+            run()
+            mock_producer.approve.assert_called_once()
 
     def test_run_calls_handle_trade_for_trades_topic(self):
         with patch(
             "risk_service.consumer.KafkaConsumer", return_value=[_make_trade_msg()]
-        ):
-            with patch("risk_service.consumer.RiskProducer") as mock_producer_cls:
-                mock_producer_cls.return_value = MagicMock()
-                with patch("risk_service.consumer.handle_trade") as mock_handle_trade:
-                    run()
-                    mock_handle_trade.assert_called_once()
+        ), patch("risk_service.consumer.RiskProducer") as mock_producer_cls:
+            mock_producer_cls.return_value = MagicMock()
+            with patch("risk_service.consumer.handle_trade") as mock_handle_trade:
+                run()
+                mock_handle_trade.assert_called_once()
