@@ -46,7 +46,12 @@ def before_all(context):
 
 
 def before_feature(context, feature):
-    kafka_tags = {"needs_kafka", "needs_full_stack", "needs_risk_service"}
+    kafka_tags = {
+        "needs_kafka",
+        "needs_full_stack",
+        "needs_risk_service",
+        "needs_exec_reports",
+    }
     if kafka_tags & set(feature.tags):
         _verify_kafka()
 
@@ -63,6 +68,8 @@ def before_scenario(context, scenario):
         _init_kafka_consumer(context)
     if "needs_risk_service" in all_tags:
         _init_risk_consumers(context)
+    if "needs_exec_reports" in all_tags:
+        _init_exec_report_consumer(context)
 
 
 def after_scenario(context, scenario):
@@ -75,6 +82,9 @@ def after_scenario(context, scenario):
     if hasattr(context, "risk_rejected_consumer"):
         context.risk_rejected_consumer.close()
         del context.risk_rejected_consumer
+    if hasattr(context, "exec_reports_consumer"):
+        context.exec_reports_consumer.close()
+        del context.exec_reports_consumer
     _restart_chaos_services(context)
 
 
@@ -177,3 +187,20 @@ def _init_risk_consumers(context):
 
     context.risk_approved_consumer = _make("risk_approved_orders")
     context.risk_rejected_consumer = _make("risk_rejected_orders")
+
+
+def _init_exec_report_consumer(context):
+    from kafka import KafkaConsumer
+
+    broker = os.getenv("KAFKA_BROKER", "localhost:9092")
+    consumer = KafkaConsumer(
+        "execution_reports",
+        bootstrap_servers=broker,
+        group_id=f"int-exec-{uuid.uuid4().hex}",
+        auto_offset_reset="latest",
+        value_deserializer=lambda v: json.loads(v.decode("utf-8")),
+        consumer_timeout_ms=15_000,
+        session_timeout_ms=10_000,
+    )
+    consumer.poll(timeout_ms=2_000)
+    context.exec_reports_consumer = consumer
