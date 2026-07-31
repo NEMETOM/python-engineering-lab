@@ -50,6 +50,7 @@ def run():
                 symbol=event.get("symbol", ""),
                 client_id=event.get("client_id", "UNKNOWN"),
                 order_qty=qty,
+                approved_at=event.get("approved_at", ""),
             )
             t0 = time.perf_counter()
             trades = engine.process(order)

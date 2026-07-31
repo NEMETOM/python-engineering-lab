@@ -2,6 +2,7 @@ import json
 from datetime import UTC, datetime
 
 from kafka import KafkaConsumer
+from prometheus_client import start_http_server
 
 from risk_service import config
 from risk_service.checker import RiskChecker
@@ -15,6 +16,7 @@ from shared.schemas.execution_report_event import ExecutionReportEvent
 configure_logging()
 logger = get_logger(__name__)
 
+_METRICS_PORT = 8004
 _tracer = init_tracer("risk-service")
 
 
@@ -62,6 +64,8 @@ def handle_order(
                 order.side,
                 order.quantity,
             )
+            # consumed by matching-engine to compute New->Fill exec-report latency
+            value["approved_at"] = datetime.now(UTC).isoformat()
             producer.approve(value)
             logger.info(
                 f"pre_trade_decision | order={order.order_id} client={order.client_id}"
@@ -133,6 +137,8 @@ def handle_order(
 
 
 def run() -> None:
+    start_http_server(_METRICS_PORT)
+    logger.info(f"metrics server started on :{_METRICS_PORT}")
     consumer = KafkaConsumer(
         config.INPUT_TOPIC,
         config.TRADES_TOPIC,

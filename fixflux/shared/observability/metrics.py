@@ -49,6 +49,12 @@ exec_reports_emitted = Counter(
     "FIX Execution Reports (35=8) published to Kafka",
     ["exec_type", "service"],
 )
+new_to_fill_latency_seconds = Histogram(
+    "new_to_fill_latency_seconds",
+    "Wall-clock time between risk-service's New ack (ExecType=0) and the matching-engine Fill (ExecType=F) for the same order",
+    ["side"],
+    buckets=[0.005, 0.01, 0.05, 0.1, 0.5, 1, 5, 10, 30, 60],
+)
 
 # Compliance Service
 violations_detected = Counter(

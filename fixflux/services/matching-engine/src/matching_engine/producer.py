@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 from opentelemetry import trace
 
 from matching_engine.infrastructure.kafka_client import (
@@ -5,12 +7,24 @@ from matching_engine.infrastructure.kafka_client import (
     create_producer,
 )
 from matching_engine.models import Trade
-from shared.observability.metrics import exec_reports_emitted
+from shared.observability.metrics import (
+    exec_reports_emitted,
+    new_to_fill_latency_seconds,
+)
 from shared.observability.tracing import inject_ctx
 from shared.schemas.execution_report_event import ExecutionReportEvent
 
 _EXEC_REPORTS_TOPIC = "execution_reports"
 _tracer = trace.get_tracer("matching-engine")
+
+
+def _new_to_fill_latency_seconds(approved_at: str) -> float | None:
+    if not approved_at:
+        return None
+    try:
+        return (datetime.now(UTC) - datetime.fromisoformat(approved_at)).total_seconds()
+    except ValueError:
+        return None
 
 
 class Producer:
@@ -32,9 +46,21 @@ class Producer:
 
     def send_exec_reports(self, trade: Trade) -> None:
         """Emit one FIX Execution Report (ExecType=F) per side of the trade."""
-        for order_id, client_id, side, order_qty in [
-            (trade.buy_order_id, trade.buy_client_id, "BUY", trade.buy_order_qty),
-            (trade.sell_order_id, trade.sell_client_id, "SELL", trade.sell_order_qty),
+        for order_id, client_id, side, order_qty, approved_at in [
+            (
+                trade.buy_order_id,
+                trade.buy_client_id,
+                "BUY",
+                trade.buy_order_qty,
+                trade.buy_approved_at,
+            ),
+            (
+                trade.sell_order_id,
+                trade.sell_client_id,
+                "SELL",
+                trade.sell_order_qty,
+                trade.sell_approved_at,
+            ),
         ]:
             try:
                 report = ExecutionReportEvent(
@@ -58,6 +84,10 @@ class Producer:
                     span.set_attribute("exec_type", "F")
                     span.set_attribute("order.id", order_id)
                     span.set_attribute("order.side", side)
+                    latency = _new_to_fill_latency_seconds(approved_at)
+                    if latency is not None:
+                        span.set_attribute("latency.new_to_fill_seconds", latency)
+                        new_to_fill_latency_seconds.labels(side=side).observe(latency)
                     data = report.model_dump(mode="json")
                     inject_ctx(data)
                     self._exec_producer.send(_EXEC_REPORTS_TOPIC, data)

@@ -1,0 +1,17 @@
+groups:
+  - name: exec-reports
+    rules:
+      - alert: FailedExecReportEmissions
+        expr: |
+          sum(count_over_time({container=~".*(risk-service|matching-engine).*"} |= "failed to emit exec report" [5m])) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Execution report emission is failing"
+          description: >
+            risk-service or matching-engine logged "failed to emit exec report" at least once
+            in the last 5 minutes. Exec reports are best-effort (a Kafka failure here does not
+            block order approval or trade publication), so trading is unaffected, but the
+            execution_reports topic is silently missing records. Check the Loki "Failed Exec
+            Report Emissions" panel for the offending order_id.

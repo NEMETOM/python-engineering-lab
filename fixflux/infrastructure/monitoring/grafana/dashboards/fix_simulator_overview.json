@@ -656,6 +656,76 @@
           "refId": "A"
         }
       ]
+    },
+    {
+      "id": 24,
+      "type": "row",
+      "title": "MiFID II Pre-Trade Funnel & Fill Latency",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 57 }
+    },
+    {
+      "id": 25,
+      "type": "timeseries",
+      "title": "Rejection Rate (% of New Acks)",
+      "description": "Risk-service rejections (ExecType=8) as a fraction of New acks (ExecType=0) — the pre-trade approval funnel.\n\nUnlike the raw Approved/Rejected rate panel above, this normalizes for traffic volume: a spike here means the *proportion* of rejected orders is rising, which is a leading indicator of a bad risk-limit deploy or a client sending malformed/oversized orders, independent of overall order volume.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 58 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "unit": "percentunit",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "calcs": ["lastNotNull"], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(rate(exec_reports_emitted_total{exec_type=\"8\"}[$__rate_interval])) / sum(rate(exec_reports_emitted_total{exec_type=\"0\"}[$__rate_interval]))",
+          "legendFormat": "Rejected / New",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "type": "timeseries",
+      "title": "New → Fill Latency (P50/P99)",
+      "description": "Wall-clock time between an order's New ack (ExecType=0, risk-service) and its Fill (ExecType=F, matching-engine), derived from the same trace context carried on the OTel spans risk-service.send_exec_report and matching-engine.send_exec_reports (see the Tempo dashboard for individual traces).\n\nFor an order that fills immediately this is near-zero (matches Matching Latency P99). For a resting limit order, this is how long the client actually waited for a counterparty — the number a trader cares about, as opposed to raw engine processing time.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 58 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "calcs": ["lastNotNull"], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "histogram_quantile(0.50, sum(rate(new_to_fill_latency_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "histogram_quantile(0.99, sum(rate(new_to_fill_latency_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p99",
+          "refId": "B"
+        }
+      ]
     }
   ]
 }

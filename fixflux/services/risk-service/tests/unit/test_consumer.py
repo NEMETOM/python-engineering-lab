@@ -88,6 +88,23 @@ class TestHandleOrder:
         )
         self.producer.approve.assert_not_called()
 
+    def test_approved_order_stamps_approved_at(self):
+        value = _order_dict()
+        handle_order(value, _checker(), self.store, self.last_prices, self.producer)
+        sent_value = self.producer.approve.call_args[0][0]
+        assert "approved_at" in sent_value
+
+    def test_rejected_order_does_not_stamp_approved_at(self):
+        value = _order_dict(price=9_999_999.0, quantity=9_999_999)
+        handle_order(
+            value,
+            _checker(notional_limit=1.0),
+            self.store,
+            self.last_prices,
+            self.producer,
+        )
+        assert "approved_at" not in value
+
     def test_approved_order_is_recorded_in_store(self):
         handle_order(
             _order_dict(order_id="O1"),
@@ -221,6 +238,7 @@ def _make_trade_msg():
 class TestRun:
     def test_run_processes_order_message(self):
         with (
+            patch("risk_service.consumer.start_http_server"),
             patch(
                 "risk_service.consumer.KafkaConsumer", return_value=[_make_order_msg()]
             ),
@@ -231,6 +249,7 @@ class TestRun:
 
     def test_run_processes_trade_message(self):
         with (
+            patch("risk_service.consumer.start_http_server"),
             patch(
                 "risk_service.consumer.KafkaConsumer", return_value=[_make_trade_msg()]
             ),
@@ -241,6 +260,7 @@ class TestRun:
 
     def test_run_calls_handle_order_for_order_topic(self):
         with (
+            patch("risk_service.consumer.start_http_server"),
             patch(
                 "risk_service.consumer.KafkaConsumer", return_value=[_make_order_msg()]
             ),
@@ -253,6 +273,7 @@ class TestRun:
 
     def test_run_calls_handle_trade_for_trades_topic(self):
         with (
+            patch("risk_service.consumer.start_http_server"),
             patch(
                 "risk_service.consumer.KafkaConsumer", return_value=[_make_trade_msg()]
             ),
