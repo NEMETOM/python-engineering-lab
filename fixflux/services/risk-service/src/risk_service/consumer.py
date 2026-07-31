@@ -3,13 +3,13 @@ from datetime import UTC, datetime
 
 from kafka import KafkaConsumer
 from prometheus_client import start_http_server
+
 from risk_service import config
 from risk_service.checker import RiskChecker
 from risk_service.models import RejectedOrderEvent, TradeEvent, ValidatedOrder
 from risk_service.position_store import PositionStore
 from risk_service.producer import RiskProducer
 from risk_service.utils.logger import configure_logging, get_logger
-
 from shared.observability.tracing import extract_ctx, init_tracer
 from shared.schemas.execution_report_event import ExecutionReportEvent
 
