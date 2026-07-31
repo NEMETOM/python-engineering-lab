@@ -10,6 +10,7 @@ class Order:
     symbol: str = ""
     client_id: str = "UNKNOWN"
     order_qty: int = 0  # original quantity before matching; used in leaves_qty/cum_qty
+    approved_at: str = ""  # ISO timestamp from risk-service; used for New->Fill latency
 
 
 @dataclass
@@ -24,3 +25,5 @@ class Trade:
     sell_client_id: str = "UNKNOWN"
     buy_order_qty: int = 0
     sell_order_qty: int = 0
+    buy_approved_at: str = ""
+    sell_approved_at: str = ""

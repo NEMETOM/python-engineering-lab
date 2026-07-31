@@ -1,3 +1,4 @@
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -159,6 +160,40 @@ class TestExecReportsMetric:
             producer.send_exec_reports(_make_trade())
             for c in mock_metric.labels.call_args_list:
                 assert c.kwargs["service"] == "matching-engine"
+
+
+class TestNewToFillLatency:
+    def test_latency_observed_when_approved_at_present(
+        self, producer, mock_kafka_producer
+    ):
+        approved_at = (datetime.now(UTC) - timedelta(seconds=2)).isoformat()
+        with patch(
+            "matching_engine.producer.new_to_fill_latency_seconds"
+        ) as mock_metric:
+            producer.send_exec_reports(
+                _make_trade(buy_approved_at=approved_at, sell_approved_at=approved_at)
+            )
+            assert mock_metric.labels.call_count == 2
+            observed = mock_metric.labels.return_value.observe.call_args_list
+            assert all(call.args[0] >= 2.0 for call in observed)
+
+    def test_latency_not_observed_when_approved_at_missing(
+        self, producer, mock_kafka_producer
+    ):
+        with patch(
+            "matching_engine.producer.new_to_fill_latency_seconds"
+        ) as mock_metric:
+            producer.send_exec_reports(_make_trade())
+            mock_metric.labels.assert_not_called()
+
+    def test_latency_not_observed_when_approved_at_unparseable(
+        self, producer, mock_kafka_producer
+    ):
+        with patch(
+            "matching_engine.producer.new_to_fill_latency_seconds"
+        ) as mock_metric:
+            producer.send_exec_reports(_make_trade(buy_approved_at="not-a-timestamp"))
+            mock_metric.labels.assert_not_called()
 
 
 class TestExecReportsBestEffort:

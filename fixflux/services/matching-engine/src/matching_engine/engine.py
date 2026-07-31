@@ -31,6 +31,8 @@ class MatchingEngine:
                         sell_client_id=best_sell.client_id,
                         buy_order_qty=order.order_qty,
                         sell_order_qty=best_sell.order_qty,
+                        buy_approved_at=order.approved_at,
+                        sell_approved_at=best_sell.approved_at,
                     )
                 )
 
@@ -57,6 +59,8 @@ class MatchingEngine:
                         sell_client_id=order.client_id,
                         buy_order_qty=best_buy.order_qty,
                         sell_order_qty=order.order_qty,
+                        buy_approved_at=best_buy.approved_at,
+                        sell_approved_at=order.approved_at,
                     )
                 )
 

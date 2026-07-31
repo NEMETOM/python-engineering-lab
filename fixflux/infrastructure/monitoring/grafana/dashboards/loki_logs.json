@@ -122,7 +122,7 @@
       "id": 10,
       "type": "logs",
       "title": "Failed Exec Report Emissions",
-      "description": "WARNING logs from risk-service and matching-engine for exec report sends that failed silently.\n\nExec reports use best-effort semantics: a Kafka failure does not block order approval or trade publication, but it is logged at WARNING level. This panel surfaces those failures — in normal operation it should be empty.\n\nCommon causes: Kafka broker unreachable, topic not yet created, serialisation error in ExecutionReportEvent.\n\nLogQL: `{container=~\".*(risk-service|matching-engine).*\"} |= \"failed to emit exec report\"`",
+      "description": "WARNING logs from risk-service and matching-engine for exec report sends that failed silently.\n\nExec reports use best-effort semantics: a Kafka failure does not block order approval or trade publication, but it is logged at WARNING level. This panel surfaces those failures — in normal operation it should be empty.\n\nCommon causes: Kafka broker unreachable, topic not yet created, serialisation error in ExecutionReportEvent.\n\nLogQL: `{container=~\".*(risk-service|matching-engine).*\"} |= \"failed to emit exec report\"`\n\nThis panel is no longer passive: the same LogQL condition backs the `FailedExecReportEmissions` alert (Loki ruler → Alertmanager, see `infrastructure/monitoring/loki-rules/fake/fixflux-alerts.yaml`), so a sustained failure now fires instead of only showing up here after the fact.",
       "datasource": { "type": "loki", "uid": "loki" },
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 27 },
       "options": {
