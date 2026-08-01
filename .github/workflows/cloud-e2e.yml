@@ -13,6 +13,7 @@ on:
           - golden-path   # Happy path only - fastest demo (~30 sec)
           - volume        # 1000 order throughput test (~4 min)
           - chaos         # Service kill + recovery scenarios (~5 min)
+          - exec-reports  # FIX Execution Report (35=8) New/Reject/Fill checks (~30 sec)
 
 permissions:
   contents: read
@@ -62,10 +63,11 @@ jobs:
           SUITE: ${{ github.event.inputs.test_suite }}
         run: |
           case "$SUITE" in
-            e2e)          FEATURE="tests/integration/features/filedrop_e2e_pipeline.feature" ; TAGS="--tags=@e2e --tags=~@volume" ;;
+            e2e)          FEATURE="tests/integration/features/filedrop_e2e_pipeline.feature tests/integration/features/exec_report_pipeline.feature" ; TAGS="--tags=@e2e --tags=~@volume" ;;
             golden-path)  FEATURE="tests/integration/features/filedrop_e2e_pipeline.feature" ; TAGS="--tags=@golden-path" ;;
             volume)       FEATURE="tests/integration/features/filedrop_e2e_pipeline.feature" ; TAGS="--tags=@volume" ;;
             chaos)        FEATURE="tests/integration/features/chaos_recovery.feature"        ; TAGS="--tags=@chaos" ;;
+            exec-reports) FEATURE="tests/integration/features/exec_report_pipeline.feature"   ; TAGS="--tags=@e2e" ;;
           esac
           ssh -i ~/.ssh/fixflux_do root@${{ secrets.DO_DROPLET_IP }} \
             "cd ~/python-engineering-lab/fixflux && \

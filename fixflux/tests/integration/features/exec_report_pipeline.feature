@@ -1,4 +1,4 @@
-@integration @needs_kafka @needs_risk_service @needs_exec_reports @needs_full_stack
+@integration @e2e @needs_kafka @needs_risk_service @needs_exec_reports @needs_full_stack
 Feature: FIX Execution Report Pipeline (35=8)
   Every state transition an order goes through - accepted, rejected, or filled -
   must produce a FIX Execution Report (MsgType 35=8) on the execution_reports
