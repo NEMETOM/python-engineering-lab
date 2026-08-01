@@ -190,7 +190,7 @@ def _init_risk_consumers(context):
     context.risk_rejected_consumer = _make("risk_rejected_orders")
 
 
-def _wait_for_assignment_and_seek_to_end(consumer, timeout_secs=5):
+def _wait_for_assignment_and_seek_to_end(consumer, timeout_secs=20):
     """Block until the consumer group has actually completed partition assignment,
     then explicitly seek to the current end of every assigned partition.
 
@@ -201,13 +201,23 @@ def _wait_for_assignment_and_seek_to_end(consumer, timeout_secs=5):
     topics (several messages produced in rapid succession right after the
     consumer is created), which is exactly the exec_report_pipeline Fill
     scenario's shape (2 New acks + 2 Fills in quick succession).
+
+    Fails loudly (RuntimeError) rather than silently proceeding if assignment
+    never completes - a slow/stuck coordinator should surface as a clear setup
+    error here, not as a confusing "message never appeared" assertion minutes
+    later in a scenario that had nothing wrong with it.
     """
     deadline = time.monotonic() + timeout_secs
     while not consumer.assignment() and time.monotonic() < deadline:
         consumer.poll(timeout_ms=200)
     partitions = consumer.assignment()
-    if partitions:
-        consumer.seek_to_end(*partitions)
+    if not partitions:
+        raise RuntimeError(
+            f"Kafka consumer group '{consumer.config['group_id']}' did not complete "
+            f"partition assignment within {timeout_secs}s - broker/coordinator may "
+            "be unavailable or still starting up."
+        )
+    consumer.seek_to_end(*partitions)
 
 
 def _init_exec_report_consumer(context):
