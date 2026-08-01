@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+import time
 import uuid
 from pathlib import Path
 
@@ -189,6 +190,26 @@ def _init_risk_consumers(context):
     context.risk_rejected_consumer = _make("risk_rejected_orders")
 
 
+def _wait_for_assignment_and_seek_to_end(consumer, timeout_secs=5):
+    """Block until the consumer group has actually completed partition assignment,
+    then explicitly seek to the current end of every assigned partition.
+
+    A single best-effort poll() is not enough: with auto_offset_reset="latest",
+    if the rebalance/assignment finishes *after* a message has already landed on
+    a partition, that partition's "latest" offset can resolve to a position past
+    that message - silently skipping it forever. This matters most for bursty
+    topics (several messages produced in rapid succession right after the
+    consumer is created), which is exactly the exec_report_pipeline Fill
+    scenario's shape (2 New acks + 2 Fills in quick succession).
+    """
+    deadline = time.monotonic() + timeout_secs
+    while not consumer.assignment() and time.monotonic() < deadline:
+        consumer.poll(timeout_ms=200)
+    partitions = consumer.assignment()
+    if partitions:
+        consumer.seek_to_end(*partitions)
+
+
 def _init_exec_report_consumer(context):
     from kafka import KafkaConsumer
 
@@ -202,7 +223,7 @@ def _init_exec_report_consumer(context):
         consumer_timeout_ms=15_000,
         session_timeout_ms=10_000,
     )
-    consumer.poll(timeout_ms=2_000)
+    _wait_for_assignment_and_seek_to_end(consumer)
     context.exec_reports_consumer = consumer
     # Holds messages consumed but not matched by an earlier assertion in this
     # scenario - poll() is destructive, so a message for a *later* assertion
