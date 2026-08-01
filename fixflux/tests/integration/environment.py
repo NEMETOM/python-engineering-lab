@@ -204,3 +204,8 @@ def _init_exec_report_consumer(context):
     )
     consumer.poll(timeout_ms=2_000)
     context.exec_reports_consumer = consumer
+    # Holds messages consumed but not matched by an earlier assertion in this
+    # scenario - poll() is destructive, so a message for a *later* assertion
+    # (e.g. the sell side's Fill, batched together with the buy side's) must be
+    # buffered here rather than discarded. See _poll_for_exec_report.
+    context.exec_reports_buffer = []

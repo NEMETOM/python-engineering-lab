@@ -1,0 +1,61 @@
+name: FIXFlux - Droplet Health Check
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */12 * * *'  # every 12 hours
+
+permissions:
+  contents: read
+
+concurrency:
+  group: droplet-health-check
+  cancel-in-progress: true
+
+jobs:
+  health-check:
+    name: Verify all FIXFlux components on the Droplet
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DO_SSH_KEY }}" > ~/.ssh/fixflux_do
+          chmod 600 ~/.ssh/fixflux_do
+          ssh-keyscan -H ${{ secrets.DO_DROPLET_IP }} >> ~/.ssh/known_hosts
+
+      - name: Verify every container is running
+        run: |
+          ssh -i ~/.ssh/fixflux_do root@${{ secrets.DO_DROPLET_IP }} '
+            set -e
+            cd ~/python-engineering-lab/fixflux
+
+            # init-topics is a one-shot job (expected to exit 0), deliberately excluded
+            EXPECTED="redpanda postgres fix-gateway order-service risk-service matching-engine market-data-service trade-store trade-store-consumer compliance-api compliance-consumer prometheus loki alertmanager promtail grafana tempo"
+            RUNNING=$(docker compose --profile full --profile monitoring ps --services --filter "status=running")
+
+            MISSING=""
+            for svc in $EXPECTED; do
+              if ! echo "$RUNNING" | grep -qx "$svc"; then
+                MISSING="$MISSING $svc"
+              fi
+            done
+
+            if [ -n "$MISSING" ]; then
+              echo "Down or unhealthy container(s):$MISSING"
+              echo "--- docker compose ps ---"
+              docker compose --profile full --profile monitoring ps
+              exit 1
+            fi
+            echo "All $(echo "$EXPECTED" | wc -w) containers running."
+          '
+
+      - name: Check HTTP health endpoints
+        run: |
+          ssh -i ~/.ssh/fixflux_do root@${{ secrets.DO_DROPLET_IP }} '
+            set -e
+            curl -sf http://localhost:8000/health >/dev/null && echo "trade-store: OK"
+            curl -sf http://localhost:8010/health >/dev/null && echo "compliance-api: OK"
+          '

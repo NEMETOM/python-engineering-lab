@@ -34,11 +34,23 @@ def _publish(topic, payload):
     producer.close()
 
 
-def _poll_for_exec_report(consumer, order_id, exec_type, timeout_secs):
-    """Poll consumer until an execution report for order_id/exec_type arrives or timeout."""
+def _poll_for_exec_report(context, order_id, exec_type, timeout_secs):
+    """Poll context.exec_reports_consumer until a matching report arrives or timeout.
+
+    A single poll() batch often contains reports for *other* order_ids/exec_types
+    this scenario will check later (e.g. both sides' Fill reports land together).
+    Kafka consumption is destructive - a message not matched now is gone from the
+    topic's read position forever - so every non-matching message is buffered on
+    context.exec_reports_buffer for a subsequent call to check first.
+    """
+    for i, value in enumerate(context.exec_reports_buffer):
+        if value.get("order_id") == order_id and value.get("exec_type") == exec_type:
+            del context.exec_reports_buffer[i]
+            return value
+
     deadline = time.monotonic() + timeout_secs
     while time.monotonic() < deadline:
-        records = consumer.poll(timeout_ms=2_000)
+        records = context.exec_reports_consumer.poll(timeout_ms=2_000)
         for tp_records in records.values():
             for msg in tp_records:
                 value = msg.value
@@ -47,6 +59,7 @@ def _poll_for_exec_report(consumer, order_id, exec_type, timeout_secs):
                     and value.get("exec_type") == exec_type
                 ):
                     return value
+                context.exec_reports_buffer.append(value)
     return None
 
 
@@ -100,9 +113,7 @@ def step_publish_crossing_orders(context):
     'an execution report for the order with ExecType "{exec_type}" appears within {timeout:d} seconds'
 )
 def step_assert_exec_report(context, exec_type, timeout):
-    result = _poll_for_exec_report(
-        context.exec_reports_consumer, context.risk_order_id, exec_type, timeout
-    )
+    result = _poll_for_exec_report(context, context.risk_order_id, exec_type, timeout)
     assert result is not None, (
         f"No execution report with ExecType={exec_type!r} for order {context.risk_order_id} "
         f"appeared in execution_reports within {timeout}s.\n"
@@ -128,9 +139,7 @@ def step_assert_exec_report_reason(context, fragment):
 
 @then("a Fill execution report for the buy order appears within {timeout:d} seconds")
 def step_assert_buy_fill(context, timeout):
-    result = _poll_for_exec_report(
-        context.exec_reports_consumer, context.risk_buy_order_id, "F", timeout
-    )
+    result = _poll_for_exec_report(context, context.risk_buy_order_id, "F", timeout)
     assert result is not None, (
         f"No Fill execution report for buy order {context.risk_buy_order_id} appeared "
         f"within {timeout}s.\n"
@@ -141,9 +150,7 @@ def step_assert_buy_fill(context, timeout):
 
 @then("a Fill execution report for the sell order appears within {timeout:d} seconds")
 def step_assert_sell_fill(context, timeout):
-    result = _poll_for_exec_report(
-        context.exec_reports_consumer, context.risk_sell_order_id, "F", timeout
-    )
+    result = _poll_for_exec_report(context, context.risk_sell_order_id, "F", timeout)
     assert result is not None, (
         f"No Fill execution report for sell order {context.risk_sell_order_id} appeared "
         f"within {timeout}s.\n"
