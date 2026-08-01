@@ -45,8 +45,12 @@ jobs:
 
             if [ -n "$MISSING" ]; then
               echo "Down or unhealthy container(s):$MISSING"
-              echo "--- docker compose ps ---"
-              docker compose --profile full --profile monitoring ps
+              echo "--- docker compose ps --all (default ps hides exited/restarting containers) ---"
+              docker compose --profile full --profile monitoring ps --all
+              for svc in $MISSING; do
+                echo "--- logs: $svc (last 30 lines) ---"
+                docker compose --profile full --profile monitoring logs --tail=30 "$svc" || true
+              done
               exit 1
             fi
             echo "All $(echo "$EXPECTED" | wc -w) containers running."
