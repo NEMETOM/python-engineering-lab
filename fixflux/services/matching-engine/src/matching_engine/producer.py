@@ -7,12 +7,15 @@ from matching_engine.infrastructure.kafka_client import (
     create_producer,
 )
 from matching_engine.models import Trade
+from matching_engine.utils.logger import get_logger
 from shared.observability.metrics import (
     exec_reports_emitted,
     new_to_fill_latency_seconds,
 )
 from shared.observability.tracing import inject_ctx
 from shared.schemas.execution_report_event import ExecutionReportEvent
+
+logger = get_logger(__name__)
 
 _EXEC_REPORTS_TOPIC = "execution_reports"
 _tracer = trace.get_tracer("matching-engine")
@@ -94,8 +97,10 @@ class Producer:
                     exec_reports_emitted.labels(
                         exec_type="F", service="matching-engine"
                     ).inc()
-            except Exception:  # noqa: BLE001, S110
-                pass  # best-effort; do not block the trade flow
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    f"failed to emit exec report (Fill) for order {order_id}: {exc}"
+                )
 
     def send_book(self, book) -> None:
 

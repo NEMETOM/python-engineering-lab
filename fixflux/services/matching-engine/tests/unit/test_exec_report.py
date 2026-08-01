@@ -215,3 +215,9 @@ class TestExecReportsBestEffort:
         mock_exec_producer.send.side_effect = flaky_send
         producer.send_exec_reports(_make_trade())
         assert call_count == 2
+
+    def test_kafka_error_is_logged(self, producer, mock_exec_producer, caplog):
+        mock_exec_producer.send.side_effect = RuntimeError("broker down")
+        with caplog.at_level("WARNING"):
+            producer.send_exec_reports(_make_trade())
+        assert "failed to emit exec report" in caplog.text
