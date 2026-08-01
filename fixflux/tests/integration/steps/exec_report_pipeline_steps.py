@@ -57,11 +57,15 @@ def _poll_for_exec_report(consumer, order_id, exec_type, timeout_secs):
     'a crossing buy order for the test client symbol "{symbol}" at price {price:f} qty {qty:d}'
 )
 def step_crossing_buy_order(context, symbol, price, qty):
+    # matching-engine's order books are in-memory and never cleared between
+    # runs; a fixed symbol would let a resting order from an earlier/failed
+    # run silently steal this scenario's match. Suffix it unique per run.
+    context.risk_crossing_symbol = f"{symbol}-{uuid.uuid4().hex[:8].upper()}"
     context.risk_buy_order_id = f"ORD-{uuid.uuid4().hex[:12]}"
     context.risk_buy_payload = _build_order_payload(
         order_id=context.risk_buy_order_id,
         client_id=context.risk_client_id,
-        symbol=symbol,
+        symbol=context.risk_crossing_symbol,
         side="BUY",
         price=price,
         quantity=qty,
@@ -76,7 +80,7 @@ def step_crossing_sell_order(context, symbol, price, qty):
     context.risk_sell_payload = _build_order_payload(
         order_id=context.risk_sell_order_id,
         client_id=context.risk_client_id_2,
-        symbol=symbol,
+        symbol=context.risk_crossing_symbol,
         side="SELL",
         price=price,
         quantity=qty,
