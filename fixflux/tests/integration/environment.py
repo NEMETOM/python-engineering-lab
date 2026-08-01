@@ -190,50 +190,36 @@ def _init_risk_consumers(context):
     context.risk_rejected_consumer = _make("risk_rejected_orders")
 
 
-def _wait_for_assignment_and_seek_to_end(consumer, timeout_secs=20):
-    """Block until the consumer group has actually completed partition assignment,
-    then explicitly seek to the current end of every assigned partition.
-
-    A single best-effort poll() is not enough: with auto_offset_reset="latest",
-    if the rebalance/assignment finishes *after* a message has already landed on
-    a partition, that partition's "latest" offset can resolve to a position past
-    that message - silently skipping it forever. This matters most for bursty
-    topics (several messages produced in rapid succession right after the
-    consumer is created), which is exactly the exec_report_pipeline Fill
-    scenario's shape (2 New acks + 2 Fills in quick succession).
-
-    Fails loudly (RuntimeError) rather than silently proceeding if assignment
-    never completes - a slow/stuck coordinator should surface as a clear setup
-    error here, not as a confusing "message never appeared" assertion minutes
-    later in a scenario that had nothing wrong with it.
-    """
-    deadline = time.monotonic() + timeout_secs
-    while not consumer.assignment() and time.monotonic() < deadline:
-        consumer.poll(timeout_ms=200)
-    partitions = consumer.assignment()
-    if not partitions:
-        raise RuntimeError(
-            f"Kafka consumer group '{consumer.config['group_id']}' did not complete "
-            f"partition assignment within {timeout_secs}s - broker/coordinator may "
-            "be unavailable or still starting up."
-        )
-    consumer.seek_to_end(*partitions)
-
-
 def _init_exec_report_consumer(context):
-    from kafka import KafkaConsumer
+    from kafka import KafkaConsumer, TopicPartition
 
     broker = os.getenv("KAFKA_BROKER", "localhost:9092")
+    topic = "execution_reports"
     consumer = KafkaConsumer(
-        "execution_reports",
         bootstrap_servers=broker,
-        group_id=f"int-exec-{uuid.uuid4().hex}",
-        auto_offset_reset="latest",
         value_deserializer=lambda v: json.loads(v.decode("utf-8")),
         consumer_timeout_ms=15_000,
-        session_timeout_ms=10_000,
     )
-    _wait_for_assignment_and_seek_to_end(consumer)
+    # Manual partition assignment instead of subscribe() + consumer group.
+    # This scenario only ever needs one reader with no load-balancing across
+    # instances, so there is no reason to depend on (or race against) the
+    # JoinGroup/SyncGroup rebalance protocol at all - two rounds of patching
+    # around its timing (waiting for consumer.assignment(), then waiting
+    # longer) both failed to reliably fix missed messages. assign() takes
+    # effect immediately with no rebalance to wait for, and seek_to_end()
+    # deterministically positions at each partition's current high-water mark.
+    deadline = time.monotonic() + 10
+    partition_ids = consumer.partitions_for_topic(topic)
+    while not partition_ids and time.monotonic() < deadline:
+        partition_ids = consumer.partitions_for_topic(topic)
+    if not partition_ids:
+        raise RuntimeError(
+            f"Could not fetch partition metadata for topic '{topic}' - "
+            "is Kafka/Redpanda reachable and is the topic created?"
+        )
+    topic_partitions = [TopicPartition(topic, p) for p in partition_ids]
+    consumer.assign(topic_partitions)
+    consumer.seek_to_end(*topic_partitions)
     context.exec_reports_consumer = consumer
     # Holds messages consumed but not matched by an earlier assertion in this
     # scenario - poll() is destructive, so a message for a *later* assertion
