@@ -51,15 +51,25 @@ def _poll_for_exec_report(context, order_id, exec_type, timeout_secs):
     deadline = time.monotonic() + timeout_secs
     while time.monotonic() < deadline:
         records = context.exec_reports_consumer.poll(timeout_ms=2_000)
+        match = None
+        # Drain the *entire* batch every time - never return the moment a
+        # match is found. Kafka commonly batches both sides' Fill reports
+        # into a single poll() response (buy sent first, sell right after,
+        # same producer); returning early left whatever came after the match
+        # in that same batch un-buffered and permanently lost.
         for tp_records in records.values():
             for msg in tp_records:
                 value = msg.value
                 if (
-                    value.get("order_id") == order_id
+                    match is None
+                    and value.get("order_id") == order_id
                     and value.get("exec_type") == exec_type
                 ):
-                    return value
-                context.exec_reports_buffer.append(value)
+                    match = value
+                else:
+                    context.exec_reports_buffer.append(value)
+        if match is not None:
+            return match
     return None
 
 
