@@ -55,6 +55,8 @@ def before_feature(context, feature):
     }
     if kafka_tags & set(feature.tags):
         _verify_kafka()
+    if "needs_compliance_api" in feature.tags:
+        _verify_compliance_api()
 
 
 def before_scenario(context, scenario):
@@ -144,6 +146,21 @@ def _verify_kafka():
             "Kafka pipeline tests require Kafka.\n"
             "Start it with:  docker-compose up redpanda\n"
             f"Cannot reach {broker}: {exc}"
+        ) from exc
+
+
+def _verify_compliance_api():
+    import httpx
+
+    url = os.getenv("COMPLIANCE_URL", "http://localhost:8010")
+    try:
+        response = httpx.get(f"{url}/health", timeout=5.0)
+        response.raise_for_status()
+    except Exception as exc:
+        raise RuntimeError(
+            "Compliance pipeline tests require compliance-api.\n"
+            "Start it with:  docker compose --profile full up compliance-api\n"
+            f"Cannot reach {url}/health: {exc}"
         ) from exc
 
 
