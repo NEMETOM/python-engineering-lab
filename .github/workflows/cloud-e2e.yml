@@ -20,6 +20,11 @@ on:
                             # inject a fake timestamp, so it's fundamentally not triggerable
                             # on demand. The video script already handles this correctly
                             # (code walkthrough only, no live demo) - no change needed there.
+      preserve_state:
+        description: 'Skip truncating trades/violations before each scenario (keeps existing Droplet demo data - test isolation between scenarios is weaker)'
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -67,6 +72,7 @@ jobs:
       - name: Run ${{ github.event.inputs.test_suite }} tests
         env:
           SUITE: ${{ github.event.inputs.test_suite }}
+          PRESERVE_STATE: ${{ github.event.inputs.preserve_state }}
         run: |
           case "$SUITE" in
             e2e)          FEATURE="tests/integration/features/filedrop_e2e_pipeline.feature tests/integration/features/exec_report_pipeline.feature tests/integration/features/compliance_pipeline.feature" ; TAGS="--tags=@e2e --tags=~@volume" ;;
@@ -76,11 +82,17 @@ jobs:
             exec-reports) FEATURE="tests/integration/features/exec_report_pipeline.feature"   ; TAGS="--tags=@e2e" ;;
             compliance)   FEATURE="tests/integration/features/compliance_pipeline.feature"    ; TAGS="--tags=@e2e" ;;
           esac
+          if [ "$PRESERVE_STATE" = "true" ]; then
+            TRUNCATE_FLAG="E2E_TRUNCATE_STATE=false"
+          else
+            TRUNCATE_FLAG="E2E_TRUNCATE_STATE=true"
+          fi
           ssh -i ~/.ssh/fixflux_do root@${{ secrets.DO_DROPLET_IP }} \
             "cd ~/python-engineering-lab/fixflux && \
              mkdir -p /tmp/fixflux-reports && \
              KAFKA_BROKER=localhost:9092 \
              DATABASE_URL=postgresql://fixuser:fixpass@localhost:5433/fixdb \
+             $TRUNCATE_FLAG \
              python3 -m behave $FEATURE \
              $TAGS --no-capture \
              --junit --junit-directory /tmp/fixflux-reports/"
