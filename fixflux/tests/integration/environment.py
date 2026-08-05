@@ -14,6 +14,14 @@ for _p in (str(_repo_root), str(_trade_store_src)):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
+# Truncating trades/violations before every scenario gives each one a clean
+# slate for test isolation - correct for an ephemeral CI database, but on a
+# shared/persistent environment (e.g. a demo Droplet) it silently wipes real
+# history between test runs. Default preserves existing behaviour; set
+# E2E_TRUNCATE_STATE=false to skip truncation when that matters more than
+# isolation for a given run.
+_TRUNCATE_STATE = os.getenv("E2E_TRUNCATE_STATE", "true").lower() != "false"
+
 
 def _start_metrics_server():
     try:
@@ -24,6 +32,11 @@ def _start_metrics_server():
 
 
 def before_all(context):
+    if not _TRUNCATE_STATE:
+        print(
+            "E2E_TRUNCATE_STATE=false: skipping trades/violations truncation "
+            "before each scenario - existing history will be preserved."
+        )
     _start_metrics_server()
     from shared.infrastructure.db import Base, engine
     from trade_store.models import TradeModel  # noqa: F401 - registers with Base
@@ -60,8 +73,9 @@ def before_feature(context, feature):
 
 
 def before_scenario(context, scenario):
-    _truncate_trades()
-    _truncate_violations()
+    if _TRUNCATE_STATE:
+        _truncate_trades()
+        _truncate_violations()
     # Fresh client ID per scenario so unmatched orders from TradeSizeRule
     # scenarios don't accumulate in the risk-service's in-memory PositionStore
     # across runs and eventually hit RISK_MAX_OPEN_ORDERS=10.
