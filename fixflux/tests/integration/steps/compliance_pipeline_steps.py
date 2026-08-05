@@ -100,8 +100,17 @@ def step_create_compliance_client(context):
     'a price baseline of {baseline_price:f} has been established for symbol "{symbol}" on raw_orders'
 )
 def step_price_baseline(context, baseline_price, symbol):
+    # PriceDeviationRule's history is keyed by symbol alone (not client_id) and
+    # never expires - a fixed symbol would accumulate price history across
+    # every past run of this scenario, skewing the rolling average. Same class
+    # of bug as the matching-engine order-book fix; suffix it unique per run.
+    context.compliance_price_symbol = f"{symbol}-{uuid.uuid4().hex[:8].upper()}"
     payload = _build_order_payload(
-        context.compliance_client_id, symbol, "BUY", baseline_price, 10
+        context.compliance_client_id,
+        context.compliance_price_symbol,
+        "BUY",
+        baseline_price,
+        10,
     )
     _publish("raw_orders", payload)
     time.sleep(2)  # let the compliance-raw consumer thread record the history
@@ -112,7 +121,7 @@ def step_price_baseline(context, baseline_price, symbol):
 )
 def step_publish_raw_order(context, symbol, price, qty):
     payload = _build_order_payload(
-        context.compliance_client_id, symbol, "BUY", price, qty
+        context.compliance_client_id, context.compliance_price_symbol, "BUY", price, qty
     )
     _publish("raw_orders", payload)
 
@@ -138,8 +147,18 @@ def step_rapid_fire_burst(context, symbol):
     'a volume baseline of qty {baseline_qty:d} has been established for symbol "{symbol}" on validated_orders'
 )
 def step_volume_baseline(context, baseline_qty, symbol):
+    # VolumeSpikeRule's history is keyed by symbol alone (not client_id) and
+    # only expires entries older than baseline_window_seconds (1h default).
+    # Worse, it appends every quantity unconditionally - including the spike
+    # itself - so a fixed symbol lets one run's spike poison the next run's
+    # baseline average within that window. Suffix it unique per run.
+    context.compliance_volume_symbol = f"{symbol}-{uuid.uuid4().hex[:8].upper()}"
     payload = _build_order_payload(
-        context.compliance_client_id, symbol, "BUY", 100.00, baseline_qty
+        context.compliance_client_id,
+        context.compliance_volume_symbol,
+        "BUY",
+        100.00,
+        baseline_qty,
     )
     _publish("validated_orders", payload)
     time.sleep(2)  # let the compliance-validated consumer thread record the baseline
@@ -150,7 +169,11 @@ def step_volume_baseline(context, baseline_qty, symbol):
 )
 def step_publish_validated_order(context, symbol, qty):
     payload = _build_order_payload(
-        context.compliance_client_id, symbol, "BUY", 100.00, qty
+        context.compliance_client_id,
+        context.compliance_volume_symbol,
+        "BUY",
+        100.00,
+        qty,
     )
     _publish("validated_orders", payload)
 
