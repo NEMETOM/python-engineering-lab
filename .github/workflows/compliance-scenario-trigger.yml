@@ -1,0 +1,77 @@
+name: FIXFlux - Compliance Scenario Trigger (DigitalOcean)
+
+on:
+  workflow_dispatch:
+    inputs:
+      scenario_file:
+        description: 'Scenario file (from fixflux/data/) to drop into the filedrop directory'
+        required: true
+        type: choice
+        options:
+          - scenario_price_deviation.txt
+          - scenario_rapid_fire.txt
+          - scenario_volume_spike.txt
+          - scenario_repeated_orders.txt
+          - scenario_wash_trading_high_risk.txt
+          - scenario_audit_trail.txt
+
+permissions:
+  contents: read
+
+jobs:
+  trigger-scenario:
+    name: Drop ${{ github.event.inputs.scenario_file }} on the Droplet
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DO_SSH_KEY }}" > ~/.ssh/fixflux_do
+          chmod 600 ~/.ssh/fixflux_do
+          ssh-keyscan -H ${{ secrets.DO_DROPLET_IP }} >> ~/.ssh/known_hosts
+
+      - name: Clear the processed folder on the Droplet
+        run: |
+          ssh -i ~/.ssh/fixflux_do root@${{ secrets.DO_DROPLET_IP }} \
+            "rm -f ~/python-engineering-lab/fixflux/clients/fix-filedrop-client/processed/*.txt"
+
+      - name: Copy scenario file to the Droplet's filedrop directory
+        env:
+          SCENARIO_FILE: ${{ github.event.inputs.scenario_file }}
+        run: |
+          # watcher.py tracks already-seen filenames in memory for the life of the
+          # systemd service and never re-processes a repeat name - drop under a
+          # fresh unique name every run so re-triggering the same scenario always works.
+          DROP_NAME="${SCENARIO_FILE%.txt}_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}.txt"
+          echo "DROP_NAME=$DROP_NAME" >> "$GITHUB_ENV"
+          scp -i ~/.ssh/fixflux_do \
+            "fixflux/data/$SCENARIO_FILE" \
+            "root@${{ secrets.DO_DROPLET_IP }}:~/python-engineering-lab/fixflux/clients/fix-filedrop-client/filedrop/$DROP_NAME"
+          echo "Dropped as $DROP_NAME"
+
+      - name: Wait for the file to be processed
+        run: |
+          ssh -i ~/.ssh/fixflux_do root@${{ secrets.DO_DROPLET_IP }} \
+            "cd ~/python-engineering-lab/fixflux/clients/fix-filedrop-client && \
+             for i in \$(seq 1 30); do
+               if [ -f \"processed/${{ env.DROP_NAME }}\" ]; then echo 'PROCESSED'; exit 0; fi
+               if [ -f \"rejected/${{ env.DROP_NAME }}\" ]; then echo 'REJECTED:'; cat \"rejected/${{ env.DROP_NAME }}\" 2>/dev/null; exit 1; fi
+               sleep 2
+             done
+             echo 'TIMEOUT: file never appeared in processed/ or rejected/ within 60s.'
+             echo 'Is fixflux-watcher.service running?  systemctl status fixflux-watcher'
+             exit 1"
+
+      - name: Show filedrop directory state
+        if: always()
+        run: |
+          ssh -i ~/.ssh/fixflux_do root@${{ secrets.DO_DROPLET_IP }} \
+            "cd ~/python-engineering-lab/fixflux/clients/fix-filedrop-client && \
+             echo '--- filedrop/ ---' && ls -la filedrop/ && \
+             echo '--- processed/ ---' && ls -la processed/ && \
+             echo '--- rejected/ ---' && ls -la rejected/"
