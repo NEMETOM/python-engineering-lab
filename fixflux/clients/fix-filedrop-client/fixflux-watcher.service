@@ -12,6 +12,7 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=fixflux-watcher
 Environment=KAFKA_BROKER=localhost:9092
+Environment=PYTHONPATH=/root/python-engineering-lab/fixflux:/root/python-engineering-lab/fixflux/services/fix-gateway/src
 
 [Install]
 WantedBy=multi-user.target
