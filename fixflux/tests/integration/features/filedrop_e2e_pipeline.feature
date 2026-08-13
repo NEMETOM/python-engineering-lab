@@ -191,8 +191,16 @@ Feature: FIXFlux End-to-End Order Pipeline
             And <count> sell FIX orders for "<symbol>" at price <price> qty <qty> are dropped into the filedrop
         Then <count> trades for "<symbol>" appear in GET /trades within 120 seconds
 
+        # risk-service's fat-finger check keeps one in-memory last-traded-price
+        # per symbol for the life of the process, shared across every scenario
+        # in this run - not just this one. Each price here must stay within
+        # RISK_FAT_FINGER_PCT (10%) of that symbol's last trade price
+        # elsewhere in this feature file (EURUSD/AAPL match the golden-path
+        # price; GBPUSD matches the wash-trading scenario's 1.27000), or every
+        # order in the batch gets rejected before matching and this reports 0
+        # trades.
     Examples:
         | symbol | count | price   | qty |
         | EURUSD | 1000  | 1.09000 | 100 |
-        | GBPUSD | 1000  | 1.01000 | 100 |
+        | GBPUSD | 1000  | 1.27000 | 100 |
         | AAPL   | 500   | 175.00  | 50  |
