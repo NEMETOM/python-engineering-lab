@@ -176,6 +176,68 @@ def _verify_compliance_api():
             "Start it with:  docker compose --profile full up compliance-api\n"
             f"Cannot reach {url}/health: {exc}"
         ) from exc
+    _verify_compliance_consumer_ready(url)
+
+
+def _verify_compliance_consumer_ready(url):
+    # /health only proves compliance-api's FastAPI process is up. The separate
+    # compliance-consumer container can still be mid Kafka consumer-group
+    # join/rebalance at that point, which the very first scenario in a run
+    # can race - it publishes and polls for a violation before the consumer
+    # has actually started reading raw_orders. Round-trip a canary order
+    # through the real pipeline and wait for its order_received audit entry
+    # so scenarios only start once the consumer is demonstrably consuming.
+    import time
+    import uuid
+
+    from kafka import KafkaProducer
+
+    broker = os.getenv("KAFKA_BROKER", "localhost:9092")
+    canary_client_id = f"E2E_CANARY_{uuid.uuid4().hex[:8].upper()}"
+    payload = {
+        "order_id": f"ORD-{uuid.uuid4().hex[:12]}",
+        "client_id": canary_client_id,
+        "symbol": "EURUSD",
+        "side": "BUY",
+        "price": 1.0,
+        "quantity": 1,
+    }
+
+    producer = KafkaProducer(
+        bootstrap_servers=broker,
+        value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+    )
+    try:
+        producer.send("raw_orders", payload)
+        producer.flush()
+    finally:
+        producer.close()
+
+    import httpx
+
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        try:
+            response = httpx.get(
+                f"{url}/audit",
+                params={
+                    "client_id": canary_client_id,
+                    "event_type": "order_received",
+                    "limit": 1,
+                },
+                timeout=5.0,
+            )
+            if response.status_code == 200 and response.json():
+                return
+        except Exception:  # noqa: BLE001
+            pass
+        time.sleep(1)
+
+    raise RuntimeError(
+        "compliance-consumer did not process a canary order within 30s.\n"
+        "compliance-api is up but the consumer container may still be "
+        "starting or crash-looping - check:  docker compose logs compliance-consumer"
+    )
 
 
 def _init_kafka_consumer(context):
