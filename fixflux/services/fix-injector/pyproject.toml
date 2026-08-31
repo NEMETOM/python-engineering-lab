@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fix-injector"
+version = "0.1.0"
+
+dependencies = [
+ "kafka-python",
+ "pydantic",
+ "fastapi",
+ "uvicorn",
+ "jinja2",
+ "python-multipart",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+fix_injector = ["templates/*.html"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint.isort]
+known-first-party = ["fix_injector", "shared"]
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+
+[tool.isort]
+profile = "black"
+known_first_party = ["fix_injector", "shared"]
+
+[tool.mypy]
+mypy_path = "src"
+explicit_package_bases = true
+ignore_missing_imports = true
+pretty = true
+show_error_codes = true
+
+[tool.pyright]
+extraPaths = ["../../"]

@@ -152,6 +152,24 @@ services:
     restart: on-failure
     profiles: [full]
 
+  fix-injector:
+    build:
+      context: .
+      dockerfile: services/fix-injector/Dockerfile
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      init-topics:
+        condition: service_completed_successfully
+    environment:
+      KAFKA_BROKER: redpanda:9092
+      LOG_LEVEL: INFO
+    ports:
+      - "8020:8000"
+    logging: *default-logging
+    restart: on-failure
+    profiles: [full]
+
   trade-store:
     build:
       context: .

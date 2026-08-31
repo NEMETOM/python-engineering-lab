@@ -57,6 +57,7 @@ test-unit:
 	    services/matching-engine/tests/unit/ \
 	    services/trade-store/tests/unit/ \
 	    services/compliance-service/tests/unit/ \
+	    services/fix-injector/tests/unit/ \
 	    -v --tb=short
 
 # ── Integration tests (behave) ────────────────────────────────────────────────

@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>FIX Message Test Injector</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 h-screen flex flex-col">
+  <header class="px-6 py-4 border-b border-slate-800">
+    <h1 class="text-lg font-semibold">FIX Message Test Injector</h1>
+    <p class="text-sm text-slate-400">
+      Paste or upload raw FIX New Order Single messages (SOH or <code>|</code> delimited).
+      Valid lines are published to <code class="text-emerald-400">{{ target_topic }}</code>.
+    </p>
+  </header>
+
+  <main class="flex-1 grid grid-cols-2 gap-4 p-6 min-h-0">
+    <!-- Left panel: input -->
+    <section class="flex flex-col gap-3 min-h-0">
+      <label class="text-sm font-medium text-slate-300" for="raw_text">Raw FIX message(s), one per line</label>
+      <textarea
+        id="raw_text"
+        name="raw_text"
+        class="flex-1 min-h-0 w-full resize-none rounded-lg bg-slate-900 border border-slate-700 p-3 font-mono text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        placeholder="8=FIX.4.2|35=D|49=CLIENT1|55=EURUSD|54=1|40=2|44=1.09000|38=100|"
+      ></textarea>
+
+      <div class="flex items-center gap-3">
+        <label class="text-sm text-slate-300">
+          or upload a file:
+          <input id="file" name="file" type="file" class="ml-2 text-sm text-slate-400" />
+        </label>
+      </div>
+
+      <button
+        id="submit"
+        class="self-start rounded-lg bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-sm font-medium text-white"
+      >
+        Inject
+      </button>
+      <p id="status" class="text-sm text-slate-400"></p>
+    </section>
+
+    <!-- Right panel: preview -->
+    <section class="flex flex-col gap-3 min-h-0">
+      <h2 class="text-sm font-medium text-slate-300">Parsed payload / validation log</h2>
+      <div id="results" class="flex-1 min-h-0 overflow-auto rounded-lg bg-slate-900 border border-slate-700 p-3 space-y-2">
+        <p class="text-slate-500 text-sm">No messages injected yet.</p>
+      </div>
+      <pre id="raw_json" class="max-h-40 overflow-auto rounded-lg bg-slate-900 border border-slate-700 p-3 text-xs text-slate-400"></pre>
+    </section>
+  </main>
+
+  <script>
+    const submitBtn = document.getElementById("submit");
+    const statusEl = document.getElementById("status");
+    const resultsEl = document.getElementById("results");
+    const rawJsonEl = document.getElementById("raw_json");
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function renderResults(data) {
+      rawJsonEl.textContent = JSON.stringify(data, null, 2);
+
+      if (!data.results || data.results.length === 0) {
+        resultsEl.innerHTML = '<p class="text-slate-500 text-sm">No messages injected yet.</p>';
+        return;
+      }
+
+      resultsEl.innerHTML = data.results.map((r) => {
+        const ok = r.status === "published";
+        const badge = ok
+          ? '<span class="text-emerald-400">PUBLISHED</span>'
+          : '<span class="text-red-400">ERROR</span>';
+        const body = escapeHtml(ok ? JSON.stringify(r.parsed, null, 2) : r.error);
+        return `
+          <div class="rounded border border-slate-700 p-2">
+            <div class="flex justify-between text-xs font-mono text-slate-500">
+              <span>${badge}</span>
+            </div>
+            <div class="text-xs font-mono text-slate-400 truncate">${escapeHtml(r.raw_line)}</div>
+            <pre class="mt-1 text-xs ${ok ? "text-slate-200" : "text-red-300"} whitespace-pre-wrap">${body}</pre>
+          </div>
+        `;
+      }).join("");
+    }
+
+    submitBtn.addEventListener("click", async () => {
+      const rawText = document.getElementById("raw_text").value;
+      const fileInput = document.getElementById("file");
+
+      const formData = new FormData();
+      formData.append("raw_text", rawText);
+      if (fileInput.files.length > 0) {
+        formData.append("file", fileInput.files[0]);
+      }
+
+      submitBtn.disabled = true;
+      statusEl.textContent = "Injecting...";
+
+      try {
+        const resp = await fetch("/api/orders/inject", {
+          method: "POST",
+          body: formData,
+        });
+        const data = await resp.json();
+
+        if (!resp.ok) {
+          statusEl.textContent = `Error: ${data.detail || resp.statusText}`;
+          rawJsonEl.textContent = JSON.stringify(data, null, 2);
+          return;
+        }
+
+        statusEl.textContent = `${data.published}/${data.total} published, ${data.errors} rejected.`;
+        renderResults(data);
+      } catch (err) {
+        statusEl.textContent = `Request failed: ${err}`;
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
