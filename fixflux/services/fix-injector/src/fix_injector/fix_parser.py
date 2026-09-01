@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 _SOH = "\x01"
 _PIPE = "|"
@@ -70,6 +70,6 @@ def to_raw_order_event(parsed: dict) -> dict:
         "side": parsed["side"],
         "price": parsed["price"],
         "quantity": parsed["quantity"],
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "client_id": parsed["client_id"],
     }
