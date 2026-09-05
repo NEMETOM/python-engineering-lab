@@ -1,0 +1,56 @@
+name: FIXFlux - Reset Pipeline State
+
+# Manual-only: restarts matching-engine and/or risk-service on the Droplet to
+# clear their in-memory state (matching-engine's resting order book,
+# risk-service's last-traded-price map and open-order counts). Neither is
+# touched by the weekly cleanup job, which only prunes Postgres rows and
+# Kafka topics - this is the only way to get a clean book/reference prices
+# without a full redeploy.
+
+on:
+  workflow_dispatch:
+    inputs:
+      services:
+        description: 'Space-separated docker compose service names to restart'
+        required: false
+        default: 'matching-engine risk-service'
+
+permissions:
+  contents: read
+
+jobs:
+  reset:
+    name: Restart stateful services on Droplet
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DO_SSH_KEY }}" > ~/.ssh/fixflux_do
+          chmod 600 ~/.ssh/fixflux_do
+          ssh-keyscan -H ${{ secrets.DO_DROPLET_IP }} >> ~/.ssh/known_hosts
+
+      - name: Restart requested services
+        run: |
+          ssh -i ~/.ssh/fixflux_do -o ConnectTimeout=10 root@${{ secrets.DO_DROPLET_IP }} "
+            cd ~/python-engineering-lab/fixflux
+            docker compose restart ${{ github.event.inputs.services }}
+            docker compose ps ${{ github.event.inputs.services }}
+          "
+
+      - name: Verify services came back up
+        run: |
+          ssh -i ~/.ssh/fixflux_do -o ConnectTimeout=10 root@${{ secrets.DO_DROPLET_IP }} "
+            cd ~/python-engineering-lab/fixflux
+            for svc in ${{ github.event.inputs.services }}; do
+              status=\$(docker compose ps --status running --quiet \"\$svc\" | wc -l)
+              if [ \"\$status\" -eq 0 ]; then
+                echo \"::error::\$svc did not come back up\"
+                docker compose logs --tail=50 \"\$svc\"
+                exit 1
+              fi
+              echo \"\$svc is running\"
+            done
+          "
