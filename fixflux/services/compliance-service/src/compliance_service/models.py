@@ -58,3 +58,21 @@ class ComplianceAuditTrail(Base):
     payload = Column(JSON, nullable=False)
     checksum = Column(String(64))
     recorded_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
+
+
+class RuleOverride(Base):
+    """Ops-toggled rule state. compliance-consumer polls this table and applies
+    it to its live Rule instances - see consumer._refresh_rule_overrides. Absence
+    of a row for a rule_id means "no override", not "disabled": the effective
+    default then comes from compliance_policies.yaml.
+    """
+
+    __tablename__ = "compliance_rule_overrides"
+
+    rule_id = Column(String(50), primary_key=True)
+    enabled = Column(Boolean, nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+    )
