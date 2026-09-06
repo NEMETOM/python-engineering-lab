@@ -4,6 +4,7 @@ from fastapi import FastAPI, Request
 from prometheus_client import make_asgi_app
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from compliance_service.api.routes.admin import router as admin_router
 from compliance_service.api.routes.audit import router as audit_router
 from compliance_service.api.routes.health import router as health_router
 from compliance_service.api.routes.risk import router as risk_router
@@ -46,6 +47,7 @@ def create_app() -> FastAPI:
     app.include_router(violations_router)
     app.include_router(risk_router)
     app.include_router(audit_router)
+    app.include_router(admin_router)
     app.add_middleware(_MetricsMiddleware)
     app.mount("/metrics", make_asgi_app())
 

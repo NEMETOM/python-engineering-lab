@@ -1,4 +1,6 @@
+import os
 import threading
+import time
 from typing import Any
 
 from compliance_service.config import load_policies
@@ -6,7 +8,12 @@ from compliance_service.engine.audit_logger import AuditLogger
 from compliance_service.engine.risk_scorer import RiskScorer
 from compliance_service.engine.rules_engine import RulesEngine
 from compliance_service.infrastructure.db import Base, engine
+from compliance_service.repository.rule_override_repository import (
+    RuleOverrideRepository,
+)
 from compliance_service.repository.violation_repository import ViolationRepository
+from compliance_service.rules.base import Rule
+from compliance_service.rules.catalog import rule_ids_by_category
 from compliance_service.rules.loader import (
     build_compliance_rules,
     build_surveillance_rules,
@@ -17,6 +24,55 @@ from shared.observability.metrics import violations_detected
 
 configure_logging()
 logger = get_logger(__name__)
+
+_OVERRIDE_REFRESH_SECONDS = int(
+    os.getenv("COMPLIANCE_RULE_OVERRIDE_REFRESH_SECONDS", "5")
+)
+
+
+def _build_rule_registry(
+    compliance_rules: list[Rule], surveillance_rules: list[Rule]
+) -> dict[str, Rule]:
+    """Maps catalog rule_ids to the actual live Rule instances RulesEngine holds,
+    so overrides mutate the objects that are really evaluated - not a copy."""
+    compliance_ids = rule_ids_by_category("compliance")
+    surveillance_ids = rule_ids_by_category("surveillance")
+    if len(compliance_ids) != len(compliance_rules) or len(surveillance_ids) != len(
+        surveillance_rules
+    ):
+        raise RuntimeError(
+            "rules/catalog.py has drifted from rules/loader.py's rule "
+            f"construction order: compliance {len(compliance_ids)} ids vs "
+            f"{len(compliance_rules)} rules, surveillance {len(surveillance_ids)} "
+            f"ids vs {len(surveillance_rules)} rules"
+        )
+    return dict(zip(compliance_ids, compliance_rules)) | dict(
+        zip(surveillance_ids, surveillance_rules)
+    )
+
+
+def _refresh_rule_overrides(rule_registry: dict[str, Rule]) -> None:
+    """Background loop: polls compliance_rule_overrides and applies them to the
+    live rule instances. A plain bool attribute set is atomic under the GIL, so
+    no lock is needed even though raw_orders/validated_orders consumer threads
+    read rule.enabled concurrently."""
+    repo = RuleOverrideRepository()
+    while True:
+        time.sleep(_OVERRIDE_REFRESH_SECONDS)
+        try:
+            overrides = repo.get_all()
+        except Exception:
+            logger.exception("Failed to refresh compliance rule overrides")
+            continue
+        for rule_id, enabled in overrides.items():
+            rule = rule_registry.get(rule_id)
+            if rule is None:
+                continue
+            if rule.enabled != enabled:
+                logger.info(
+                    f"rule override applied | rule_id={rule_id} enabled={enabled}"
+                )
+            rule.enabled = enabled
 
 
 def _process_event(
@@ -106,8 +162,11 @@ def run() -> None:
     logger.info("Compliance database tables ensured")
 
     policies = load_policies()
-    compliance_engine = RulesEngine(build_compliance_rules(policies))
-    surveillance_engine = RulesEngine(build_surveillance_rules(policies))
+    compliance_rules = build_compliance_rules(policies)
+    surveillance_rules = build_surveillance_rules(policies)
+    compliance_engine = RulesEngine(compliance_rules)
+    surveillance_engine = RulesEngine(surveillance_rules)
+    rule_registry = _build_rule_registry(compliance_rules, surveillance_rules)
 
     raw_orders_thread = threading.Thread(
         target=_run_consumer,
@@ -121,10 +180,20 @@ def run() -> None:
         daemon=True,
         name="compliance-validated-orders",
     )
+    overrides_thread = threading.Thread(
+        target=_refresh_rule_overrides,
+        args=(rule_registry,),
+        daemon=True,
+        name="compliance-rule-overrides",
+    )
 
     raw_orders_thread.start()
     validated_orders_thread.start()
-    logger.info("Compliance consumer threads started - raw_orders + validated_orders")
+    overrides_thread.start()
+    logger.info(
+        "Compliance consumer threads started - "
+        "raw_orders + validated_orders + rule-overrides"
+    )
 
     raw_orders_thread.join()
     validated_orders_thread.join()

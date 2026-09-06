@@ -37,6 +37,23 @@ class TestRulesEngine:
         result = engine.evaluate({})
         assert result == [v1, v2]
 
+    def test_toggling_enabled_after_construction_takes_effect(self):
+        # Regression test: a live override (see consumer._refresh_rule_overrides)
+        # flips rule.enabled on an already-constructed engine. This must be
+        # honored per-evaluate(), not just read once at __init__ time.
+        rule = MagicMock()
+        rule.enabled = True
+        rule.check.return_value = None
+        engine = RulesEngine([rule])
+
+        rule.enabled = False
+        engine.evaluate({})
+        rule.check.assert_not_called()
+
+        rule.enabled = True
+        engine.evaluate({})
+        rule.check.assert_called_once()
+
     def test_skips_disabled_rules(self):
         rule = MagicMock()
         rule.enabled = False
