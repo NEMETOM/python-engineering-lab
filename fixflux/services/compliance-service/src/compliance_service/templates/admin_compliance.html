@@ -47,7 +47,13 @@
       return `
         <div class="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-900 px-4 py-3">
           <div>
-            <div class="font-medium">${escapeHtml(rule.label)}</div>
+            <div class="font-medium flex items-center gap-1.5">
+              ${escapeHtml(rule.label)}
+              <span
+                class="inline-flex h-4 w-4 items-center justify-center rounded-full text-[10px] text-slate-400 border border-slate-600 cursor-help"
+                title="${escapeHtml(rule.description)}"
+              >i</span>
+            </div>
             <div class="flex items-center gap-2 mt-1">${badge}${overrideNote}</div>
           </div>
           <button
