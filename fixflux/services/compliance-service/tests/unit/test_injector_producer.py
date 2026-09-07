@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock, patch
 
-from fix_injector.producer import InjectorProducer
+from compliance_service.injector_producer import InjectorProducer
 
 
 @patch("shared.infrastructure.kafka_client.KafkaProducer")

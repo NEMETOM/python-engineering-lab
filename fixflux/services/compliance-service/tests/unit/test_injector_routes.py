@@ -3,8 +3,8 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from fix_injector.api.main import app
-from fix_injector.api.routes import get_producer
+from compliance_service.api.main import app
+from compliance_service.api.routes.injector import get_producer
 
 
 @pytest.fixture
