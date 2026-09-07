@@ -5,20 +5,19 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from fix_injector.config import settings
-from fix_injector.fix_parser import (
+from compliance_service.fix_parser import (
     FixParseError,
     parse_new_order_single,
     to_raw_order_event,
 )
-from fix_injector.producer import InjectorProducer
-from fix_injector.utils.logger import get_logger
+from compliance_service.injector_producer import TARGET_TOPIC, InjectorProducer
+from compliance_service.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-router = APIRouter()
+router = APIRouter(tags=["injector"])
 
-_TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
+_TEMPLATES_DIR = Path(__file__).resolve().parent.parent.parent / "templates"
 templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 
 
@@ -32,7 +31,9 @@ def get_producer() -> InjectorProducer:
 @router.get("/", response_class=HTMLResponse)
 def index(request: Request):
     return templates.TemplateResponse(
-        request, "index.html", {"target_topic": settings.target_topic}
+        request,
+        "index.html",
+        {"target_topic": TARGET_TOPIC, "active_tab": "injector"},
     )
 
 
@@ -71,7 +72,7 @@ def inject_orders(
 
     published = sum(1 for r in results if r["status"] == "published")
     return {
-        "topic": settings.target_topic,
+        "topic": TARGET_TOPIC,
         "total": len(results),
         "published": published,
         "errors": len(results) - published,

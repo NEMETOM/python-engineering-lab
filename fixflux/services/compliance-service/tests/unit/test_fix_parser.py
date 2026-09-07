@@ -1,6 +1,6 @@
 import pytest
 
-from fix_injector.fix_parser import (
+from compliance_service.fix_parser import (
     FixParseError,
     parse_new_order_single,
     to_raw_order_event,
