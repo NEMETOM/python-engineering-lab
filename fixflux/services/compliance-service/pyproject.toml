@@ -18,6 +18,7 @@ dependencies = [
     "pyyaml",
     "prometheus-client>=0.20",
     "jinja2",
+    "python-multipart",
 ]
 
 [project.optional-dependencies]
@@ -35,7 +36,7 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.setuptools.package-data]
-compliance_service = ["templates/*.html"]
+compliance_service = ["templates/*.html", "static/*.png"]
 
 [tool.ruff]
 line-length = 88
@@ -43,6 +44,11 @@ target-version = "py311"
 
 [tool.ruff.lint.isort]
 known-first-party = ["compliance_service", "shared"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's DI pattern relies on calling Depends()/Query() etc. as an argument
+# default; B008 doesn't special-case this the way it does for e.g. dataclasses.
+extend-immutable-calls = ["fastapi.Depends"]
 
 [tool.black]
 line-length = 88

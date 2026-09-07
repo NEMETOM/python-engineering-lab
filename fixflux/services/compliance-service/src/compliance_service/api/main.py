@@ -1,16 +1,21 @@
 import time
+from pathlib import Path
 
 from fastapi import FastAPI, Request
+from fastapi.staticfiles import StaticFiles
 from prometheus_client import make_asgi_app
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from compliance_service.api.routes.admin import router as admin_router
 from compliance_service.api.routes.audit import router as audit_router
 from compliance_service.api.routes.health import router as health_router
+from compliance_service.api.routes.injector import router as injector_router
 from compliance_service.api.routes.risk import router as risk_router
 from compliance_service.api.routes.violations import router as violations_router
 from compliance_service.infrastructure.db import Base, engine
 from compliance_service.utils.logger import configure_logging, get_logger
+
+_STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
 configure_logging()
 logger = get_logger(__name__)
@@ -48,8 +53,10 @@ def create_app() -> FastAPI:
     app.include_router(risk_router)
     app.include_router(audit_router)
     app.include_router(admin_router)
+    app.include_router(injector_router)
     app.add_middleware(_MetricsMiddleware)
     app.mount("/metrics", make_asgi_app())
+    app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 
     return app
 

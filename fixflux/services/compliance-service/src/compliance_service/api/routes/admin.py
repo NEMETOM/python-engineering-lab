@@ -45,7 +45,9 @@ def _effective_rules() -> list[dict]:
 @router.get("/admin/compliance", response_class=HTMLResponse)
 def admin_compliance_page(request: Request):
     return templates.TemplateResponse(
-        request, "admin_compliance.html", {"rules": _effective_rules()}
+        request,
+        "admin_compliance.html",
+        {"rules": _effective_rules(), "active_tab": "compliance"},
     )
 
 
