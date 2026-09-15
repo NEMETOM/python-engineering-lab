@@ -64,39 +64,51 @@ class TestSendBook:
         self, producer, mock_kafka_producer
     ):
         book = OrderBook()
-        producer.send_book(book)
+        producer.send_book("AAPL", book)
         topic = mock_kafka_producer.send.call_args[0][0]
         assert topic == "order_book_updates"
+
+    def test_send_book_includes_symbol(self, producer, mock_kafka_producer):
+        book = OrderBook()
+        producer.send_book("AAPL", book)
+        snapshot = mock_kafka_producer.send.call_args[0][1]
+        assert snapshot["symbol"] == "AAPL"
 
     def test_send_book_with_bids_and_asks(self, producer, mock_kafka_producer):
         book = OrderBook()
         book.add_order(Order("B1", "BUY", 99.0, 10))
         book.add_order(Order("S1", "SELL", 101.0, 10))
-        producer.send_book(book)
+        producer.send_book("AAPL", book)
         snapshot = mock_kafka_producer.send.call_args[0][1]
-        assert snapshot == {"best_bid": 99.0, "best_ask": 101.0}
+        assert snapshot == {"symbol": "AAPL", "best_bid": 99.0, "best_ask": 101.0}
 
     def test_send_book_empty_sends_none_values(self, producer, mock_kafka_producer):
         book = OrderBook()
-        producer.send_book(book)
+        producer.send_book("AAPL", book)
         snapshot = mock_kafka_producer.send.call_args[0][1]
-        assert snapshot == {"best_bid": None, "best_ask": None}
+        assert snapshot == {"symbol": "AAPL", "best_bid": None, "best_ask": None}
 
     def test_send_book_bids_only(self, producer, mock_kafka_producer):
         book = OrderBook()
         book.add_order(Order("B1", "BUY", 99.0, 10))
-        producer.send_book(book)
+        producer.send_book("AAPL", book)
         snapshot = mock_kafka_producer.send.call_args[0][1]
-        assert snapshot == {"best_bid": 99.0, "best_ask": None}
+        assert snapshot == {"symbol": "AAPL", "best_bid": 99.0, "best_ask": None}
 
     def test_send_book_asks_only(self, producer, mock_kafka_producer):
         book = OrderBook()
         book.add_order(Order("S1", "SELL", 101.0, 10))
-        producer.send_book(book)
+        producer.send_book("AAPL", book)
         snapshot = mock_kafka_producer.send.call_args[0][1]
-        assert snapshot == {"best_bid": None, "best_ask": 101.0}
+        assert snapshot == {"symbol": "AAPL", "best_bid": None, "best_ask": 101.0}
+
+    def test_send_book_different_symbol(self, producer, mock_kafka_producer):
+        book = OrderBook()
+        producer.send_book("BTCUSD", book)
+        snapshot = mock_kafka_producer.send.call_args[0][1]
+        assert snapshot["symbol"] == "BTCUSD"
 
     def test_send_book_called_once(self, producer, mock_kafka_producer):
         book = OrderBook()
-        producer.send_book(book)
+        producer.send_book("AAPL", book)
         mock_kafka_producer.send.assert_called_once()
