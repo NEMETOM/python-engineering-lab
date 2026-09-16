@@ -152,6 +152,22 @@ services:
     restart: on-failure
     profiles: [full]
 
+  market-data-api:
+    build:
+      context: .
+      dockerfile: services/market-data-api/Dockerfile
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER: redpanda:9092
+      LOG_LEVEL: INFO
+    ports:
+      - "8006:8000"
+    logging: *default-logging
+    restart: on-failure
+    profiles: [full]
+
   trade-store:
     build:
       context: .

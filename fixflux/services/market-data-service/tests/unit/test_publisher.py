@@ -3,8 +3,13 @@ from unittest.mock import MagicMock, patch
 from market_data_service.publisher import MarketPublisher
 
 
-def _make_snapshot(**overrides):
-    base = {"best_bid": 99.50, "best_ask": 100.50, "last_trade_price": 100.0}
+def _make_snapshot(symbol="AAPL", **overrides):
+    base = {
+        "symbol": symbol,
+        "best_bid": 99.50,
+        "best_ask": 100.50,
+        "last_trade_price": 100.0,
+    }
     return {**base, **overrides}
 
 
@@ -12,7 +17,7 @@ class TestPublish:
     @patch("market_data_service.publisher.create_producer")
     def test_publish_calls_snapshot(self, _):
         mock_cache = MagicMock()
-        mock_cache.snapshot.return_value = _make_snapshot()
+        mock_cache.snapshot.return_value = {"AAPL": _make_snapshot()}
         publisher = MarketPublisher(mock_cache)
         publisher.publish()
         mock_cache.snapshot.assert_called_once()
@@ -22,19 +27,19 @@ class TestPublish:
         mock_producer = MagicMock()
         mock_create_producer.return_value = mock_producer
         mock_cache = MagicMock()
-        mock_cache.snapshot.return_value = _make_snapshot()
+        mock_cache.snapshot.return_value = {"AAPL": _make_snapshot()}
         publisher = MarketPublisher(mock_cache)
         publisher.publish()
         assert mock_producer.send.call_args[0][0] == "market_data"
 
     @patch("market_data_service.publisher.create_producer")
-    def test_skips_when_no_data(self, mock_create_producer):
+    def test_skips_symbol_with_no_data(self, mock_create_producer):
         mock_producer = MagicMock()
         mock_create_producer.return_value = mock_producer
         mock_cache = MagicMock()
-        mock_cache.snapshot.return_value = _make_snapshot(
-            best_bid=None, best_ask=None, last_trade_price=None
-        )
+        mock_cache.snapshot.return_value = {
+            "AAPL": _make_snapshot(best_bid=None, best_ask=None, last_trade_price=None)
+        }
         publisher = MarketPublisher(mock_cache)
         publisher.publish()
         mock_producer.send.assert_not_called()
@@ -44,7 +49,7 @@ class TestPublish:
         mock_producer = MagicMock()
         mock_create_producer.return_value = mock_producer
         mock_cache = MagicMock()
-        mock_cache.snapshot.return_value = _make_snapshot()
+        mock_cache.snapshot.return_value = {"AAPL": _make_snapshot()}
         publisher = MarketPublisher(mock_cache)
         publisher.publish()
         publisher.publish()
@@ -56,10 +61,50 @@ class TestPublish:
         mock_create_producer.return_value = mock_producer
         mock_cache = MagicMock()
         mock_cache.snapshot.side_effect = [
-            _make_snapshot(best_bid=99.0),
-            _make_snapshot(best_bid=99.5),
+            {"AAPL": _make_snapshot(best_bid=99.0)},
+            {"AAPL": _make_snapshot(best_bid=99.5)},
         ]
         publisher = MarketPublisher(mock_cache)
         publisher.publish()
         publisher.publish()
         assert mock_producer.send.call_count == 2
+
+    @patch("market_data_service.publisher.create_producer")
+    def test_symbols_are_published_independently(self, mock_create_producer):
+        mock_producer = MagicMock()
+        mock_create_producer.return_value = mock_producer
+        mock_cache = MagicMock()
+        mock_cache.snapshot.return_value = {
+            "AAPL": _make_snapshot(symbol="AAPL"),
+            "BTCUSD": _make_snapshot(symbol="BTCUSD", best_bid=50000, best_ask=50010),
+        }
+        publisher = MarketPublisher(mock_cache)
+        publisher.publish()
+        assert mock_producer.send.call_count == 2
+        published_symbols = {
+            call.args[1]["symbol"] for call in mock_producer.send.call_args_list
+        }
+        assert published_symbols == {"AAPL", "BTCUSD"}
+
+    @patch("market_data_service.publisher.create_producer")
+    def test_unchanged_symbol_does_not_republish_while_sibling_changes(
+        self, mock_create_producer
+    ):
+        mock_producer = MagicMock()
+        mock_create_producer.return_value = mock_producer
+        mock_cache = MagicMock()
+        mock_cache.snapshot.side_effect = [
+            {
+                "AAPL": _make_snapshot(symbol="AAPL"),
+                "BTCUSD": _make_snapshot(symbol="BTCUSD", best_bid=50000),
+            },
+            {
+                "AAPL": _make_snapshot(symbol="AAPL"),
+                "BTCUSD": _make_snapshot(symbol="BTCUSD", best_bid=50001),
+            },
+        ]
+        publisher = MarketPublisher(mock_cache)
+        publisher.publish()
+        publisher.publish()
+        # first call: 2 sends (both new). second call: only BTCUSD changed -> 1 more.
+        assert mock_producer.send.call_count == 3

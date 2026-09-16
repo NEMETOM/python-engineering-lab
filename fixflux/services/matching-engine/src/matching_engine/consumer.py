@@ -64,7 +64,7 @@ def run():
                     trades_executed.labels(symbol=trade.symbol).inc()
                     producer.send_trade(trade)
                     producer.send_exec_reports(trade)
-                producer.send_book(book)
+                producer.send_book(order.symbol, book)
 
 
 if __name__ == "__main__":

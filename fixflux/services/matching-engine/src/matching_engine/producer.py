@@ -102,9 +102,10 @@ class Producer:
                     f"failed to emit exec report (Fill) for order {order_id}: {exc}"
                 )
 
-    def send_book(self, book) -> None:
+    def send_book(self, symbol: str, book) -> None:
 
         snapshot = {
+            "symbol": symbol,
             "best_bid": book.best_bid().price if book.best_bid() else None,
             "best_ask": book.best_ask().price if book.best_ask() else None,
         }
