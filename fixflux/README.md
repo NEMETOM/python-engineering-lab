@@ -25,9 +25,9 @@
 - Parallel **RegTech compliance and surveillance module** for real-time rule evaluation and audit trail
 - **MiFID II pre-trade risk gate**: notional cap, fat-finger, and position limit checks before orders reach the matching engine
 - Built with Python microservices, Redpanda (Kafka-compatible), PostgreSQL, and Docker
-- Follows 12-Factor App, Hexagonal Architecture, and Domain-Driven Design principles
+- Follows 12-Factor App principles; each service is a small, single-purpose consumer/producer over Kafka topics - not a Hexagonal/Ports-and-Adapters or formal DDD design (no domain-service layer, no repository interfaces behind ports)
 
-> Designed to reflect the architecture of production trading systems at firms such as Bloomberg, Fidessa, Coinbase, and Kraken - where FIX protocol ingestion, Kafka-based event routing, and microservice-bounded contexts are standard engineering practice.
+> The event-driven style here - FIX ingestion, Kafka-based routing, one bounded responsibility per service - is a pattern documented at real trading/exchange platforms (see [Robinhood's Kafka architecture](https://factorhouse.io/articles/robinhood-kafka-architecture) and [Coinbase's Kafka use cases](https://www.automq.com/blog/kafka-use-cases-in-coinbase)). This project is a learning/portfolio simulator, not a claim of architectural parity with any specific firm's production system.
 
 ---
 
@@ -266,13 +266,9 @@ Alternatives: WinSCP (SFTP file browser + built-in terminal via Session → Open
 | Processes | Stateless consumers; Kafka holds all durable inter-service state |
 | Logs | Structured JSON to stdout; no log files |
 
-### Hexagonal Architecture (Ports and Adapters)
+### Single-Purpose Services Over Kafka
 
-Infrastructure concerns (Kafka client, database session) are isolated in `infrastructure/` within each service. Domain logic (validator, matching engine, transformer) has no framework dependencies and is independently testable.
-
-### Bounded Contexts (Domain-Driven Design)
-
-Each service owns exactly one bounded context. Services communicate through Kafka events, never via direct calls - consistent with Sam Newman's microservices patterns and Martin Fowler's event-driven architecture guidance.
+This is **not** Hexagonal/Ports-and-Adapters and **not** formal Domain-Driven Design - there's no domain-service layer or repository interfaces abstracted behind ports. Each service follows the same plain layered structure (`consumer.py` / `producer.py` / `models.py` / `config.py`, plus `api/` where an HTTP surface exists) and owns exactly one responsibility, communicating with the rest of the pipeline only through Kafka topics, never via direct service-to-service calls. That simplicity is deliberate - see `.claude/instructions/system_architecture.md` for the verified, current shape of each service.
 
 ### Python Packaging (PEP 517/518 + src layout)
 
