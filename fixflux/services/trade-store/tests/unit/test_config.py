@@ -19,7 +19,7 @@ class TestDefaultSettings:
             importlib.reload(cfg)
             assert (
                 cfg.Settings().db_url
-                == "postgresql://user:password@postgres:5432/trades"
+                == "postgresql+psycopg2://user:password@postgres:5432/trades"
             )
 
 

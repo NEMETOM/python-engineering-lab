@@ -75,7 +75,7 @@ The table is created automatically on startup via `Base.metadata.create_all()`.
 | Variable | Default | Description |
 |---|---|---|
 | `KAFKA_BROKER` | `kafka:9092` | Kafka bootstrap server address |
-| `DATABASE_URL` | `postgresql://user:password@postgres:5432/trades` | SQLAlchemy connection string |
+| `DATABASE_URL` | `postgresql+psycopg2://user:password@postgres:5432/trades` | SQLAlchemy connection string |
 
 ---
 

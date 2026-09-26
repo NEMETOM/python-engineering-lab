@@ -15,4 +15,4 @@ def build_db_url() -> str:
         cfg = yaml.safe_load(f)["database"]
 
     password = quote_plus(str(cfg["password"]))
-    return f"postgresql://{cfg['user']}:{password}@{cfg['host']}:{cfg['port']}/{cfg['name']}"
+    return f"postgresql+psycopg2://{cfg['user']}:{password}@{cfg['host']}:{cfg['port']}/{cfg['name']}"

@@ -60,7 +60,7 @@ jobs:
       - name: Run E2E BDD tests
         env:
           KAFKA_BROKER: localhost:9092
-          DATABASE_URL: postgresql://fixuser:fixpass@localhost:5433/fixdb
+          DATABASE_URL: postgresql+psycopg2://fixuser:fixpass@localhost:5433/fixdb
         run: |
           python -m behave tests/integration/features/filedrop_e2e_pipeline.feature \
             --tags="@e2e" \
@@ -166,7 +166,7 @@ jobs:
       - name: Run volume BDD tests
         env:
           KAFKA_BROKER: localhost:9092
-          DATABASE_URL: postgresql://fixuser:fixpass@localhost:5433/fixdb
+          DATABASE_URL: postgresql+psycopg2://fixuser:fixpass@localhost:5433/fixdb
         run: |
           python -m behave tests/integration/features/filedrop_e2e_pipeline.feature \
             --tags="@volume" \

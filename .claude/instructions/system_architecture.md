@@ -114,3 +114,21 @@ one `fixflux/docker-compose.yml` with named `profiles` (`pipeline`, `full`, `mon
 to a single DigitalOcean droplet; `deploy.yml` does `git pull` + `docker compose build` + `up -d`
 over SSH on every push to `main` touching `fixflux/**`. There is no Kubernetes, no service mesh, no
 multi-region anything — keep proposals proportionate to a single 2 vCPU / 4GB droplet.
+
+**Alerting** (added — not purely observational anymore): `prometheus_alerts.yml` defines 4 rules
+(matching-engine P99 latency, trade-store 5xx rate, Kafka consumer lag, compliance violation-rate
+spike), loaded via Prometheus's `rule_files:` and evaluated against Alertmanager
+(`alerting.alertmanagers` in `prometheus.yml`). Two of the four needed new data sources that didn't
+exist before this was added:
+- `kafka-exporter` (danielqsj/kafka-exporter, scraped as job `kafka-exporter`) — Kafka consumer lag
+  was not exposed anywhere in this stack before. Given the single-partition topic ceiling noted
+  above, lag is exactly the metric that would surface that ceiling being hit under load.
+- `compliance-consumer` now runs its own `prometheus_client.start_http_server(8011)` (same pattern
+  as `matching-engine`'s `_METRICS_PORT`), scraped as job `compliance-consumer` — the
+  `violations_detected_total` counter existed before but was incremented in a process with no
+  `/metrics` endpoint at all, so it was never actually queryable.
+
+**Alertmanager has no real notification receiver configured** — `alertmanager.yml`'s `critical`/
+`warning` receivers route correctly by severity but neither has a `slack_configs:`/`email_configs:`/
+`pagerduty_configs:` block. Fired alerts are visible at `:9093` but nothing pages anyone until real
+credentials are added — don't assume paging works just because the routing tree exists.

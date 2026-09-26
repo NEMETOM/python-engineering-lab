@@ -4,7 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 DATABASE_URL = os.getenv(
-    "DATABASE_URL", "postgresql://fixuser:fixpass@localhost:5433/fixdb"
+    "DATABASE_URL", "postgresql+psycopg2://fixuser:fixpass@localhost:5433/fixdb"
 )
 
 engine = create_engine(DATABASE_URL)

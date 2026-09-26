@@ -91,7 +91,7 @@ jobs:
             "cd ~/python-engineering-lab/fixflux && \
              mkdir -p /tmp/fixflux-reports && \
              KAFKA_BROKER=localhost:9092 \
-             DATABASE_URL=postgresql://fixuser:fixpass@localhost:5433/fixdb \
+             DATABASE_URL=postgresql+psycopg2://fixuser:fixpass@localhost:5433/fixdb \
              $TRUNCATE_FLAG \
              python3 -m behave $FEATURE \
              $TAGS --no-capture \

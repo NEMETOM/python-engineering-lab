@@ -25,5 +25,5 @@ helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
 Database URL constructed from postgres values.
 */}}
 {{- define "fixflux.databaseUrl" -}}
-postgresql://{{ .Values.postgres.credentials.user }}:{{ .Values.postgres.credentials.password }}@postgres:5432/{{ .Values.postgres.credentials.database }}
+postgresql+psycopg2://{{ .Values.postgres.credentials.user }}:{{ .Values.postgres.credentials.password }}@postgres:5432/{{ .Values.postgres.credentials.database }}
 {{- end -}}

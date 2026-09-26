@@ -6,7 +6,7 @@ class Settings:
     kafka_broker = os.getenv("KAFKA_BROKER", "kafka:9092")
 
     db_url = os.getenv(
-        "DATABASE_URL", "postgresql://user:password@postgres:5432/trades"
+        "DATABASE_URL", "postgresql+psycopg2://user:password@postgres:5432/trades"
     )
 
 

@@ -9,7 +9,7 @@ class TestSettingsDefaults:
 
     def test_db_url_default(self):
         assert Settings.db_url == os.getenv(
-            "DATABASE_URL", "postgresql://user:password@localhost:5432/trades"
+            "DATABASE_URL", "postgresql+psycopg2://fixuser:fixpass@localhost:5433/fixdb"
         )
 
     def test_log_level_default(self):
@@ -21,7 +21,10 @@ class TestSettingsDefaults:
 
     def test_db_url_value_when_no_env(self):
         if "DATABASE_URL" not in os.environ:
-            assert Settings.db_url == "postgresql://user:password@localhost:5432/trades"
+            assert (
+                Settings.db_url
+                == "postgresql+psycopg2://fixuser:fixpass@localhost:5433/fixdb"
+            )
 
     def test_log_level_value_when_no_env(self):
         if "LOG_LEVEL" not in os.environ:
