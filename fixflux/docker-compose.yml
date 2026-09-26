@@ -179,7 +179,7 @@ services:
         condition: service_healthy
     environment:
       KAFKA_BROKER: redpanda:9092
-      DATABASE_URL: postgresql://fixuser:fixpass@postgres:5432/fixdb
+      DATABASE_URL: postgresql+psycopg2://fixuser:fixpass@postgres:5432/fixdb
       LOG_LEVEL: INFO
     ports:
       - "8000:8000"
@@ -198,7 +198,7 @@ services:
         condition: service_healthy
     environment:
       KAFKA_BROKER: redpanda:9092
-      DATABASE_URL: postgresql://fixuser:fixpass@postgres:5432/fixdb
+      DATABASE_URL: postgresql+psycopg2://fixuser:fixpass@postgres:5432/fixdb
       LOG_LEVEL: INFO
       OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
     logging: *default-logging
@@ -216,7 +216,7 @@ services:
         condition: service_healthy
     environment:
       KAFKA_BROKER: redpanda:9092
-      DATABASE_URL: postgresql://fixuser:fixpass@postgres:5432/fixdb
+      DATABASE_URL: postgresql+psycopg2://fixuser:fixpass@postgres:5432/fixdb
       LOG_LEVEL: INFO
     ports:
       - "8010:8010"
@@ -235,7 +235,7 @@ services:
         condition: service_healthy
     environment:
       KAFKA_BROKER: redpanda:9092
-      DATABASE_URL: postgresql://fixuser:fixpass@postgres:5432/fixdb
+      DATABASE_URL: postgresql+psycopg2://fixuser:fixpass@postgres:5432/fixdb
       LOG_LEVEL: INFO
     ports:
       - "8011:8011"

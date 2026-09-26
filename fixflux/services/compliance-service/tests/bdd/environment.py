@@ -9,4 +9,4 @@ for _p in (_src, _repo_root):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost/testdb")
+os.environ.setdefault("DATABASE_URL", "postgresql+psycopg2://test:test@localhost/testdb")
