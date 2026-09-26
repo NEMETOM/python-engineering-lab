@@ -237,6 +237,8 @@ services:
       KAFKA_BROKER: redpanda:9092
       DATABASE_URL: postgresql://fixuser:fixpass@postgres:5432/fixdb
       LOG_LEVEL: INFO
+    ports:
+      - "8011:8011"
     logging: *default-logging
     restart: on-failure
     profiles: [pipeline, full]
@@ -245,6 +247,9 @@ services:
     image: prom/prometheus:v2.51.0
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    depends_on:
+      alertmanager:
+        condition: service_started
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
@@ -254,10 +259,22 @@ services:
       - "--storage.tsdb.retention.time=15d"
     volumes:
       - ./infrastructure/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infrastructure/monitoring/prometheus_alerts.yml:/etc/prometheus/prometheus_alerts.yml:ro
       - prometheus_data:/prometheus
     ports:
       - "9090:9090"
     logging: *default-logging
+    profiles: [monitoring]
+
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:v1.7.0
+    command:
+      - "--kafka.server=redpanda:9092"
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    logging: *default-logging
+    restart: on-failure
     profiles: [monitoring]
 
   loki:

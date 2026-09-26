@@ -4,9 +4,23 @@ route:
   group_wait: 10s
   group_interval: 5m
   repeat_interval: 3h
+  routes:
+    - match:
+        severity: critical
+      receiver: critical
+      repeat_interval: 1h
+    - match:
+        severity: warning
+      receiver: warning
 
 receivers:
-  # Placeholder receiver: no notification integration configured.
-  # Fired alerts are visible at http://localhost:9093 but nothing is paged
-  # until a real receiver (Slack webhook, email, PagerDuty, etc.) is added here.
+  # Every receiver below is a structural placeholder: the routing tree (by
+  # severity label) is real and will group/dedupe alerts correctly, but none
+  # of these actually notify anyone yet. No Slack webhook, email SMTP config,
+  # or PagerDuty key exists in this repo - don't invent one. Fired alerts are
+  # always visible at http://localhost:9093 regardless; add a real
+  # `slack_configs:` / `email_configs:` / `pagerduty_configs:` block to
+  # `critical` and `warning` below once real notification credentials exist.
   - name: default
+  - name: critical
+  - name: warning

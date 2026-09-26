@@ -3,6 +3,8 @@ import threading
 import time
 from typing import Any
 
+from prometheus_client import start_http_server
+
 from compliance_service.config import load_policies
 from compliance_service.engine.audit_logger import AuditLogger
 from compliance_service.engine.risk_scorer import RiskScorer
@@ -28,6 +30,7 @@ logger = get_logger(__name__)
 _OVERRIDE_REFRESH_SECONDS = int(
     os.getenv("COMPLIANCE_RULE_OVERRIDE_REFRESH_SECONDS", "5")
 )
+_METRICS_PORT = 8011
 
 
 def _build_rule_registry(
@@ -158,6 +161,9 @@ def _run_consumer(topic: str, group_id: str, rules_engine: RulesEngine) -> None:
 
 
 def run() -> None:
+    start_http_server(_METRICS_PORT)
+    logger.info(f"metrics server started on :{_METRICS_PORT}")
+
     Base.metadata.create_all(bind=engine)
     logger.info("Compliance database tables ensured")
 
