@@ -1,0 +1,82 @@
+groups:
+  - name: fixflux-core-alerts
+    rules:
+      # Requires: matching-engine's existing /metrics (job "matching-engine",
+      # already scraped) - order_matching_latency_seconds is a real histogram
+      # with bucket boundaries up to 0.1s, so a 0.01 (10ms) threshold sits
+      # inside the real bucket range.
+      - alert: MatchingEngineP99LatencyHigh
+        expr: >
+          histogram_quantile(
+            0.99,
+            sum(rate(order_matching_latency_seconds_bucket{job="matching-engine"}[5m])) by (le)
+          ) > 0.01
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Matching engine P99 latency above 10ms"
+          description: >
+            P99 order-matching latency has been above 10ms for at least 2 minutes
+            (current: {{ $value | humanizeDuration }}).
+
+      # Requires: trade-store's existing /metrics (job "trade-store", already
+      # scraped) - api_requests_total is a real hand-rolled counter with a
+      # status_code label (this service does NOT use prometheus-fastapi-
+      # instrumentator, it's a custom Starlette middleware).
+      - alert: TradeStore5xxRateHigh
+        expr: sum(rate(api_requests_total{job="trade-store", status_code=~"5.."}[5m])) * 60 > 5
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "trade-store 5xx error rate above 5/min"
+          description: >
+            trade-store has averaged more than 5 server errors per minute over
+            the last 5 minutes (current: {{ $value | printf "%.1f" }}/min).
+
+      # Requires: the new "kafka-exporter" service + scrape job added in this
+      # change (docker-compose.yml, prometheus.yml) - no Kafka lag metric
+      # existed anywhere in this stack before. kafka_consumergroup_lag_sum is
+      # danielqsj/kafka_exporter's real metric name (verified against its own
+      # README), aggregated per consumer group per topic across all partitions.
+      - alert: KafkaConsumerLagHigh
+        expr: kafka_consumergroup_lag_sum > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Consumer group {{ $labels.consumergroup }} lagging on {{ $labels.topic }}"
+          description: >
+            Consumer group {{ $labels.consumergroup }} has more than 1000 messages
+            of lag on topic {{ $labels.topic }} (current: {{ $value }}).
+
+      # Requires: the new metrics server added to compliance_service/consumer.py
+      # in this change (port 8011) + scrape job "compliance-consumer" - this
+      # counter existed before but was never scraped by anything.
+      #
+      # "Spike" is relative, not absolute, since there's no fixed volume this
+      # demo/simulator system is expected to run at: fires when the trailing
+      # 5-minute violation rate is more than 3x the trailing 1-hour rate, AND
+      # above a 5/min floor so normal low-volume noise can't trigger a 3x jump
+      # off a near-zero baseline. Tune the multiplier and floor once this runs
+      # against real, sustained traffic - these are starting values, not
+      # measured ones.
+      - alert: ComplianceViolationRateSpike
+        expr: >
+          (
+            sum(rate(violations_detected_total{job="compliance-consumer"}[5m]))
+            >
+            3 * sum(rate(violations_detected_total{job="compliance-consumer"}[1h]))
+          )
+          and
+          sum(rate(violations_detected_total{job="compliance-consumer"}[5m])) * 60 > 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Compliance violation rate spiking"
+          description: >
+            Violation rate over the last 5 minutes is more than 3x the trailing
+            1-hour average, and above the 5/min noise floor
+            (current 5m rate: {{ $value | printf "%.2f" }}/s).
