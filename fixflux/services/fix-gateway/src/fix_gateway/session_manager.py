@@ -47,3 +47,13 @@ class SessionManager:
         if session:
             session.last_heartbeat = datetime.now(tz=UTC)
             logger.debug(f"heartbeat updated {session.session_id}")
+
+    def is_expired(self, sender_comp_id: str, timeout_seconds: int) -> bool:
+        """True if sender_comp_id has an active session that's gone silent for
+        longer than timeout_seconds. False (not expired) for an unknown sender -
+        "no session" and "expired session" are different things to the caller."""
+        session = self.get_session(sender_comp_id)
+        if session is None:
+            return False
+        elapsed = (datetime.now(tz=UTC) - session.last_heartbeat).total_seconds()
+        return elapsed > timeout_seconds

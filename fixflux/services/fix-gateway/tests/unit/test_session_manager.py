@@ -1,6 +1,7 @@
 # fixflux/services/fix-gateway/tests/unit/test_session_manager.py
 
 import time
+from datetime import UTC, datetime, timedelta
 
 from fix_gateway.session_manager import SessionManager
 
@@ -103,3 +104,54 @@ def test_remove_session_only_removes_target():
 
     assert manager.get_session("CLIENT1") is None
     assert manager.get_session("CLIENT2") is not None
+
+
+def test_is_expired_false_for_fresh_session():
+    manager = SessionManager()
+    manager.create_session("CLIENT1")
+
+    assert manager.is_expired("CLIENT1", timeout_seconds=60) is False
+
+
+def test_is_expired_true_once_timeout_elapsed():
+
+    manager = SessionManager()
+    manager.create_session("CLIENT1")
+    manager.get_session("CLIENT1").last_heartbeat = datetime.now(tz=UTC) - timedelta(
+        seconds=61
+    )
+
+    assert manager.is_expired("CLIENT1", timeout_seconds=60) is True
+
+
+def test_is_expired_false_right_at_the_boundary():
+
+    manager = SessionManager()
+    manager.create_session("CLIENT1")
+    manager.get_session("CLIENT1").last_heartbeat = datetime.now(tz=UTC) - timedelta(
+        seconds=59
+    )
+
+    assert manager.is_expired("CLIENT1", timeout_seconds=60) is False
+
+
+def test_is_expired_unknown_sender_returns_false_not_true():
+    manager = SessionManager()
+
+    # No session at all is a different situation than a stale one - the caller
+    # (FixServer.handle_connection) must not treat "never logged on" as expired.
+    assert manager.is_expired("UNKNOWN", timeout_seconds=60) is False
+
+
+def test_update_heartbeat_resets_expiry():
+
+    manager = SessionManager()
+    manager.create_session("CLIENT1")
+    manager.get_session("CLIENT1").last_heartbeat = datetime.now(tz=UTC) - timedelta(
+        seconds=61
+    )
+    assert manager.is_expired("CLIENT1", timeout_seconds=60) is True
+
+    manager.update_heartbeat("CLIENT1")
+
+    assert manager.is_expired("CLIENT1", timeout_seconds=60) is False

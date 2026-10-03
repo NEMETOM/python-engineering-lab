@@ -41,6 +41,14 @@ def test_identify_new_order():
     assert not handler.is_new_order({"35": "A"})
 
 
+def test_identify_logout():
+
+    handler = FixHandler()
+
+    assert handler.is_logout({"35": "5"})
+    assert not handler.is_logout({"35": "A"})
+
+
 def test_parse_ignores_malformed_fields():
 
     handler = FixHandler()

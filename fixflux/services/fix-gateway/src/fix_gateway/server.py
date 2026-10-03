@@ -27,6 +27,7 @@ class FixServer:
     def __init__(self):
         self.host = settings.host
         self.port = settings.port
+        self.heartbeat_timeout = settings.heartbeat_timeout_seconds
         self.session_manager = SessionManager()
         self.fix_handler = FixHandler(delimiter=settings.fix_delimiter)
 
@@ -42,20 +43,41 @@ class FixServer:
 
     def handle_connection(self, conn):
         sender = None
+        conn.settimeout(self.heartbeat_timeout)
         with conn:
             while True:
-                data = conn.recv(settings.buffer_size)
+                try:
+                    data = conn.recv(settings.buffer_size)
+                except TimeoutError:
+                    # socket.timeout is TimeoutError as of Python 3.10. No bytes
+                    # arrived within heartbeat_timeout_seconds - only an actual
+                    # logged-on session can expire; a connection that never sent
+                    # Logon just keeps waiting (matches real FIX: the heartbeat
+                    # timer only starts once a session exists).
+                    if sender and self.session_manager.is_expired(
+                        sender, self.heartbeat_timeout
+                    ):
+                        logger.warning(f"session expired (heartbeat timeout) {sender}")
+                        break
+                    continue
                 if not data:
                     break
                 raw_message = data.decode()
                 logger.debug(f"received raw FIX {raw_message}")
                 fix_msg = self.fix_handler.parse(raw_message)
-                sender = self.process_message(fix_msg) or sender
+                new_sender, logged_out = self.process_message(fix_msg)
+                sender = new_sender or sender
+                if logged_out:
+                    logger.info(f"logout processed, closing connection {sender}")
+                    break
         if sender:
             self.session_manager.remove_session(sender)
             logger.info(f"client disconnected {sender}")
 
-    def process_message(self, fix_msg: dict) -> str | None:
+    def process_message(self, fix_msg: dict) -> tuple[str | None, bool]:
+        """Returns (sender_to_track, should_close_connection). Only Logon
+        populates sender_to_track (handle_connection's loop needs to know who to
+        clean up on TCP close); only Logout sets should_close_connection."""
         if self.fix_handler.is_logon(fix_msg):
             sender = fix_msg.get("49")
             if self.session_manager.get_session(sender):
@@ -63,13 +85,22 @@ class FixServer:
             self.session_manager.create_session(sender)
             fix_messages_received.labels(msg_type="logon").inc()
             logger.info("logon processed")
-            return sender
+            return sender, False
         elif self.fix_handler.is_heartbeat(fix_msg):
             sender = fix_msg.get("49")
             self.session_manager.update_heartbeat(sender)
             fix_messages_received.labels(msg_type="heartbeat").inc()
             logger.debug("heartbeat processed")
+        elif self.fix_handler.is_logout(fix_msg):
+            sender = fix_msg.get("49")
+            fix_messages_received.labels(msg_type="logout").inc()
+            logger.info("logout processed")
+            return sender, True
         elif self.fix_handler.is_new_order(fix_msg):
+            sender = fix_msg.get("49")
+            # Any inbound message counts as session activity, not just explicit
+            # Heartbeat - see config.py's heartbeat_timeout_seconds docstring.
+            self.session_manager.update_heartbeat(sender)
             fix_messages_received.labels(msg_type="new_order").inc()
             with _tracer.start_as_current_span("fix-gateway.new_order") as span:
                 span.set_attribute("fix.symbol", fix_msg.get("55", ""))
@@ -82,7 +113,7 @@ class FixServer:
             logger.warning(
                 f"unrecognized FIX message type: {fix_msg.get('35', 'none')}"
             )
-        return None
+        return None, False
 
 
 if __name__ == "__main__":
