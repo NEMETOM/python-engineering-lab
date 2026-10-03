@@ -9,6 +9,7 @@ Feature: FIX Gateway message handling and session management
       | A        | logon     |
       | 0        | heartbeat |
       | D        | new order |
+      | 5        | logout    |
 
   Scenario: Parse a raw FIX Logon message
     Given a raw FIX message "35=A|49=CLIENT1|108=30|"
@@ -44,3 +45,19 @@ Feature: FIX Gateway message handling and session management
     Given a session manager
     When a heartbeat is received from sender "UNKNOWN"
     Then no session exists for "UNKNOWN"
+
+  Scenario: A session that has gone silent past the timeout is expired
+    Given a session manager
+    And a session already exists for sender "CLIENT3"
+    And the last heartbeat for "CLIENT3" was 61 seconds ago
+    Then the session for "CLIENT3" is expired with a 60 second timeout
+
+  Scenario: A session that heartbeats within the timeout is not expired
+    Given a session manager
+    And a session already exists for sender "CLIENT4"
+    And the last heartbeat for "CLIENT4" was 10 seconds ago
+    Then the session for "CLIENT4" is not expired with a 60 second timeout
+
+  Scenario: An unknown sender is never considered expired
+    Given a session manager
+    Then the session for "UNKNOWN" is not expired with a 60 second timeout

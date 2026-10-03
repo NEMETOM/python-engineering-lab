@@ -47,3 +47,7 @@ class FixHandler:
     def is_new_order(self, msg: dict):
 
         return msg.get("35") == "D"
+
+    def is_logout(self, msg: dict):
+
+        return msg.get("35") == "5"

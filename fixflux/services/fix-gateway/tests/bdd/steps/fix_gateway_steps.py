@@ -24,6 +24,7 @@ def then_handler_identifies(context, label):
         "logon": context.handler.is_logon,
         "heartbeat": context.handler.is_heartbeat,
         "new order": context.handler.is_new_order,
+        "logout": context.handler.is_logout,
     }
     assert mapping[label](
         context.msg
@@ -92,3 +93,24 @@ def then_heartbeat_is_recent(context, sender):
     assert session is not None, f"No session found for '{sender}'"
     delta = datetime.now(tz=UTC) - session.last_heartbeat
     assert delta < timedelta(seconds=5), f"Heartbeat timestamp is not recent: {delta}"
+
+
+@given('the last heartbeat for "{sender}" was {seconds:d} seconds ago')
+def given_last_heartbeat_seconds_ago(context, sender, seconds):
+    session = context.session_manager.get_session(sender)
+    assert session is not None, f"No session found for '{sender}'"
+    session.last_heartbeat = datetime.now(tz=UTC) - timedelta(seconds=seconds)
+
+
+@then('the session for "{sender}" is expired with a {timeout:d} second timeout')
+def then_session_is_expired(context, sender, timeout):
+    assert context.session_manager.is_expired(
+        sender, timeout_seconds=timeout
+    ), f"Expected session for '{sender}' to be expired with a {timeout}s timeout"
+
+
+@then('the session for "{sender}" is not expired with a {timeout:d} second timeout')
+def then_session_is_not_expired(context, sender, timeout):
+    assert not context.session_manager.is_expired(
+        sender, timeout_seconds=timeout
+    ), f"Expected session for '{sender}' to NOT be expired with a {timeout}s timeout"
