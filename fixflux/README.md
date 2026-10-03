@@ -282,55 +282,65 @@ Every service uses the `src/` layout recommended by the Python Packaging User Gu
 fixflux/
 ├── docker-compose.yml               # Full-stack orchestration with health-check startup ordering
 ├── services/
-│   ├── fix-gateway/                 # FIX TCP/file ingestion, session management
+│   ├── fix-gateway/                 # FIX TCP/file ingestion, session management, Logout (35=5) + heartbeat-timeout expiry
 │   │   ├── src/fix_gateway/
-│   │   │   ├── server.py            # TCP socket server
-│   │   │   ├── fix_handler.py       # FIX parser (tag=value)
-│   │   │   └── session_manager.py   # Per-client session state (inc/dec on connect/disconnect)
+│   │   │   ├── server.py            # TCP socket server; process_message() returns (sender, should_close)
+│   │   │   ├── fix_handler.py       # FIX parser (tag=value) + message-type identification incl. is_logout
+│   │   │   └── session_manager.py   # Per-client session state + is_expired() heartbeat-timeout check
 │   │   └── tests/                   # unit + BDD tests
 │   ├── order-service/               # Validation, enrichment, UUID assignment
 │   ├── risk-service/                # MiFID II pre-trade risk checks (notional cap, fat-finger, position limits)
 │   ├── matching-engine/             # Price-time priority order book + trade execution
-│   ├── market-data-service/         # Change-detected snapshot publishing
+│   ├── market-data-service/         # Change-detected snapshot publishing to the `market_data` topic
+│   ├── market-data-api/             # WebSocket broadcast of market-data snapshots at /ws/market-data - the one deliberate async service in this codebase (sync Kafka consumer thread bridged to asyncio, not aiokafka)
 │   ├── trade-store/                 # Kafka consumer + PostgreSQL + FastAPI REST
-│   └── compliance-service/          # RegTech compliance & surveillance module
+│   └── compliance-service/          # RegTech compliance/surveillance + the FixFlux Console (FIX injector + admin UI, formerly a standalone fix-injector service)
 │       ├── src/compliance_service/
-│       │   ├── consumer.py          # Dual-topic consumer (raw_orders + validated_orders)
-│       │   ├── models.py            # SQLAlchemy: violations, risk scores, audit trail
+│       │   ├── consumer.py          # Dual-topic consumer (raw_orders + validated_orders) + rule-override polling + /metrics on :8011
+│       │   ├── fix_parser.py        # FIX parsing for the Console's injector tab
+│       │   ├── injector_producer.py # Publishes parsed orders to raw_orders
+│       │   ├── models.py            # SQLAlchemy: violations, risk scores, audit trail, rule overrides
 │       │   ├── config.py            # YAML policy loader
 │       │   ├── rules/
 │       │   │   ├── base.py          # Rule ABC, Violation dataclass, Severity enum
+│       │   │   ├── catalog.py       # RULE_CATALOG - id/category/label/description per rule; backs the admin UI's tooltips
 │       │   │   ├── compliance/      # 6 compliance rules (size, symbol, hours, ...)
 │       │   │   └── surveillance/    # 4 surveillance detections (wash, rapid-fire, ...)
 │       │   ├── engine/
-│       │   │   ├── rules_engine.py  # Evaluates rules, collects violations
+│       │   │   ├── rules_engine.py  # Evaluates rules, collects violations (live rule-toggle takes effect per-call)
 │       │   │   ├── risk_scorer.py   # Weighted risk score per severity
-│       │   │   └── audit_logger.py  # SHA-256 tamper-evident audit trail
-│       │   ├── repository/          # ViolationRepository, AuditRepository
-│       │   └── api/                 # FastAPI: /violations, /risk, /audit, /health
+│       │   │   └── audit_logger.py  # SHA-256 per-record tamper-evident checksum - not a hash chain, see .claude/agents/legal_counsel_agent.md
+│       │   ├── repository/          # Violation/Audit/RuleOverride repositories
+│       │   ├── api/routes/          # FastAPI: injector, admin, violations, risk, audit, health
+│       │   ├── templates/           # Jinja2: _shell.html (shared nav), index.html (injector tab), admin_compliance.html
+│       │   └── static/              # fixflux-logo.png
 │       ├── policies/
 │       │   └── compliance_policies.yaml  # All rule thresholds - no code change needed
 │       └── tests/                   # unit + BDD tests
 ├── shared/                          # Internal platform library
 │   ├── schemas/                     # Pydantic v2 event schemas (OrderEvent, TradeEvent, BookEvent)
-│   ├── infrastructure/              # Kafka client factory, SQLAlchemy session, DB setup
+│   ├── infrastructure/              # Kafka client factory (enable_idempotence=False), SQLAlchemy session, DB setup
 │   ├── observability/               # Structured logging + Prometheus metric definitions
 │   └── exceptions/                  # Typed exception hierarchy
 ├── infrastructure/
 │   └── monitoring/
-│       ├── prometheus.yml           # Scrape config (fix-gateway, matching-engine, trade-store)
+│       ├── prometheus.yml           # Scrape config + rule_files + alerting.alertmanagers
+│       ├── prometheus_alerts.yml    # 4 alert rules: matching-engine P99 latency, trade-store 5xx rate, Kafka consumer lag, compliance violation-rate spike
+│       ├── alertmanager.yml         # Severity-routed (critical/warning) - no real notification channel wired yet
 │       ├── loki-config.yaml         # Loki log aggregation backend
 │       ├── promtail-config.yaml     # Promtail log collector (Docker socket, regex pipeline)
 │       ├── tempo.yaml               # Tempo distributed tracing backend
 │       └── grafana/
 │           ├── provisioning/
-│           │   ├── datasources/     # Auto-provisioned: Prometheus, Loki, Tempo
+│           │   ├── datasources/     # Auto-provisioned: Prometheus, Loki, Tempo, Alertmanager
 │           │   └── dashboards/      # Dashboard provider config
 │           └── dashboards/
-│               └── fix_simulator_overview.json  # 15-panel trading overview (4 rows)
+│               ├── fix_simulator_overview.json  # 15-panel trading overview (4 rows)
+│               ├── tempo_traces.json            # Span tables with Trace ID + Span ID columns
+│               └── loki_logs.json
 ├── clients/
 │   └── fix-filedrop-client/         # Directory watcher - drops FIX files into pipeline
-├── data/                            # Sample + compliance test FIX files
+├── data/                            # Sample + compliance/surveillance test FIX files, volume-burst demo files
 ├── k8s/                             # Raw Kubernetes manifests (apply with kubectl or kustomize)
 │   ├── 00-namespace.yaml
 │   ├── 01-configmap.yaml
@@ -361,6 +371,7 @@ fixflux/
 └── scripts/
     ├── update_status_badge.py       # Queries Prometheus; updates live status badge in README
     ├── check-observability.sh       # Smoke-tests the full monitoring stack on the Droplet
+    ├── generate_thumbnail.py        # Branded 1280x720 YouTube thumbnail generator (Pillow)
     ├── clear_db.py                  # Truncates all tables (dev reset)
     ├── test_db_connection.py        # Verifies PostgreSQL connectivity
     └── k8s-*.ps1 / build-images.ps1 # Kubernetes + Docker convenience scripts (Windows)
@@ -1276,12 +1287,13 @@ The order-service and market-data-service follow the identical pattern:
 |---|---|---|
 | ~~Wire `trades_stored_total`~~ | ~~Low~~ | **Done.** `trades_stored.labels(symbol=...).inc()` is called in `trade-store/consumer.py` after each successful `repo.save()`. Graph `rate(trades_stored_total[1m])` against `rate(trades_executed_total[1m])` in Grafana to see consumer lag as a live rate divergence. |
 | ~~Instrument order-service & compliance-service~~ | ~~Low~~ | **Done.** `orders_processed.labels(status="approved\|rejected").inc()` wired in order-service consumer; `violations_detected.labels(rule=..., severity=...).inc()` wired in compliance-service consumer for each rule that fires. |
-| FIX TCP session | Medium | Full logout (`35=5`) handling and session expiry via heartbeat timeout; Logon + TCP disconnect lifecycle is already implemented. |
-| WebSocket market data | Medium | Add an async FastAPI WebSocket endpoint to market-data-service that broadcasts change-detected snapshots to connected clients in real time. Removes the need for algorithmic trading stubs to poll a REST endpoint, and demonstrates async server-push over a persistent connection. |
-| Prometheus alerting rules | Medium | Write a `prometheus_alerts.yml` defining real thresholds: P99 matching latency > 10 ms for 2 min, trade-store 5xx rate > 5/min, Kafka consumer lag > 1000 messages, compliance violation rate spike. Wire into AlertManager for notification routing. Currently all monitoring is purely observational. |
+| ~~FIX TCP session~~ | ~~Medium~~ | **Done.** `fix_handler.is_logout()` identifies `35=5`; `process_message()` returns `(sender, should_close)` so Logout closes the connection immediately rather than waiting for TCP close. `SessionManager.is_expired()` plus a socket `recv()` timeout in `handle_connection` expire a session after `FIX_HEARTBEAT_TIMEOUT_SECONDS` (default 60s) of total silence - any inbound message resets the timer, not just explicit Heartbeat, matching real FIX session semantics. |
+| ~~WebSocket market data~~ | ~~Medium~~ | **Done.** New `market-data-api` service (port 8006) consumes `market_data` and broadcasts change-detected snapshots over `/ws/market-data` - the one deliberate async service in this codebase (a sync Kafka consumer thread bridged to asyncio via `asyncio.run_coroutine_threadsafe`, not `aiokafka`). |
+| ~~Prometheus alerting rules~~ | ~~Medium~~ | **Done**, with one gap still open. `infrastructure/monitoring/prometheus_alerts.yml` defines the 4 rules exactly as scoped (matching-engine P99 latency, trade-store 5xx rate, Kafka consumer lag via a new `kafka-exporter` service, compliance violation-rate spike), wired into Alertmanager via `prometheus.yml`'s `rule_files`/`alerting` config. `alertmanager.yml` has real severity-based routing (`critical`/`warning`), but **no notification channel is configured** - fired alerts are visible at `:9093` but nothing pages anyone until a real Slack/email/PagerDuty receiver is added. |
 | SLIs / SLOs | Medium | Formal SLI definitions (e.g. 99.9% of `GET /trades` requests < 200 ms) with Grafana error budget burn-rate panels. Prerequisite for meaningful on-call escalation policy and production readiness review. |
 | OPERATIONS.md runbooks | Medium | Create `OPERATIONS.md` with a runbook per alert: symptoms, diagnosis steps, remediation, and rollback. Linked from AlertManager annotations. Demonstrates the ability to debug your own architecture under simulated stress - a strong differentiator in SRE and production engineering interviews. |
 | FIX replay | Medium | Ability to replay historical FIX message files against the live pipeline for backtesting and regression testing. |
+| MiFID II post-trade transparency reporting | High | A new `reporting-service` consuming `trades`, enriching each with the regulatory fields RTS 1/2 post-trade transparency requires (buyer/seller LEI, trading capacity, instrument CFI code, reporting timestamp), and persisting to a `regulatory_reports` table with a unique constraint on `trade_id` for idempotency. A phased draft prompt for this already exists in `NEXT_TWO_ENHANCEMENTS_PROMPTS_md` (untracked) - it assumes Hexagonal Architecture framing that doesn't match this repo's real conventions; build it with the same plain layered service structure (`consumer.py`/`models.py`/`config.py`) every other service here uses. |
 | Schema registry | High | Confluent Schema Registry for Avro/Protobuf event versioning with schema evolution enforcement at the producer and consumer boundary. |
 | Async I/O (aiokafka) | High | Replace blocking Kafka consumers in order-service and market-data-service with `aiokafka` async consumers. Allows each service to handle concurrent I/O, metrics scraping, and health endpoints in a single event loop without blocking the primary consumption thread. Required groundwork before horizontal scaling removes GIL contention as the bottleneck. |
 
