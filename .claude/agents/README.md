@@ -28,11 +28,33 @@ Act as the sre_agent (.claude/agents/sre_agent.md) and check why trades aren't s
 ```
 
 **2. The skill wrappers in `.claude/skills/`** — a short slash-invocation instead of a full sentence:
+
+`/sdet-agent` — testing tasks (pytest/behave, coverage, mocked Kafka boundary):
 ```
 /sdet-agent write unit tests for the new rule
-/sre-agent check why trades aren't showing up
-/legal-counsel-agent review the audit trail for evidentiary defensibility
+/sdet-agent review test coverage for risk-service
+/sdet-agent debug why the compliance BDD suite is failing
+/sdet-agent write a regression test for the rules-engine live-toggle bug
+/sdet-agent generate an integration test for market-data-api
 ```
+
+`/sre-agent` — droplet/observability/deploy-pipeline tasks:
+```
+/sre-agent check why trades aren't showing up
+/sre-agent check whether prometheus_alerts.yml actually loaded on the droplet
+/sre-agent diagnose the matching-engine P99 latency spike
+/sre-agent check Kafka consumer lag before we push a new consumer service
+/sre-agent verify the firewall allows the new service's port before I test it
+```
+
+`/legal-counsel-agent` — audit trail, regulatory mapping, forensic replay:
+```
+/legal-counsel-agent review the audit trail for evidentiary defensibility
+/legal-counsel-agent map WashTradingRule to the MiFID II provision it illustrates
+/legal-counsel-agent explain the gap between per-record tamper-evidence and true chain-of-custody
+/legal-counsel-agent check whether Kafka retention covers replaying a given incident
+```
+
 Each skill (`.claude/skills/sdet-agent/`, `sre-agent/`, `legal-counsel-agent/`) is a thin pointer —
 its `SKILL.md` just says "read the corresponding agent file and adopt its persona for this task."
 The agent `.md` files stay the single source of truth; the skills don't duplicate their content, so
