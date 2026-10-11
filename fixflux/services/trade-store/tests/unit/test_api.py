@@ -2,9 +2,19 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
+from shared.observability.metrics import api_request_latency, api_requests
 from trade_store.api.main import app
 
 client = TestClient(app)
+
+
+def _label_values(metric, label):
+    return {
+        sample.labels[label]
+        for family in metric.collect()
+        for sample in family.samples
+        if label in sample.labels
+    }
 
 
 class TestHealthEndpoint:
@@ -104,6 +114,36 @@ class TestGetTradeByIdEndpoint:
             mock_repo.get_by_id.return_value = None
             response = client.get("/trades/NOTEXIST")
         assert "detail" in response.json()
+
+
+class TestPrometheusMiddlewareLabeling:
+    """endpoint label must be the route template, not the raw URL - a raw path
+    like "/trades/T1" creates one new time series per unique trade_id ever
+    queried, an unbounded-cardinality label. See _PrometheusMiddleware."""
+
+    def test_parameterized_route_labels_with_template_not_raw_path(self):
+        with patch("trade_store.api.routes.repo") as mock_repo:
+            mock_repo.get_by_id.return_value = _SAMPLE_TRADE
+            client.get("/trades/T1")
+            client.get("/trades/SOME-OTHER-ID")
+
+        endpoints = _label_values(api_requests, "endpoint")
+        assert "/trades/{trade_id}" in endpoints
+        assert "T1" not in " ".join(endpoints)
+        assert "SOME-OTHER-ID" not in " ".join(endpoints)
+
+    def test_unmatched_route_falls_back_to_raw_path(self):
+        response = client.get("/this-route-does-not-exist")
+
+        assert response.status_code == 404
+        assert "/this-route-does-not-exist" in _label_values(api_requests, "endpoint")
+
+    def test_latency_histogram_also_uses_route_template(self):
+        with patch("trade_store.api.routes.repo") as mock_repo:
+            mock_repo.get_by_id.return_value = _SAMPLE_TRADE
+            client.get("/trades/ANOTHER-ID")
+
+        assert "/trades/{trade_id}" in _label_values(api_request_latency, "endpoint")
 
 
 class TestWrongMethods:

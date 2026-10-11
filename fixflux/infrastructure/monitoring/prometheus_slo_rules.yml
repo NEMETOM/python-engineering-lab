@@ -1,0 +1,178 @@
+# Multiwindow, multi-burn-rate SLO alerting for trade-store, following Google's
+# SRE Workbook "Alerting on SLOs" chapter (Table 5-8, verified against the
+# source directly, not from memory): for a 99.9% SLO, error budget = 0.1%.
+#
+#   Severity | Long window | Short window | Burn rate | Budget consumed
+#   Page     | 1h          | 5m           | 14.4x     | 2%
+#   Page     | 6h          | 30m          | 6x        | 5%
+#   Ticket   | 3d          | 6h           | 1x        | 10%
+#
+# Threshold for each tier = burn_rate * (1 - SLO) = burn_rate * 0.001.
+#
+# Scope: trade-store only. It's the only service with real per-request HTTP
+# metrics today (api_requests_total, api_request_latency_seconds) - see
+# SLO.md for why compliance-api isn't covered yet.
+#
+# See SLO.md for the full SLI/SLO definitions this file implements.
+
+groups:
+  - name: trade-store-sli-recording-rules
+    rules:
+      # --- Latency SLI: fraction of requests completing in > 200ms (bad) ---
+      # Needs the 0.2 (200ms) bucket added to api_request_latency_seconds in
+      # shared/observability/metrics.py - without a real bucket boundary at
+      # the threshold, this would need histogram_quantile() interpolation
+      # instead, which is not accurate enough for burn-rate alerting.
+      - record: trade_store:sli_latency_bad_ratio_rate5m
+        expr: >
+          1 - (
+            sum(rate(api_request_latency_seconds_bucket{job="trade-store", le="0.2"}[5m]))
+            /
+            sum(rate(api_request_latency_seconds_count{job="trade-store"}[5m]))
+          )
+      - record: trade_store:sli_latency_bad_ratio_rate30m
+        expr: >
+          1 - (
+            sum(rate(api_request_latency_seconds_bucket{job="trade-store", le="0.2"}[30m]))
+            /
+            sum(rate(api_request_latency_seconds_count{job="trade-store"}[30m]))
+          )
+      - record: trade_store:sli_latency_bad_ratio_rate1h
+        expr: >
+          1 - (
+            sum(rate(api_request_latency_seconds_bucket{job="trade-store", le="0.2"}[1h]))
+            /
+            sum(rate(api_request_latency_seconds_count{job="trade-store"}[1h]))
+          )
+      - record: trade_store:sli_latency_bad_ratio_rate6h
+        expr: >
+          1 - (
+            sum(rate(api_request_latency_seconds_bucket{job="trade-store", le="0.2"}[6h]))
+            /
+            sum(rate(api_request_latency_seconds_count{job="trade-store"}[6h]))
+          )
+      - record: trade_store:sli_latency_bad_ratio_rate3d
+        expr: >
+          1 - (
+            sum(rate(api_request_latency_seconds_bucket{job="trade-store", le="0.2"}[3d]))
+            /
+            sum(rate(api_request_latency_seconds_count{job="trade-store"}[3d]))
+          )
+      # Not used by any burn-rate alert (the longest alert window is 3d, per
+      # the Workbook's own recommended table) - only for the Grafana dashboard's
+      # "error budget remaining over the full 30-day SLO period" panel. Requires
+      # Prometheus's --storage.tsdb.retention.time to actually cover 30d.
+      - record: trade_store:sli_latency_bad_ratio_rate30d
+        expr: >
+          1 - (
+            sum(rate(api_request_latency_seconds_bucket{job="trade-store", le="0.2"}[30d]))
+            /
+            sum(rate(api_request_latency_seconds_count{job="trade-store"}[30d]))
+          )
+
+      # --- Availability SLI: fraction of requests returning 5xx (bad) ---
+      - record: trade_store:sli_availability_bad_ratio_rate5m
+        expr: >
+          1 - (
+            sum(rate(api_requests_total{job="trade-store", status_code!~"5.."}[5m]))
+            /
+            sum(rate(api_requests_total{job="trade-store"}[5m]))
+          )
+      - record: trade_store:sli_availability_bad_ratio_rate30m
+        expr: >
+          1 - (
+            sum(rate(api_requests_total{job="trade-store", status_code!~"5.."}[30m]))
+            /
+            sum(rate(api_requests_total{job="trade-store"}[30m]))
+          )
+      - record: trade_store:sli_availability_bad_ratio_rate1h
+        expr: >
+          1 - (
+            sum(rate(api_requests_total{job="trade-store", status_code!~"5.."}[1h]))
+            /
+            sum(rate(api_requests_total{job="trade-store"}[1h]))
+          )
+      - record: trade_store:sli_availability_bad_ratio_rate6h
+        expr: >
+          1 - (
+            sum(rate(api_requests_total{job="trade-store", status_code!~"5.."}[6h]))
+            /
+            sum(rate(api_requests_total{job="trade-store"}[6h]))
+          )
+      - record: trade_store:sli_availability_bad_ratio_rate3d
+        expr: >
+          1 - (
+            sum(rate(api_requests_total{job="trade-store", status_code!~"5.."}[3d]))
+            /
+            sum(rate(api_requests_total{job="trade-store"}[3d]))
+          )
+      # Dashboard-only, same rationale as the latency rate30d rule above.
+      - record: trade_store:sli_availability_bad_ratio_rate30d
+        expr: >
+          1 - (
+            sum(rate(api_requests_total{job="trade-store", status_code!~"5.."}[30d]))
+            /
+            sum(rate(api_requests_total{job="trade-store"}[30d]))
+          )
+
+  - name: trade-store-slo-burn-rate-alerts
+    rules:
+      - alert: TradeStoreLatencySLOBurnRatePage
+        expr: >
+          (trade_store:sli_latency_bad_ratio_rate1h > 0.0144 and trade_store:sli_latency_bad_ratio_rate5m > 0.0144)
+          or
+          (trade_store:sli_latency_bad_ratio_rate6h > 0.006 and trade_store:sli_latency_bad_ratio_rate30m > 0.006)
+        for: 2m
+        labels:
+          severity: page
+          slo: trade-store-latency
+        annotations:
+          summary: "trade-store latency SLO burning fast enough to page"
+          description: >
+            At this burn rate the 30-day error budget for "99.9% of requests under
+            200ms" will be exhausted well before the period ends. Fires on either a
+            14.4x burn sustained for 1h (confirmed over the last 5m), or a 6x burn
+            sustained for 6h (confirmed over the last 30m) - the two Page-tier
+            conditions from the SRE Workbook's recommended table, OR'd together.
+
+      - alert: TradeStoreLatencySLOBurnRateTicket
+        expr: trade_store:sli_latency_bad_ratio_rate3d > 0.001 and trade_store:sli_latency_bad_ratio_rate6h > 0.001
+        for: 15m
+        labels:
+          severity: ticket
+          slo: trade-store-latency
+        annotations:
+          summary: "trade-store latency SLO burning steadily - not urgent, needs review"
+          description: >
+            A 1x burn rate sustained for 3 days (confirmed over the last 6h) means
+            the error budget will be fully consumed right at the end of the 30-day
+            window if this continues - worth investigating, not worth waking anyone.
+
+      - alert: TradeStoreAvailabilitySLOBurnRatePage
+        expr: >
+          (trade_store:sli_availability_bad_ratio_rate1h > 0.0144 and trade_store:sli_availability_bad_ratio_rate5m > 0.0144)
+          or
+          (trade_store:sli_availability_bad_ratio_rate6h > 0.006 and trade_store:sli_availability_bad_ratio_rate30m > 0.006)
+        for: 2m
+        labels:
+          severity: page
+          slo: trade-store-availability
+        annotations:
+          summary: "trade-store availability SLO burning fast enough to page"
+          description: >
+            5xx rate is high enough to exhaust the 30-day error budget for "99.9%
+            non-5xx responses" well before the period ends. Same dual-window
+            page-tier pattern as the latency alert, applied to the availability SLI.
+
+      - alert: TradeStoreAvailabilitySLOBurnRateTicket
+        expr: trade_store:sli_availability_bad_ratio_rate3d > 0.001 and trade_store:sli_availability_bad_ratio_rate6h > 0.001
+        for: 15m
+        labels:
+          severity: ticket
+          slo: trade-store-availability
+        annotations:
+          summary: "trade-store availability SLO burning steadily - not urgent, needs review"
+          description: >
+            A 1x burn rate sustained for 3 days means the availability error
+            budget will be fully consumed right at the end of the 30-day window
+            if this continues.

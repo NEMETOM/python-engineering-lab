@@ -1,0 +1,241 @@
+{
+  "id": null,
+  "uid": "fixflux-slo-overview",
+  "title": "FIXFlux - trade-store SLO / Error Budget",
+  "description": "Formal SLI/SLO tracking for trade-store (see SLO.md) - the only service with real per-request HTTP metrics today. Current SLI value, 30-day error budget remaining, and the burn-rate series that back the page/ticket alerts in prometheus_slo_rules.yml.",
+  "tags": ["fintech", "fix-protocol", "slo", "sre"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-7d", "to": "now" },
+  "annotations": { "list": [] },
+  "templating": { "list": [] },
+  "panels": [
+
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Latency SLO - 99.9% of requests under 200ms",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Current latency SLI (1h window)",
+      "description": "Fraction of requests completing under 200ms, over the last hour. Target: 99.9%.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 3,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.995 },
+              { "color": "green", "value": 0.999 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "1 - trade_store:sli_latency_bad_ratio_rate1h",
+          "refId": "A"
+        }
+      ]
+    },
+
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Latency error budget remaining (30d)",
+      "description": "1 - (budget consumed). Budget consumed = bad-event ratio over 30d / (1 - SLO). At 0% remaining, the entire monthly error budget for this SLI is spent.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 2,
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.1 },
+              { "color": "green", "value": 0.3 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "area"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "clamp_min(1 - (trade_store:sli_latency_bad_ratio_rate30d / 0.001), 0)",
+          "refId": "A"
+        }
+      ]
+    },
+
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Latency bad-event ratio vs. burn-rate thresholds",
+      "description": "The dual-window pairs that back TradeStoreLatencySLOBurnRatePage (1h+5m at 14.4x, 6h+30m at 6x) and TradeStoreLatencySLOBurnRateTicket (3d+6h at 1x), plotted against their fixed thresholds. An alert fires when both lines in a pair cross their threshold together.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 0 }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "trade_store:sli_latency_bad_ratio_rate5m", "legendFormat": "5m (page, fast)", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "trade_store:sli_latency_bad_ratio_rate1h", "legendFormat": "1h (page, fast)", "refId": "B" },
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "trade_store:sli_latency_bad_ratio_rate30m", "legendFormat": "30m (page, slow)", "refId": "C" },
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "trade_store:sli_latency_bad_ratio_rate6h", "legendFormat": "6h (page, slow)", "refId": "D" },
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "trade_store:sli_latency_bad_ratio_rate3d", "legendFormat": "3d (ticket)", "refId": "E" },
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "0.0144", "legendFormat": "page threshold (14.4x / 6x avg line for reference)", "refId": "F" },
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "0.001", "legendFormat": "ticket threshold (1x)", "refId": "G" }
+      ]
+    },
+
+    {
+      "id": 5,
+      "type": "row",
+      "title": "Availability SLO - 99.9% non-5xx",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 }
+    },
+
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Current availability SLI (1h window)",
+      "description": "Fraction of requests NOT returning a 5xx, over the last hour. Target: 99.9%.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 10 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 3,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.995 },
+              { "color": "green", "value": 0.999 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "1 - trade_store:sli_availability_bad_ratio_rate1h",
+          "refId": "A"
+        }
+      ]
+    },
+
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Availability error budget remaining (30d)",
+      "description": "1 - (budget consumed). Budget consumed = bad-event ratio over 30d / (1 - SLO).",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 10 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 2,
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.1 },
+              { "color": "green", "value": 0.3 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "area"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "clamp_min(1 - (trade_store:sli_availability_bad_ratio_rate30d / 0.001), 0)",
+          "refId": "A"
+        }
+      ]
+    },
+
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Availability bad-event ratio vs. burn-rate thresholds",
+      "description": "Same dual-window pattern as the latency panel, applied to the 5xx-based availability SLI.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 10 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 0 }
+        },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "trade_store:sli_availability_bad_ratio_rate5m", "legendFormat": "5m (page, fast)", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "trade_store:sli_availability_bad_ratio_rate1h", "legendFormat": "1h (page, fast)", "refId": "B" },
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "trade_store:sli_availability_bad_ratio_rate30m", "legendFormat": "30m (page, slow)", "refId": "C" },
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "trade_store:sli_availability_bad_ratio_rate6h", "legendFormat": "6h (page, slow)", "refId": "D" },
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "trade_store:sli_availability_bad_ratio_rate3d", "legendFormat": "3d (ticket)", "refId": "E" },
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "0.0144", "legendFormat": "page threshold (14.4x / 6x avg line for reference)", "refId": "F" },
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "0.001", "legendFormat": "ticket threshold (1x)", "refId": "G" }
+      ]
+    }
+
+  ]
+}
