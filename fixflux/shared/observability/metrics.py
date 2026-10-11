@@ -90,5 +90,8 @@ api_request_latency = Histogram(
     "api_request_latency_seconds",
     "HTTP API request latency",
     ["endpoint"],
-    buckets=[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0],
+    # 0.2 (200ms) added deliberately: it's the trade-store latency SLO threshold
+    # (see SLO.md) and SLI burn-rate math needs a real bucket boundary at the
+    # threshold, not a histogram_quantile() interpolation across a bucket gap.
+    buckets=[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.2, 0.25, 0.5, 1.0],
 )

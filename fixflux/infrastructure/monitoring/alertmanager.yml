@@ -12,6 +12,18 @@ route:
     - match:
         severity: warning
       receiver: warning
+    # SLO burn-rate alerts (prometheus_slo_rules.yml) use severity: page/ticket,
+    # not critical/warning - Google's SRE Workbook terminology, used as-is
+    # rather than force-fit onto a scheme meant for threshold alerts. Routed
+    # the same way: page gets the shorter repeat_interval, matching how
+    # `critical` is already treated above.
+    - match:
+        severity: page
+      receiver: page
+      repeat_interval: 1h
+    - match:
+        severity: ticket
+      receiver: ticket
 
 receivers:
   # Every receiver below is a structural placeholder: the routing tree (by
@@ -19,8 +31,10 @@ receivers:
   # of these actually notify anyone yet. No Slack webhook, email SMTP config,
   # or PagerDuty key exists in this repo - don't invent one. Fired alerts are
   # always visible at http://localhost:9093 regardless; add a real
-  # `slack_configs:` / `email_configs:` / `pagerduty_configs:` block to
-  # `critical` and `warning` below once real notification credentials exist.
+  # `slack_configs:` / `email_configs:` / `pagerduty_configs:` block to each
+  # receiver below once real notification credentials exist.
   - name: default
   - name: critical
   - name: warning
+  - name: page
+  - name: ticket
