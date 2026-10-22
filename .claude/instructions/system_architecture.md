@@ -115,9 +115,9 @@ to a single DigitalOcean droplet; `deploy.yml` does `git pull` + `docker compose
 over SSH on every push to `main` touching `fixflux/**`. There is no Kubernetes, no service mesh, no
 multi-region anything — keep proposals proportionate to a single 2 vCPU / 4GB droplet.
 
-**Alerting** (added — not purely observational anymore): `prometheus_alerts.yml` defines 4 rules
-(matching-engine P99 latency, trade-store 5xx rate, Kafka consumer lag, compliance violation-rate
-spike), loaded via Prometheus's `rule_files:` and evaluated against Alertmanager
+**Alerting** (added — not purely observational anymore): `prometheus_alerts.yml` defines 5 rules
+(matching-engine down, matching-engine P99 latency, trade-store 5xx rate, Kafka consumer lag,
+compliance violation-rate spike; runbooks in `fixflux/OPERATIONS.md`), loaded via Prometheus's `rule_files:` and evaluated against Alertmanager
 (`alerting.alertmanagers` in `prometheus.yml`). Two of the four needed new data sources that didn't
 exist before this was added:
 - `kafka-exporter` (danielqsj/kafka-exporter, scraped as job `kafka-exporter`) — Kafka consumer lag

@@ -20,6 +20,23 @@ groups:
             P99 order-matching latency has been above 10ms for at least 2 minutes
             (current: {{ $value | humanizeDuration }}).
 
+      # Requires: matching-engine's existing /metrics (job "matching-engine").
+      # The order book is in-memory only, so a down engine means no matching
+      # and, on restart, an empty book - see OPERATIONS.md section 3 before
+      # restarting it. No other rule catches this directly: lag only fires
+      # after 5m and >1000 messages, which a low-volume period may never reach.
+      - alert: MatchingEngineDown
+        expr: up{job="matching-engine"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Matching engine is down"
+          description: >
+            Prometheus has failed to scrape matching-engine for at least 1 minute.
+            Order matching is stopped and the in-memory order book is lost.
+          runbook_url: "https://github.com/NEMETOM/python-engineering-lab/blob/main/fixflux/OPERATIONS.md#3-matching-engine-crash--restart"
+
       # Requires: trade-store's existing /metrics (job "trade-store", already
       # scraped) - api_requests_total is a real hand-rolled counter with a
       # status_code label (this service does NOT use prometheus-fastapi-
@@ -50,6 +67,7 @@ groups:
           description: >
             Consumer group {{ $labels.consumergroup }} has more than 1000 messages
             of lag on topic {{ $labels.topic }} (current: {{ $value }}).
+          runbook_url: "https://github.com/NEMETOM/python-engineering-lab/blob/main/fixflux/OPERATIONS.md#2-kafkaconsumerlaghigh"
 
       # Requires: the new metrics server added to compliance_service/consumer.py
       # in this change (port 8011) + scrape job "compliance-consumer" - this
