@@ -1,7 +1,14 @@
 import json
 from unittest.mock import patch
 
-from shared.infrastructure.kafka_client import create_consumer, create_producer
+import pytest
+from kafka import TopicPartition
+
+from shared.infrastructure.kafka_client import (
+    create_consumer,
+    create_producer,
+    create_tail_consumer,
+)
 
 
 class TestCreateProducer:
@@ -69,3 +76,49 @@ class TestCreateConsumer:
             deserializer = kwargs["value_deserializer"]
             payload = {"order_id": "O1", "price": 100.0}
             assert deserializer(json.dumps(payload).encode()) == payload
+
+
+class TestCreateTailConsumer:
+    def _mock(self, mock_cls, partitions):
+        consumer = mock_cls.return_value
+        consumer.partitions_for_topic.return_value = partitions
+        return consumer
+
+    def test_returns_kafka_consumer(self):
+        with patch("shared.infrastructure.kafka_client.KafkaConsumer") as mock_cls:
+            consumer = self._mock(mock_cls, {0})
+            assert create_tail_consumer("execution_reports") is consumer
+
+    def test_has_no_group_and_never_commits(self):
+        with patch("shared.infrastructure.kafka_client.KafkaConsumer") as mock_cls:
+            self._mock(mock_cls, {0})
+            create_tail_consumer("execution_reports")
+            _, kwargs = mock_cls.call_args
+            assert kwargs["group_id"] is None
+            assert kwargs["enable_auto_commit"] is False
+
+    def test_assigns_every_partition_and_seeks_to_end(self):
+        with patch("shared.infrastructure.kafka_client.KafkaConsumer") as mock_cls:
+            consumer = self._mock(mock_cls, {1, 0})
+            create_tail_consumer("execution_reports")
+            expected = [
+                TopicPartition("execution_reports", 0),
+                TopicPartition("execution_reports", 1),
+            ]
+            consumer.assign.assert_called_once_with(expected)
+            consumer.seek_to_end.assert_called_once_with(*expected)
+            assert consumer.position.call_count == 2
+
+    def test_missing_topic_raises_and_closes(self):
+        with patch("shared.infrastructure.kafka_client.KafkaConsumer") as mock_cls:
+            consumer = self._mock(mock_cls, None)
+            with pytest.raises(RuntimeError, match="does not exist"):
+                create_tail_consumer("nope")
+            consumer.close.assert_called_once()
+
+    def test_deserializer_decodes_json_bytes(self):
+        with patch("shared.infrastructure.kafka_client.KafkaConsumer") as mock_cls:
+            self._mock(mock_cls, {0})
+            create_tail_consumer("execution_reports")
+            _, kwargs = mock_cls.call_args
+            assert kwargs["value_deserializer"](b'{"a": 1}') == {"a": 1}
