@@ -43,3 +43,6 @@ fixflux/DROPLET_ACCESS.md
 fixflux/EXEC_REPORT_PLAN.md
 fixflux/ARCHITECTURE_AND_PERFORMANCE_ANALYSIS.md
 GIT_CHEATSHEET.md
+
+# fix-replay run reports (baselines live in fixflux/clients/fix-replay/baselines/)
+fixflux/replay-results/

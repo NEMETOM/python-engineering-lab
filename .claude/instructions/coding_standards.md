@@ -103,7 +103,46 @@ logger = get_logger(__name__)
 
 ## Lint / format
 
-`ruff` + `black` + `isort` + `mypy`, line-length 88, target `py311`, `isort` profile `black`. Every
-service's `pyproject.toml` sets `known-first-party` to `[<service_package>, "shared"]`. Copy an
-existing service's `pyproject.toml` `[tool.*]` sections verbatim when starting a new one rather
+`ruff` + `black` + `isort` + `mypy`, line-length 88, target `py311`, `isort` profile `black`. Copy
+an existing service's `pyproject.toml` `[tool.*]` sections verbatim when starting a new one rather
 than reconfiguring from scratch.
+
+**First-party imports must be declared twice**, once per tool, because ruff does not read
+`[tool.isort]`:
+
+```toml
+[tool.ruff.lint.isort]
+known-first-party = ["<service_package>", "shared"]
+
+[tool.isort]
+profile = "black"
+known_first_party = ["<service_package>", "shared"]
+```
+
+With only `[tool.isort]`, isort groups `shared` with the service package while ruff treats it as
+third-party, and ruff's `I001` fails on imports isort considers correctly sorted. Neither tool's
+auto-fix can satisfy both. That's how `clients/fix-replay` broke CI (2026-10): its config was
+copied from `market-data-service`, which was missing the ruff section at the time.
+
+**ruff is pinned to `0.17.2`** in every workflow's `pip install` line and in the root
+`requirements-dev.txt`. Lint locally with the same version, because newer releases enable more
+rules by default (observed: 0.17.2 enforces `I` import sorting and `RUF100` unused-`noqa` with this
+repo's config; 0.15.1 enforced neither). A local run on a different ruff can pass while CI fails on
+identical code. Before calling lint clean:
+
+```bash
+python -m pip install ruff==0.17.2 && python -m ruff --version
+python -m ruff check . && python -m black --check . && python -m isort --check-only . && python -m mypy src/
+```
+
+To upgrade ruff, change the pin everywhere in one commit (`grep -rn "ruff==" .github
+requirements-dev.txt`) and run the new version across every service first. New workflows must pin
+it too. `black`, `isort` and `mypy` are still unpinned and can drift the same way.
+
+**Only add `# noqa: <code>` for a rule that is actually enabled.** Check with
+`ruff check --show-settings <file> | grep <code>`. A `noqa` for a disabled rule (e.g. `S310`;
+the `S` bandit rules are not enabled here) is itself an error under `RUF100`.
+
+**A lint fix isn't done until it's pushed.** CI lints the pushed commit, not the working tree.
+When a CI failure "reappears" after a local fix, check `git status` and
+`git show origin/<branch>:<path>` before changing code again.

@@ -1,7 +1,7 @@
 import json
 import os
 
-from kafka import KafkaConsumer, KafkaProducer
+from kafka import KafkaConsumer, KafkaProducer, TopicPartition
 
 KAFKA_BROKER = os.getenv("KAFKA_BROKER", "localhost:9092")
 
@@ -42,3 +42,29 @@ def create_consumer(topic: str, group_id: str):
         enable_auto_commit=True,
         value_deserializer=lambda v: json.loads(v.decode("utf-8")),
     )
+
+
+def create_tail_consumer(topic: str):
+    # Groupless reader positioned at the current end of every partition, for
+    # short-lived tools (fix-replay) that only care about messages produced
+    # after they start. No group_id means no committed offsets: a consumer
+    # group left behind by a one-off run would show ever-growing lag in
+    # kafka-exporter and eventually fire KafkaConsumerLagHigh.
+    consumer = KafkaConsumer(
+        bootstrap_servers=KAFKA_BROKER,
+        group_id=None,
+        enable_auto_commit=False,
+        value_deserializer=lambda v: json.loads(v.decode("utf-8")),
+    )
+    partitions = consumer.partitions_for_topic(topic) or set()
+    if not partitions:
+        consumer.close()
+        raise RuntimeError(f"topic {topic!r} does not exist or has no partitions")
+    assignment = [TopicPartition(topic, p) for p in sorted(partitions)]
+    consumer.assign(assignment)
+    consumer.seek_to_end(*assignment)
+    # seek_to_end is lazy; position() resolves it now, before anything is
+    # produced, so messages sent after this call can't be skipped.
+    for tp in assignment:
+        consumer.position(tp)
+    return consumer
