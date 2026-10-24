@@ -22,5 +22,5 @@ def resting_orders(metrics_text: str, symbols: set[str]) -> dict[str, int]:
 
 
 def fetch_metrics(url: str, timeout_s: float = 3.0) -> str:
-    with urllib.request.urlopen(url, timeout=timeout_s) as resp:  # noqa: S310
+    with urllib.request.urlopen(url, timeout=timeout_s) as resp:
         return resp.read().decode("utf-8")

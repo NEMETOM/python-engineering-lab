@@ -63,7 +63,7 @@ jobs:
         working-directory: fixflux/services/risk-service
         run: |
           pip install -e .
-          pip install behave pytest pytest-cov ruff black isort mypy
+          pip install behave pytest pytest-cov ruff==0.17.2 black isort mypy
 
       # ── 5. Unit tests with coverage ───────────────────────────────────────────
       - name: Run pytest with coverage

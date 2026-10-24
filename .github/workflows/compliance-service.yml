@@ -51,7 +51,7 @@ jobs:
         working-directory: fixflux/services/compliance-service
         run: |
           pip install -e .
-          pip install pytest pytest-cov ruff black isort mypy httpx behave
+          pip install pytest pytest-cov ruff==0.17.2 black isort mypy httpx behave
 
       - name: Run pytest with coverage
         working-directory: fixflux/services/compliance-service

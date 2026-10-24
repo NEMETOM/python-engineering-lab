@@ -51,7 +51,7 @@ jobs:
         working-directory: fixflux/services/market-data-api
         run: |
           pip install -e ".[test]"
-          pip install ruff black isort mypy
+          pip install ruff==0.17.2 black isort mypy
 
       - name: Run pytest with coverage
         working-directory: fixflux/services/market-data-api

@@ -35,6 +35,9 @@ testpaths = ["tests/unit"]
 line-length = 88
 target-version = "py311"
 
+[tool.ruff.lint.isort]
+known-first-party = ["fix_replay", "shared"]
+
 [tool.black]
 line-length = 88
 target-version = ["py311"]
