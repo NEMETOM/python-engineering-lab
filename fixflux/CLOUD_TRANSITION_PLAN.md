@@ -900,7 +900,7 @@ Deploy stateful services and wait for them to be fully Ready before deploying ap
   TRADE_STORE_URL=https://fixflux.yourdomain.com \
   COMPLIANCE_URL=https://fixflux.yourdomain.com \
   KAFKA_BROKER=<droplet-ip>:30092 \
-  DATABASE_URL="postgresql://fixuser:fixpass@<droplet-ip>:..." \
+  DATABASE_URL="postgresql+psycopg2://fixuser:fixpass@<droplet-ip>:..." \
   make test-integration
   ```
 - [ ] Verify all behave scenarios pass

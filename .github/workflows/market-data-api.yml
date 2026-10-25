@@ -71,6 +71,10 @@ jobs:
           python -m isort --check-only .
           python -m mypy src/
 
+      - name: Run BDD tests
+        working-directory: fixflux/services/market-data-api
+        run: python -m behave tests/bdd/features/
+
       - name: Build Docker image
         run: |
           docker build \
