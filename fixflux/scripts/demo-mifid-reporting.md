@@ -96,6 +96,12 @@ SELECT trade_id, symbol, price, price_currency, quantity,
    AND reporting_timestamp > now() - interval '10 minutes';"
 ```
 
+**Grafana dashboard:** open **FIXFlux - MiFID II Post-Trade Reporting** in Grafana (port 3000).
+After the injection it shows one each of reportable / not reportable / incomplete, zero deadline
+breaches, and the latency curve well under the 60s line. It's built from Prometheus metrics only,
+so it shows counts and latency, never individual reports or LEIs. Set the time range to cover your
+injection, e.g. "Last 15 minutes".
+
 **Metrics** (port 8012 isn't published to the host, so read it from inside the container):
 
 ```bash
