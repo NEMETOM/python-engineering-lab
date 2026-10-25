@@ -115,3 +115,20 @@ class TestRun:
         handler.assert_called_once()
         assert handler.call_args.args[0] == msg.value
         assert handler.call_args.args[2] is repo_cls.return_value
+
+    def test_every_outcome_series_exists_at_zero_before_the_first_report(self):
+        # increase() can't see a series that first appears already at 1, so the
+        # Grafana dashboard would miss the first report of each outcome.
+        from prometheus_client import REGISTRY
+
+        with (
+            patch.object(consumer, "start_http_server"),
+            patch.object(consumer, "create_consumer", return_value=[]),
+            patch.object(consumer, "ReportRepository"),
+        ):
+            consumer.run()
+        for outcome in consumer.OUTCOMES:
+            value = REGISTRY.get_sample_value(
+                "regulatory_reports_total", {"status": outcome}
+            )
+            assert value is not None, f"{outcome} series not exported"

@@ -80,7 +80,15 @@ def handle(
         )
 
 
+OUTCOMES = ("REPORTABLE", "NOT_REPORTABLE", "INCOMPLETE", "DUPLICATE")
+
+
 def run() -> None:
+    # Export every outcome at 0 from startup. A labelled series that first
+    # appears already at 1 is invisible to increase(), so the dashboard would
+    # miss the first report of each outcome after every restart.
+    for outcome in OUTCOMES:
+        regulatory_reports.labels(status=outcome)
     start_http_server(config.METRICS_PORT)
     logger.info(f"metrics server started on :{config.METRICS_PORT}")
     Base.metadata.create_all(bind=engine)
