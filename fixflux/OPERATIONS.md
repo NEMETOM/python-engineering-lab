@@ -74,6 +74,7 @@ alias rpk='docker compose exec -T redpanda rpk'
 | `matching-engine`      | `risk_approved_orders`        | matching-engine       |
 | `market-data-service`  | `order_book_updates`, `trades`| market-data-service   |
 | `trade-store`          | `trades`                      | trade-store-consumer  |
+| `reporting-service`    | `trades`                      | reporting-service     |
 
 All consumers use `auto_offset_reset="earliest"` and `enable_auto_commit=True`
 (`shared/infrastructure/kafka_client.py`). Consequence: offsets are committed on a timer, not after
@@ -396,8 +397,9 @@ Procedure:
 dc stop fix-gateway compliance-api
 
 # 2. Fence off consumers of the engine's output topics
-dc stop trade-store-consumer market-data-service
+dc stop trade-store-consumer market-data-service reporting-service
 rpk group describe trade-store         > /root/replay-trade-store-before.txt
+rpk group describe reporting-service   > /root/replay-reporting-before.txt
 rpk group describe market-data-service > /root/replay-mds-before.txt
 
 # 3. Replay
@@ -409,9 +411,10 @@ watch -n 5 'docker compose exec -T redpanda rpk group describe matching-engine' 
 # 4. Skip the replayed duplicates on downstream groups
 rpk group seek trade-store         --to end --topics trades
 rpk group seek market-data-service --to end
+rpk group seek reporting-service   --to end --topics trades   # else every replayed trade is reported again under a new trade_id
 
 # 5. Resume
-dc start trade-store-consumer market-data-service fix-gateway compliance-api
+dc start trade-store-consumer market-data-service reporting-service fix-gateway compliance-api
 ```
 
 Known residual effects of Option B (record them, do not try to undo them live):
@@ -439,12 +442,13 @@ follow up with a `git revert` PR on `main`.
 the files captured in step 2, and fall back to Option A.
 
 ```bash
-dc stop matching-engine trade-store-consumer market-data-service
+dc stop matching-engine trade-store-consumer market-data-service reporting-service
 # Rebuild /root/restore-*.txt as "<topic> <partition> <offset>" lines from the captured describe output
 rpk group seek trade-store         --to-file /root/restore-trade-store.txt
 rpk group seek market-data-service --to-file /root/restore-mds.txt
+rpk group seek reporting-service   --to-file /root/restore-reporting.txt
 rpk group seek matching-engine     --to end      # Option A: empty book, no further replay
-dc start matching-engine trade-store-consumer market-data-service fix-gateway compliance-api
+dc start matching-engine trade-store-consumer market-data-service reporting-service fix-gateway compliance-api
 ```
 
 ### 3.6 Exit criteria
@@ -461,21 +465,37 @@ dc start matching-engine trade-store-consumer market-data-service fix-gateway co
 > This section exists so that an on-call engineer or agent following a `runbook_url` here gets a
 > clear answer instead of a fabricated procedure.
 
-### 4.1 What does not exist
+### 4.1 What exists and what does not
 
-Verified by searching the repo (`services/`, `shared/`, `infrastructure/`):
+| Requested component                       | Present?                                                    |
+|-------------------------------------------|-------------------------------------------------------------|
+| Post-trade reporting service              | Yes: `reporting-service` (consumes `trades`, writes `regulatory_reports`) |
+| Reporting latency metric                  | Yes, under a different name: `regulatory_report_latency_seconds` (histogram, 60s bucket) |
+| Primary / secondary APA gateway (mock or real) | No. Reports are stored, never published                 |
+| Routing variable for APA endpoint selection | No                                                        |
+| Alert rule `MiFIDRealTimeReportingBreach` | No                                                          |
 
-| Requested component                       | Present? |
-|-------------------------------------------|----------|
-| `mifid-reporting-service`                 | No       |
-| `pipeline_reporting_latency_ms` metric    | No       |
-| Primary / secondary APA gateway (mock or real) | No  |
-| Routing variable for APA endpoint selection | No     |
-| Alert rule `MiFIDRealTimeReportingBreach` | No       |
+Reporting latency here means trade execution to report creation in `regulatory_reports`, not to
+APA acknowledgement. Late rows are flagged with `deadline_breached = true` (more than 60s, RTS 1
+Art. 14(1)(a)) and are still stored.
 
-FixFlux's MiFID II scope today is **pre-trade risk checks** in `risk-service` (notional, fat-finger,
-position, open-order limits) and **passive surveillance** in `compliance-consumer`. There is no
-post-trade transparency reporting path.
+Read-only checks while this alert doesn't exist:
+
+```bash
+# Breach count and rate of late reports
+curl -s 'localhost:9090/api/v1/query' --data-urlencode \
+  'query=sum(rate(regulatory_report_latency_seconds_count[5m])) - sum(rate(regulatory_report_latency_seconds_bucket{le="60.0"}[5m]))' \
+  | python3 -m json.tool
+
+docker compose exec -T postgres psql -U fixuser -d fixdb -c \
+  "SELECT status, deadline_breached, count(*) FROM regulatory_reports GROUP BY 1, 2 ORDER BY 1, 2;"
+
+dc logs --since 30m reporting-service | grep 'regulatory_report |' | tail
+```
+
+A breach is almost always upstream lag: reporting-service only sees a trade after matching-engine
+produces it. Check `consumergroup="reporting-service"` lag (section 2) first. A Postgres outage
+makes the service retry with backoff, which also shows up as lag, not as lost reports.
 
 ### 4.2 If this alert fires anyway
 
@@ -505,8 +525,10 @@ If it is elevated, the cause is almost always matching-engine lag: go to section
 
 ### 4.4 Prerequisites before this runbook can be written
 
-1. A reporting service consuming `trades` and publishing to an APA endpoint.
-2. A latency histogram measured from trade execution timestamp to APA acknowledgement.
+1. ~~A reporting service consuming `trades`~~ (done: `reporting-service`); publishing to an APA
+   endpoint is still missing.
+2. A latency histogram measured from trade execution to APA acknowledgement. Today's
+   `regulatory_report_latency_seconds` stops at report creation.
 3. A configurable primary/fallback endpoint with a defined, tested switchover mechanism
    (env var + container recreate is the pattern this repo would support; there is no in-memory
    config reload mechanism in any service today).

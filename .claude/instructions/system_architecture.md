@@ -55,8 +55,15 @@ FIX file (filedrop)
               └─► market-data-api   consumes on a background thread, broadcasts to WebSocket
                     clients at /ws/market-data (see coding_standards.md for the async exception this is)
         trades
-              └─► trade-store-consumer  └─► Postgres (trades table)
+              ├─► trade-store-consumer  └─► Postgres (trades table)
+              └─► reporting-service     MiFID II post-trade reporting: enriches each trade from
+                    services/reporting-service/reference/reference_data.yaml (synthetic LEIs,
+                    CFI codes, scope) └─► Postgres (regulatory_reports, unique on trade_id)
 ```
+
+The `trades` payload carries `buy_client_id`, `sell_client_id` and an execution `timestamp` (added
+for reporting-service). Every `trades` consumer parses it with a Pydantic model that ignores extra
+fields, so adding fields is safe; removing or renaming one is not.
 
 **`raw_orders`, `risk_approved_orders`, and `trades` are single-partition, single-replica** —
 confirmed directly via `rpk topic describe`. The other topics are created the same way (no

@@ -1,0 +1,140 @@
+# Reference data for reporting-service: who the counterparties are (LEI, trading
+# capacity) and what each instrument is (CFI code, MiFID II scope).
+#
+# EVERY LEI BELOW IS SYNTHETIC. Generated deterministically from the client ID
+# with a "SIMX00" prefix and valid ISO 7064 MOD 97-10 check digits, so they pass
+# format validation but identify no real entity. Never replace them with real
+# LEIs scraped from GLEIF for demo purposes.
+#
+# Clients not listed here (e.g. the VOL_B####/VOL_S#### volume-test clients)
+# produce INCOMPLETE reports by design - missing reference data is surfaced,
+# never defaulted.
+
+participants:
+  # trading_capacity per RTS 22 field 29: DEAL | MTCH | AOTC. Every simulator
+  # participant trades for its own account, hence DEAL throughout.
+  CLIENT1:
+    lei: SIMX0008HLSWOUHYQM20
+    trading_capacity: DEAL
+  CLIENT2:
+    lei: SIMX00K2V8VZF5XX2Y96
+    trading_capacity: DEAL
+  CLIENT3:
+    lei: SIMX00YHNX1R43K1AR41
+    trading_capacity: DEAL
+  CLIENT4:
+    lei: SIMX00PQHSDMTEN3BQ23
+    trading_capacity: DEAL
+  CLIENT5:
+    lei: SIMX00NXF5ME88YP7619
+    trading_capacity: DEAL
+  CLIENT6:
+    lei: SIMX00N1OXTY6660I854
+    trading_capacity: DEAL
+  CLIENT7:
+    lei: SIMX00RVOT7O5K1MRO44
+    trading_capacity: DEAL
+  CLIENT_A:
+    lei: SIMX007JK8PZLSCGZ198
+    trading_capacity: DEAL
+  CLIENT_B:
+    lei: SIMX00NSI2SHXBGBEQ52
+    trading_capacity: DEAL
+  CLIENT_BUY:
+    lei: SIMX00FPRD82RHVSS948
+    trading_capacity: DEAL
+  CLIENT_C:
+    lei: SIMX00CB5EE797YTSZ17
+    trading_capacity: DEAL
+  CLIENT_D:
+    lei: SIMX00DM1UQZ4ZU8AE98
+    trading_capacity: DEAL
+  CLIENT_SELL_A:
+    lei: SIMX0021UPVEV97PTG39
+    trading_capacity: DEAL
+  CLIENT_SELL_B:
+    lei: SIMX00R16ZC173CW3928
+    trading_capacity: DEAL
+  DEMO_AUDIT:
+    lei: SIMX00AAWAQQTC85Q833
+    trading_capacity: DEAL
+  DEMO_BUYER1:
+    lei: SIMX00NJHVVLJWTTIT90
+    trading_capacity: DEAL
+  DEMO_BUYER2:
+    lei: SIMX00GND4DW7US21K73
+    trading_capacity: DEAL
+  DEMO_PRICE:
+    lei: SIMX00CB4KFFCOH73P59
+    trading_capacity: DEAL
+  DEMO_RAPIDFIRE:
+    lei: SIMX00SNB7JX1MIQW077
+    trading_capacity: DEAL
+  DEMO_REPEATED:
+    lei: SIMX00ZMM8JEUYN38J93
+    trading_capacity: DEAL
+  DEMO_RISK:
+    lei: SIMX00WWBV0NJYH82353
+    trading_capacity: DEAL
+  DEMO_SELLER1:
+    lei: SIMX00GC5J8027LHE208
+    trading_capacity: DEAL
+  DEMO_SELLER2:
+    lei: SIMX00XULNTRUQXMOU07
+    trading_capacity: DEAL
+  DEMO_SPIKE:
+    lei: SIMX00ZDZPTNLQDIA936
+    trading_capacity: DEAL
+  LONGTRADER:
+    lei: SIMX00J7TL1MHOS0IX52
+    trading_capacity: DEAL
+  NETTRADER:
+    lei: SIMX00G63AJTELMHTN93
+    trading_capacity: DEAL
+  SHORTTRADER:
+    lei: SIMX003QB8RB9VQMZ461
+    trading_capacity: DEAL
+  TRADER1:
+    lei: SIMX006SM1B8R5WSW677
+    trading_capacity: DEAL
+  TRADER2:
+    lei: SIMX00AKVCE45EJEWK95
+    trading_capacity: DEAL
+  TRADER3:
+    lei: SIMX007VGGXLFG87UW76
+    trading_capacity: DEAL
+
+instruments:
+  # mifid_in_scope and the CFI codes are simulator assumptions for illustration,
+  # not a legal classification of these instruments. CFI codes are 6 characters
+  # per ISO 10962 (RTS 22 Annex I Table 1); only in-scope instruments need one.
+  AAPL:
+    asset_class: EQUITY
+    cfi_code: ESVUFR
+    currency: USD
+    mifid_in_scope: true
+  MSFT:
+    asset_class: EQUITY
+    cfi_code: ESVUFR
+    currency: USD
+    mifid_in_scope: true
+  EURUSD:
+    asset_class: FX_SPOT
+    currency: USD
+    mifid_in_scope: false
+    out_of_scope_reason: FX spot is treated as outside MiFID II transparency in this simulator
+  GBPUSD:
+    asset_class: FX_SPOT
+    currency: USD
+    mifid_in_scope: false
+    out_of_scope_reason: FX spot is treated as outside MiFID II transparency in this simulator
+  BTCUSD:
+    asset_class: CRYPTO
+    currency: USD
+    mifid_in_scope: false
+    out_of_scope_reason: crypto-assets are treated as outside MiFID II transparency in this simulator
+  ETHUSD:
+    asset_class: CRYPTO
+    currency: USD
+    mifid_in_scope: false
+    out_of_scope_reason: crypto-assets are treated as outside MiFID II transparency in this simulator

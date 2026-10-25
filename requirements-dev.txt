@@ -1,5 +1,5 @@
 mypy
-ruff
+ruff==0.17.2
 black
 isort
 pytest
