@@ -226,6 +226,26 @@ services:
     restart: on-failure
     profiles: [pipeline, full]
 
+  reporting-service:
+    build:
+      context: .
+      dockerfile: services/reporting-service/Dockerfile
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER: redpanda:9092
+      DATABASE_URL: postgresql+psycopg2://fixuser:fixpass@postgres:5432/fixdb
+      LOG_LEVEL: INFO
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
+    # /metrics on 8012 is scraped over the compose network; not published to
+    # the host since nothing outside the stack needs it.
+    logging: *default-logging
+    restart: on-failure
+    profiles: [pipeline, full]
+
   compliance-api:
     build:
       context: .

@@ -95,3 +95,17 @@ api_request_latency = Histogram(
     # threshold, not a histogram_quantile() interpolation across a bucket gap.
     buckets=[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.2, 0.25, 0.5, 1.0],
 )
+
+# Reporting Service
+regulatory_reports = Counter(
+    "regulatory_reports_total",
+    "Post-trade regulatory reports by outcome",
+    ["status"],  # REPORTABLE, NOT_REPORTABLE, INCOMPLETE, DUPLICATE
+)
+regulatory_report_latency_seconds = Histogram(
+    "regulatory_report_latency_seconds",
+    "Trade execution to regulatory report creation",
+    # 60 is a real bucket boundary on purpose: RTS 1 Art. 14(1)(a) requires
+    # publication within one minute, so breaches must be countable exactly.
+    buckets=[0.01, 0.05, 0.1, 0.5, 1, 5, 10, 30, 60, 120],
+)

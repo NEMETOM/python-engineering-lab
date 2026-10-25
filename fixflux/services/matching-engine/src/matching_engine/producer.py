@@ -43,6 +43,12 @@ class Producer:
             "sell_order_id": trade.sell_order_id,
             "price": trade.price,
             "quantity": trade.quantity,
+            # Counterparties + execution time for reporting-service (LEI lookup,
+            # post-trade publication latency). Additive: every other trades
+            # consumer parses with a Pydantic model that ignores extra fields.
+            "buy_client_id": trade.buy_client_id,
+            "sell_client_id": trade.sell_client_id,
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         inject_ctx(data)
         self.producer.send("trades", data)

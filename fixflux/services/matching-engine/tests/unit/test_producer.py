@@ -1,3 +1,4 @@
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -53,6 +54,17 @@ class TestSendTrade:
         assert payload["sell_order_id"] == "S1"
         assert payload["price"] == 100.0
         assert payload["quantity"] == 10
+
+    def test_send_trade_includes_counterparties_and_execution_time(
+        self, producer, mock_kafka_producer
+    ):
+        # reporting-service needs both client IDs for the LEI lookup and the
+        # execution time for the RTS 1 one-minute publication check.
+        producer.send_trade(_make_trade(buy_client_id="BUYER", sell_client_id="SELLER"))
+        payload = mock_kafka_producer.send.call_args[0][1]
+        assert payload["buy_client_id"] == "BUYER"
+        assert payload["sell_client_id"] == "SELLER"
+        assert datetime.fromisoformat(payload["timestamp"]).tzinfo is not None
 
     def test_send_trade_called_once(self, producer, mock_kafka_producer):
         producer.send_trade(_make_trade())

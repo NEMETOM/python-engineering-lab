@@ -41,6 +41,10 @@ scrape_configs:
     static_configs:
       - targets: ["compliance-consumer:8011"]
 
+  - job_name: reporting-service
+    static_configs:
+      - targets: ["reporting-service:8012"]
+
   - job_name: kafka-exporter
     static_configs:
       - targets: ["kafka-exporter:9308"]
