@@ -21,6 +21,10 @@ CLIENT_ALIAS_PATTERN = os.getenv("REPORTING_CLIENT_ALIAS_PATTERN", r"^RPL-[^-]+-
 # a silently dropped regulatory report is not.
 DB_RETRY_MAX_BACKOFF_SECONDS = float(os.getenv("REPORTING_DB_RETRY_MAX_BACKOFF", "30"))
 
+# Password for the read-only Grafana role (see public_view.py). Unset means the
+# role is never created - there is deliberately no default credential.
+GRAFANA_READER_PASSWORD = os.getenv("GRAFANA_DB_READER_PASSWORD") or None
+
 # Priority order (same scheme as compliance-service's policy file):
 # 1. Explicit path argument (tests / programmatic callers)
 # 2. REPORTING_REFERENCE_DATA_PATH env var

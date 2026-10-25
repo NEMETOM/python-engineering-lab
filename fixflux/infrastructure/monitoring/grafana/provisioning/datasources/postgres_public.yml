@@ -1,0 +1,26 @@
+apiVersion: 1
+
+# Read-only access to regulatory_reports_public: RTS 1 post-trade fields only,
+# no LEIs or client IDs. grafana_reader can SELECT that view and nothing else
+# (created by reporting-service, see services/reporting-service/src/
+# reporting_service/public_view.py). Grafana's Explore lets any Editor run
+# arbitrary SQL through a datasource, so the role is the real access control -
+# never point this at fixuser.
+#
+# The password comes from GRAFANA_DB_READER_PASSWORD (fixflux/.env on the host).
+# If it is unset, this datasource fails to authenticate; nothing else breaks.
+datasources:
+  - name: Postgres (public reports)
+    type: postgres
+    uid: postgres-public
+    url: postgres:5432
+    user: grafana_reader
+    access: proxy
+    editable: false
+    secureJsonData:
+      password: ${GRAFANA_DB_READER_PASSWORD}
+    jsonData:
+      database: fixdb
+      sslmode: disable
+      maxOpenConns: 2
+      maxIdleConns: 2

@@ -240,6 +240,9 @@ services:
       DATABASE_URL: postgresql+psycopg2://fixuser:fixpass@postgres:5432/fixdb
       LOG_LEVEL: INFO
       OTEL_EXPORTER_OTLP_ENDPOINT: http://tempo:4318
+      # Creates/rotates the read-only grafana_reader role (SELECT on
+      # regulatory_reports_public only). Unset = no role. See fixflux/.env.
+      GRAFANA_DB_READER_PASSWORD: ${GRAFANA_DB_READER_PASSWORD:-}
     # /metrics on 8012 is scraped over the compose network; not published to
     # the host since nothing outside the stack needs it.
     logging: *default-logging
@@ -367,6 +370,9 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/fix_simulator_overview.json
+      # Read by provisioning/datasources/postgres_public.yml. Set it in
+      # fixflux/.env on the host (gitignored), never in this file.
+      GRAFANA_DB_READER_PASSWORD: ${GRAFANA_DB_READER_PASSWORD:-}
     volumes:
       - ./infrastructure/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./infrastructure/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro

@@ -7,6 +7,7 @@ from sqlalchemy.exc import OperationalError
 from reporting_service import config
 from reporting_service.enricher import ReportEnricher
 from reporting_service.infrastructure.kafka_client import create_consumer
+from reporting_service.public_view import READER_ROLE, VIEW_NAME, ensure_public_view
 from reporting_service.repository import ReportRepository
 from reporting_service.schemas import RegulatoryTradeReport, TradeEvent
 from reporting_service.utils.logger import configure_logging, get_logger
@@ -92,6 +93,13 @@ def run() -> None:
     start_http_server(config.METRICS_PORT)
     logger.info(f"metrics server started on :{config.METRICS_PORT}")
     Base.metadata.create_all(bind=engine)
+    if ensure_public_view(engine, config.GRAFANA_READER_PASSWORD):
+        logger.info(f"{READER_ROLE} role ready, SELECT on {VIEW_NAME} only")
+    else:
+        logger.warning(
+            f"GRAFANA_DB_READER_PASSWORD not set: {VIEW_NAME} created, "
+            f"{READER_ROLE} role not created or updated"
+        )
     enricher = ReportEnricher(config.load_reference_data())
     repo = ReportRepository()
     consumer = create_consumer(config.INPUT_TOPIC, config.GROUP_ID)

@@ -685,6 +685,129 @@
       ],
       "description": "A deadline breach is almost always upstream lag; see OPERATIONS.md section 2.",
       "id": 14
+    },
+    {
+      "type": "row",
+      "title": "Latest reports (public RTS 1 fields only, no counterparty data)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 36
+      },
+      "id": 15
+    },
+    {
+      "type": "table",
+      "title": "Regulatory reports in selected time range (latest 200)",
+      "description": "From the regulatory_reports_public view via the read-only grafana_reader role. LEIs, client IDs and trading capacity are never exposed here; INCOMPLETE reasons are redacted because they name the client.",
+      "datasource": {
+        "type": "postgres",
+        "uid": "postgres-public"
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 37
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Status"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "REPORTABLE": {
+                        "color": "green",
+                        "index": 0
+                      },
+                      "NOT_REPORTABLE": {
+                        "color": "blue",
+                        "index": 1
+                      },
+                      "INCOMPLETE": {
+                        "color": "orange",
+                        "index": 2
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "> 60s"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "true": {
+                        "text": "BREACH",
+                        "color": "red",
+                        "index": 0
+                      },
+                      "false": {
+                        "text": "ok",
+                        "color": "green",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "postgres-public"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT reporting_timestamp AS \"Reported\", trading_timestamp AS \"Traded\", trade_id AS \"Trade ID\", symbol AS \"Symbol\", asset_class AS \"Asset class\", price AS \"Price\", price_currency AS \"Ccy\", quantity AS \"Qty\", status AS \"Status\", reason AS \"Reason\", publication_latency_ms AS \"Latency (ms)\", deadline_breached AS \"> 60s\" FROM regulatory_reports_public WHERE $__timeFilter(reporting_timestamp) ORDER BY reporting_timestamp DESC LIMIT 200",
+          "refId": "A"
+        }
+      ],
+      "id": 16
     }
   ]
 }

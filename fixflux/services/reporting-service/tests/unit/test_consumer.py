@@ -108,6 +108,7 @@ class TestRun:
             patch.object(consumer, "create_consumer", return_value=[msg]) as create,
             patch.object(consumer, "ReportRepository") as repo_cls,
             patch.object(consumer, "handle") as handler,
+            patch.object(consumer, "ensure_public_view", return_value=True),
         ):
             consumer.run()
         metrics.assert_called_once_with(8012)
@@ -125,6 +126,7 @@ class TestRun:
             patch.object(consumer, "start_http_server"),
             patch.object(consumer, "create_consumer", return_value=[]),
             patch.object(consumer, "ReportRepository"),
+            patch.object(consumer, "ensure_public_view", return_value=False),
         ):
             consumer.run()
         for outcome in consumer.OUTCOMES:
@@ -132,3 +134,14 @@ class TestRun:
                 "regulatory_reports_total", {"status": outcome}
             )
             assert value is not None, f"{outcome} series not exported"
+
+    def test_public_view_is_ensured_with_the_configured_reader_password(self):
+        with (
+            patch.object(consumer, "start_http_server"),
+            patch.object(consumer, "create_consumer", return_value=[]),
+            patch.object(consumer, "ReportRepository"),
+            patch.object(consumer.config, "GRAFANA_READER_PASSWORD", "pw"),
+            patch.object(consumer, "ensure_public_view", return_value=True) as ensure,
+        ):
+            consumer.run()
+        assert ensure.call_args.args[1] == "pw"
