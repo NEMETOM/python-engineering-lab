@@ -41,7 +41,11 @@ services:
       POSTGRES_PASSWORD: fixpass
       POSTGRES_DB: fixdb
     ports:
-      - "5433:5432"
+      # Loopback only: fixuser/fixpass are committed in this repo, so the DB must
+      # never be reachable from the internet. Host scripts, CI and SSH tunnels
+      # (ssh -L 5433:localhost:5433) all connect via localhost; services use
+      # postgres:5432 on the compose network.
+      - "127.0.0.1:5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -367,8 +371,17 @@ services:
       - loki
     environment:
       GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      # Seeds the admin password on a FRESH grafana_data volume only. An
+      # existing install keeps its stored password: rotate it with
+      #   docker compose exec grafana grafana cli admin reset-admin-password '<pw>'
+      # Set GRAFANA_ADMIN_PASSWORD in fixflux/.env (gitignored); the "admin"
+      # fallback is for local dev only.
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_USERS_ALLOW_SIGN_UP: "false"
+      # Defaults, pinned explicitly: no anonymous access, and viewers can't
+      # use Explore - only Editors/Admins can query a datasource ad hoc.
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_VIEWERS_CAN_EDIT: "false"
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/fix_simulator_overview.json
       # Read by provisioning/datasources/postgres_public.yml. Set it in
       # fixflux/.env on the host (gitignored), never in this file.

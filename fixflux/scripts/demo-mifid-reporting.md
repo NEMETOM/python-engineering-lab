@@ -110,6 +110,7 @@ The table needs a one-time setup on the host, since its database password is a s
 cd ~/python-engineering-lab/fixflux
 # Choose a strong password; .env is gitignored and stays on the droplet
 echo "GRAFANA_DB_READER_PASSWORD=$(openssl rand -hex 24)" >> .env
+echo "GRAFANA_ADMIN_PASSWORD=$(openssl rand -hex 16)" >> .env   # used on a fresh Grafana volume
 docker compose --profile full --profile monitoring up -d reporting-service grafana
 docker compose logs reporting-service | grep grafana_reader   # "grafana_reader role ready"
 ```

@@ -55,16 +55,40 @@ class TestEnsurePublicView:
         assert ensure_public_view(engine, "s3cret") is True
         sql = _executed_sql(conn)
         assert sql[0] == VIEW_SQL
-        assert f"CREATE ROLE {READER_ROLE} LOGIN PASSWORD 's3cret'" in sql
+        assert (
+            f"CREATE ROLE {READER_ROLE} LOGIN CONNECTION LIMIT 3 PASSWORD 's3cret'"
+            in sql
+        )
         assert sql[-1] == f"GRANT SELECT ON {VIEW_NAME} TO {READER_ROLE}"
         assert not [s for s in sql if "regulatory_reports " in s and "GRANT" in s]
 
     def test_existing_role_gets_its_password_rotated(self):
         engine, conn = _make_engine(role_exists=True)
         ensure_public_view(engine, "rotated")
-        assert f"ALTER ROLE {READER_ROLE} LOGIN PASSWORD 'rotated'" in _executed_sql(
-            conn
+        assert (
+            f"ALTER ROLE {READER_ROLE} LOGIN CONNECTION LIMIT 3 PASSWORD 'rotated'"
+            in _executed_sql(conn)
         )
+
+    @pytest.mark.parametrize("role_exists", [False, True])
+    @pytest.mark.parametrize(
+        "setting",
+        [
+            "default_transaction_read_only = on",  # no writes, even if over-granted
+            "statement_timeout = '5s'",  # no CPU-starving Explore queries
+            "idle_in_transaction_session_timeout = '30s'",  # no held locks
+        ],
+    )
+    def test_stolen_password_is_limited_by_role_settings(self, role_exists, setting):
+        # Applied on every start, so an existing role is hardened too.
+        engine, conn = _make_engine(role_exists=role_exists)
+        ensure_public_view(engine, "pw")
+        assert f"ALTER ROLE {READER_ROLE} SET {setting}" in _executed_sql(conn)
+
+    def test_settings_are_not_applied_without_a_password(self):
+        engine, conn = _make_engine()
+        ensure_public_view(engine, None)
+        assert not [s for s in _executed_sql(conn) if " SET " in s]
 
     def test_quote_in_password_cannot_break_out_of_the_literal(self):
         engine, conn = _make_engine()
