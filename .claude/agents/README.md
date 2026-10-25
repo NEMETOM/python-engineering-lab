@@ -197,3 +197,91 @@ is lost and nothing is duplicated.
 - If the MiFID demo has been run 5 or more times since risk-service last started, restart it
   (see SDET 4).
 - Keep SRE 8 last. Stopping a consumer is the only step that degrades the live stack, even briefly.
+
+---
+
+## Demo playbook: `/legal-counsel-agent`
+
+This persona's value is in what it *refuses* to overstate, so the best segments are ones where it
+separates (a) what it read in the code, (b) the real regulatory concept it maps to, and
+(c) controls that don't exist yet. Several prompts are built around real gaps it should find.
+
+The same labels as above apply. Additionally, **never run a tamper experiment against the
+droplet's database.** Altering or deleting `compliance_audit_trail` rows destroys the very evidence
+the demo is about. Those prompts say "local stack" explicitly.
+
+**1. What does the audit trail actually prove?** (read-only, ~2 min, a good opener)
+```
+/legal-counsel-agent a regulator asks whether FixFlux's compliance audit trail is tamper-proof. Read the AuditLogger and the compliance_audit_trail model and answer: what exactly does the SHA-256 checksum prove, what does it not prove, and how would you word it in a filing without overstating it?
+```
+Expected: "per-record tamper-evidence, not chain-of-custody". There's no hash chain, so a deleted
+row is undetectable.
+
+**2. Prove it: build a verifier, then tamper** (local edits + local DB only, ~6 min, the strongest segment)
+```
+/legal-counsel-agent no hash verifier exists in this codebase. Write a small script that recomputes the SHA-256 of every compliance_audit_trail row using the same canonicalization as AuditLogger and reports mismatches. Then, on my LOCAL docker stack only, show three cases: an untouched table verifies clean, a row with an edited payload is flagged, and a deleted row is NOT detected. Ask before modifying any row.
+```
+Shows: the guarantee and its limit demonstrated live, not just asserted.
+
+**3. Close the gap: design a hash chain** (local edits, ~4 min)
+```
+/legal-counsel-agent propose the smallest change that turns per-record tamper-evidence into a hash chain for compliance_audit_trail: the prev_checksum design, how existing rows are migrated, and what the chain still would NOT prove (e.g. truncation of the newest rows, a rewritten chain). Write it as a design note, don't implement it.
+```
+
+**4. Who can switch surveillance off?** (read-only, ~3 min, a finding that lands well)
+```
+/legal-counsel-agent the compliance admin panel can toggle rules like WashTradingRule live. If an operator disabled it for an hour and re-enabled it, what evidence would remain - in compliance_rule_overrides, the audit trail and the logs? What would a regulator expect to see instead?
+```
+Expected: one row per rule, overwritten in place (`rule_id` primary key, `updated_at` overwritten),
+no "who", no history, and not written to the audit trail. Only a log line records the toggle.
+
+**5. Map a rule to its legal basis** (read-only, ~3 min)
+```
+/legal-counsel-agent map WashTradingRule and RapidFireRule to the market abuse concepts they illustrate. Use the real trigger conditions from the rule files and the thresholds in compliance_policies.yaml (300s wash-trading window, 10 orders per 60s), and be explicit about where the mapping is illustrative rather than a compliance claim.
+```
+
+**6. Investigation pack for one client** (read-only on the droplet, ~5 min)
+```
+/legal-counsel-agent a regulator requests everything FixFlux holds about client DEMO_BUYER1 for today. Check what Kafka still retains on the live broker (rpk), then assemble the evidence from the durable Postgres sources instead: orders in the audit trail, violations, trades, regulatory_reports. Say which source each item came from and what can no longer be reconstructed.
+```
+Shows: the persona's "prefer SQL over Kafka replay" rule applied to a concrete request.
+
+**7. Review the MiFID II reporting service** (read-only, ~4 min)
+```
+/legal-counsel-agent review services/reporting-service as a regulator would. Is the separation between the public RTS 1 fields and the restricted RTS 22 fields real in the schema? What are the evidentiary risks: synthetic LEIs, INCOMPLETE reports, the trade_id uniqueness guarantee, and a matching-engine replay that regenerates trade IDs?
+```
+Expected to surface: the `trade_id` constraint can't catch a replay that issues new trade IDs, and
+no APA publication exists.
+
+**8. Test data in the evidence record** (read-only, ~3 min)
+```
+/legal-counsel-agent fix-replay publishes replayed orders to raw_orders with client IDs like RPL-<run>-<client>. Does compliance-consumer write those into compliance_audit_trail and compliance_violations alongside real activity? What does that mean for the integrity of the record, and how should replayed activity be segregated?
+```
+
+**9. Timestamps and clock sync** (read-only, ~3 min)
+```
+/legal-counsel-agent explain MiFID II RTS 25 clock-synchronisation requirements conceptually, then list every place FixFlux stamps time (services calling datetime.now, Postgres defaults, Kafka timestamps) and what would be needed before any of these timestamps could be relied on as evidence. Don't claim the system complies.
+```
+
+**10. Controls inventory memo** (local edits: writes one markdown file, ~4 min, the closer)
+```
+/legal-counsel-agent write a one-page controls inventory memo for a compliance officer: each control FixFlux has (pre-trade risk checks, surveillance rules, audit checksums, regulatory reporting), its evidence source, and its main limitation. Tag every statement as (a) verified in code, (b) regulatory concept, or (c) missing control. Save it as fixflux/docs/controls-inventory.md.
+```
+
+### Suggested running order (~20 min of footage)
+
+| # | Segment | Why here |
+|---|---|---|
+| 1 | Legal 1 (what the checksum proves) | Sets up the core distinction |
+| 2 | Legal 2 (verifier + tamper) | Proves it live: edit caught, deletion missed |
+| 3 | Legal 4 (who can switch surveillance off) | A governance gap people don't expect |
+| 4 | Legal 7 (reporting-service review) | Ties to the MiFID II feature |
+| 5 | Legal 10 (controls memo) | Closes with a deliverable |
+
+**Before recording:**
+- Segment 2 needs the stack running **locally**, with some orders injected so the audit trail
+  has rows.
+- Segment 6 queries the droplet and may show client IDs and order data on screen. Use demo clients
+  only.
+- These answers draw on regulatory concepts. The persona labels them as illustrative, and the video
+  shouldn't present them as legal advice.
