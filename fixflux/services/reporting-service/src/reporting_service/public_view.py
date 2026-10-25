@@ -48,6 +48,18 @@ VIEW_SQL = (
 )
 
 
+# Limits on what a stolen grafana_reader password can do even with a valid
+# login: no writes even if a grant is ever widened by mistake, no query long
+# enough to starve the 2-vCPU droplet, and no connection flood. The datasource
+# itself uses 2 connections (maxOpenConns in postgres_public.yml).
+READER_CONNECTION_LIMIT = 3
+READER_SETTINGS = (
+    ("default_transaction_read_only", "on"),
+    ("statement_timeout", "'5s'"),
+    ("idle_in_transaction_session_timeout", "'30s'"),
+)
+
+
 def _quote_literal(value: str) -> str:
     # CREATE/ALTER ROLE ... PASSWORD can't take a bind parameter.
     return "'" + value.replace("'", "''") + "'"
@@ -72,8 +84,11 @@ def ensure_public_view(engine: Engine, reader_password: str | None) -> bool:
         conn.execute(
             text(
                 f"{verb} ROLE {READER_ROLE} LOGIN "
+                f"CONNECTION LIMIT {READER_CONNECTION_LIMIT} "
                 f"PASSWORD {_quote_literal(reader_password)}"
             )
         )
+        for setting, value in READER_SETTINGS:
+            conn.execute(text(f"ALTER ROLE {READER_ROLE} SET {setting} = {value}"))
         conn.execute(text(f"GRANT SELECT ON {VIEW_NAME} TO {READER_ROLE}"))
     return True

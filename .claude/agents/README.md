@@ -285,3 +285,72 @@ no APA publication exists.
   only.
 - These answers draw on regulatory concepts. The persona labels them as illustrative, and the video
   shouldn't present them as legal advice.
+
+---
+
+## Demo playbook: security audit with `/sre-agent`
+
+A read-only security audit of FixFlux in three passes: the repo, the droplet as an outsider sees
+it, and the droplet from inside. It produces a findings table with evidence and a suggested fix for
+each item. Fixes are a separate, optional segment, so the audit itself never changes anything.
+
+**Ground rules (say them on camera; they're part of the demo):**
+- **Only your own droplet.** Port checks and requests go to your droplet's IP, nowhere else.
+- **Observe, don't exploit.** The agent shows that a port is open or an endpoint answers. It does
+  not publish to Kafka, toggle rules, call Prometheus's `/-/quit`, or log in with found credentials.
+- **Evidence or it didn't happen.** Every finding needs a command output, file and line, or config
+  value, and is labelled *verified* or *inferred*.
+
+### Segment A: the full audit (read-only, ~10 min)
+
+```
+/sre-agent run a read-only security audit of FixFlux. Three passes:
+1. Repo: committed secrets and default credentials, published ports in docker-compose.yml (which are 0.0.0.0 vs 127.0.0.1), containers running as root, unpinned GitHub Actions, unauthenticated HTTP endpoints, dangerous flags like --web.enable-lifecycle.
+2. Outside view: from my laptop, check which of the droplet's ports are actually reachable. Only my droplet's IP, connection checks only.
+3. Inside view: on the droplet, check ufw/firewall state, SSH config (root login, password auth), docker ps port bindings, and the grafana_reader role's limits.
+Don't exploit anything and don't change anything. Output one table: severity, finding, evidence (verified/inferred), impact, suggested fix, effort. Then the top 3 to fix first and why.
+```
+
+### Expected findings (check the agent's output against this list)
+
+Verified in the repo when this playbook was written. Some may already be fixed by the time you
+record, and finding that out is a good result in itself.
+
+| Area | Expected finding | Why it matters | Likely fix |
+|---|---|---|---|
+| Kafka | Redpanda published on `9092` on all interfaces, no auth | Anyone can publish fake orders or trades, which flow into `trades` and `regulatory_reports` | Bind to `127.0.0.1`; host clients already use localhost |
+| HTTP | compliance-api `8010`: FIX injector and rule-toggle admin panel with no authentication | Anyone can inject orders or switch surveillance rules off | Loopback plus SSH tunnel, or basic auth in front |
+| Monitoring | Prometheus `9090` public with `--web.enable-lifecycle` | Anyone can reload or shut down Prometheus | Drop the flag or bind to `127.0.0.1` |
+| Monitoring | Alertmanager `9093`, Loki `3100`, Tempo `3200`/`4318` public | Silence alerts, read logs, push fake traces | Bind to `127.0.0.1`; Grafana reaches them over the compose network |
+| Grafana | Public on `3000`; password strength depends on `.env` | Admin access means Explore across all datasources | Strong password (done via `.env`); optionally firewall to your IP |
+| Secrets | `fixuser`/`fixpass` in `docker-compose.yml`, `k8s/02-secret.yaml` and docs | Anyone reading the repo has DB credentials | Move to `.env`; rotate. Postgres is already loopback-only, which limits the damage |
+| Containers | 0 of 10 FixFlux Dockerfiles set a non-root `USER` | A compromised service runs as root in its container | Add `USER` to each Dockerfile |
+| Host | Deploys SSH in as `root` | A leaked deploy key is full root on the droplet | Dedicated deploy user in the `docker` group |
+| CI | 3 GitHub Action references pinned to mutable tags (`dorny/test-reporter@v1` twice, `peaceiris/actions-gh-pages@v3`); the other 39 are pinned to SHAs | A moved tag can run new code in CI | Pin to commit SHAs like the rest |
+| Already hardened | Postgres on `127.0.0.1:5433`; `grafana_reader` read-only with timeouts and a 3-connection limit; `.env` gitignored | Should be reported as passing checks | (none) |
+
+A good audit also says what it **couldn't** check, e.g. the DigitalOcean cloud firewall, which
+lives in DigitalOcean's control panel rather than on the droplet.
+
+### Segment B: fix the top finding (local edits, ~5 min)
+
+```
+/sre-agent fix the highest-severity finding from the audit in the repo only: make the change, explain what breaks for whom (CI, host scripts, my browser access), run /predeploy-check, and give me the exact post-deploy verification command. Don't push.
+```
+
+The likely pick is binding Redpanda, compliance-api and the monitoring ports to `127.0.0.1`. That
+has a real trade-off worth showing on camera: the FixFlux Console then needs an SSH tunnel.
+
+### Segment C: re-audit to prove the fix (read-only, ~3 min)
+
+After deploying Segment B:
+```
+/sre-agent re-run only the outside-view pass of the security audit and compare with the previous findings table: which findings are now closed, with evidence?
+```
+
+**Before recording:**
+- **Blur the droplet IP**, and any password that might show in `.env` or command output.
+- **Start the audit from your laptop**, not from an SSH session on the droplet. Otherwise the
+  outside-view pass tests the droplet from itself, where every port looks reachable.
+- **Keep Segment B separate.** If the audit and the fix are in one take, it's harder to show that
+  the audit itself changed nothing.
