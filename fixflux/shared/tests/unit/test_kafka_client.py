@@ -6,6 +6,7 @@ from kafka import TopicPartition
 
 from shared.infrastructure.kafka_client import (
     create_consumer,
+    create_exec_report_producer,
     create_producer,
     create_tail_consumer,
 )
@@ -122,3 +123,21 @@ class TestCreateTailConsumer:
             create_tail_consumer("execution_reports")
             _, kwargs = mock_cls.call_args
             assert kwargs["value_deserializer"](b'{"a": 1}') == {"a": 1}
+
+
+class TestCreateExecReportProducer:
+    def test_short_max_block_so_a_missing_topic_cannot_stall_the_consumer(self):
+        # A missing execution_reports topic used to block the calling consumer
+        # loop for kafka-python's 60s default; 1s bounds the damage.
+        with patch("shared.infrastructure.kafka_client.KafkaProducer") as mock_cls:
+            create_exec_report_producer()
+            _, kwargs = mock_cls.call_args
+            assert kwargs["max_block_ms"] == 1_000
+
+    def test_idempotence_disabled_like_every_other_producer(self):
+        # Idle idempotent producers silently dropped their first message after
+        # a long gap (OutOfOrderSequenceNumberError) - see create_producer.
+        with patch("shared.infrastructure.kafka_client.KafkaProducer") as mock_cls:
+            create_exec_report_producer()
+            _, kwargs = mock_cls.call_args
+            assert kwargs["enable_idempotence"] is False
