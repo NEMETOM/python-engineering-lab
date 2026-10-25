@@ -46,3 +46,6 @@ GIT_CHEATSHEET.md
 
 # fix-replay run reports (baselines live in fixflux/clients/fix-replay/baselines/)
 fixflux/replay-results/
+
+# Host-only secrets for docker compose (e.g. GRAFANA_DB_READER_PASSWORD)
+fixflux/.env

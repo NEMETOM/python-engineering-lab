@@ -98,9 +98,24 @@ SELECT trade_id, symbol, price, price_currency, quantity,
 
 **Grafana dashboard:** open **FIXFlux - MiFID II Post-Trade Reporting** in Grafana (port 3000).
 After the injection it shows one each of reportable / not reportable / incomplete, zero deadline
-breaches, and the latency curve well under the 60s line. It's built from Prometheus metrics only,
-so it shows counts and latency, never individual reports or LEIs. Set the time range to cover your
-injection, e.g. "Last 15 minutes".
+breaches, and the latency curve well under the 60s line. The **Latest reports** table at the
+bottom lists each report's public RTS 1 fields: trade, symbol, price, quantity, times, status and
+latency. It never shows LEIs, client IDs or trading capacity, and the reason for `INCOMPLETE`
+reports is redacted, because it names the client. Set the time range to cover your injection,
+e.g. "Last 15 minutes".
+
+The table needs a one-time setup on the host, since its database password is a secret:
+
+```bash
+cd ~/python-engineering-lab/fixflux
+# Choose a strong password; .env is gitignored and stays on the droplet
+echo "GRAFANA_DB_READER_PASSWORD=$(openssl rand -hex 24)" >> .env
+docker compose --profile full --profile monitoring up -d reporting-service grafana
+docker compose logs reporting-service | grep grafana_reader   # "grafana_reader role ready"
+```
+
+If the table shows an authentication error, that step hasn't been done. Everything else on the
+dashboard works without it.
 
 **Metrics** (port 8012 isn't published to the host, so read it from inside the container):
 
