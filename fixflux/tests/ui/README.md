@@ -41,13 +41,25 @@ uploaded as a build artifact.
 ```
 tests/ui/
 ├── behave.ini          paths = features, steps_dir = steps
+├── pyproject.toml      lint config (declares pages/ first-party for ruff AND isort)
 ├── environment.py      server, fakes, browser lifecycle, traces on failure
 ├── features/           one .feature per tab, plus navigation
-└── steps/              one steps module per feature
+├── pages/              page objects: every locator lives here
+│   ├── console.py              ConsolePage base + ConsoleNav (shared tab bar)
+│   ├── injector_page.py        InjectorPage
+│   ├── compliance_rules_page.py ComplianceRulesPage, RuleCard
+│   └── market_data_page.py     MarketDataPage, QuoteRow
+└── steps/              one steps module per feature; intent + assertions only
 ```
 
 ## Conventions
 
+- **Page objects own every locator.** Steps never call `page.locator()` or `get_by_*` directly.
+  They go through `InjectorPage`, `ComplianceRulesPage`, `MarketDataPage` or `ConsolePage.nav`.
+  When a template changes, only the matching page object changes.
+- **Page objects don't assert.** They return Playwright `Locator`s and perform actions
+  (`inject(lines)`, `rule(id).toggle()`, `nav.open_tab(name)`). Assertions stay in the steps,
+  with `expect(...)`, so a scenario's verdicts are readable in one place.
 - **Locators:** roles first (`get_by_role("link", name=...)`, `get_by_role("switch")`), then the
   `data-testid` hooks in the templates (`rule-card`, `rule-badge`, `quote-row`, `cell-*`). The
   active tab carries `aria-current="page"`.

@@ -1,0 +1,18 @@
+# Lint config for the UI tests only (not an installable package).
+# pages/ is this suite's own package: declare it first-party for BOTH tools,
+# or isort and ruff disagree on import grouping (see coding_standards.md).
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint.isort]
+known-first-party = ["pages"]
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+
+[tool.isort]
+profile = "black"
+known_first_party = ["pages"]

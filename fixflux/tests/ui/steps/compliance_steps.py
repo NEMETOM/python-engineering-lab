@@ -1,30 +1,30 @@
 from behave import given, then, when
 from playwright.sync_api import expect
 
+from pages import ComplianceRulesPage
 
-def _rule_card(page, rule_id: str):
-    return page.locator(f'[data-testid="rule-card"][data-rule-id="{rule_id}"]')
+
+def _expect_rule_state(page: ComplianceRulesPage, rule_id: str, badge: str) -> None:
+    rule = page.rule(rule_id)
+    expect(rule.badge).to_have_text(badge)
+    checked = "true" if badge == "Active" else "false"
+    expect(rule.switch).to_have_attribute("aria-checked", checked)
 
 
 @given('the Compliance Rules page is open with "{rule_id}" active')
 def step_rules_open(context, rule_id):
-    context.page.goto("/admin/compliance")
-    card = _rule_card(context.page, rule_id)
-    expect(card.get_by_test_id("rule-badge")).to_have_text("Active")
-    expect(card.get_by_role("switch")).to_have_attribute("aria-checked", "true")
+    context.rules = ComplianceRulesPage(context.page).open()
+    _expect_rule_state(context.rules, rule_id, "Active")
 
 
 @when('I switch "{rule_id}" off')
 def step_switch_off(context, rule_id):
-    _rule_card(context.page, rule_id).get_by_role("switch").click()
+    context.rules.rule(rule_id).toggle()
 
 
 @then('"{rule_id}" shows as "{badge}"')
 def step_rule_badge(context, rule_id, badge):
-    card = _rule_card(context.page, rule_id)
-    expect(card.get_by_test_id("rule-badge")).to_have_text(badge)
-    checked = "true" if badge == "Active" else "false"
-    expect(card.get_by_role("switch")).to_have_attribute("aria-checked", checked)
+    _expect_rule_state(context.rules, rule_id, badge)
 
 
 @then('the override for "{rule_id}" was saved as disabled')
@@ -35,5 +35,5 @@ def step_override_saved(context, rule_id):
 
 @then('after reloading the page "{rule_id}" still shows as "{badge}"')
 def step_after_reload(context, rule_id, badge):
-    context.page.reload()
-    step_rule_badge(context, rule_id, badge)
+    context.rules.reload()
+    _expect_rule_state(context.rules, rule_id, badge)
