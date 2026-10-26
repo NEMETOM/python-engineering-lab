@@ -14,14 +14,17 @@
     <nav class="px-6 mt-2 flex gap-1">
       <a
         href="/"
+        {% if active_tab == 'injector' %}aria-current="page"{% endif %}
         class="px-4 py-2 text-sm border-b-2 {{ 'border-emerald-500 text-emerald-400' if active_tab == 'injector' else 'border-transparent text-slate-400 hover:text-slate-200' }}"
       >Fix Msg Injector</a>
       <a
         href="/admin/compliance"
+        {% if active_tab == 'compliance' %}aria-current="page"{% endif %}
         class="px-4 py-2 text-sm border-b-2 {{ 'border-emerald-500 text-emerald-400' if active_tab == 'compliance' else 'border-transparent text-slate-400 hover:text-slate-200' }}"
       >Compliance Rules</a>
       <a
         href="/market-data"
+        {% if active_tab == 'market_data' %}aria-current="page"{% endif %}
         class="px-4 py-2 text-sm border-b-2 {{ 'border-emerald-500 text-emerald-400' if active_tab == 'market_data' else 'border-transparent text-slate-400 hover:text-slate-200' }}"
       >Market Data</a>
     </nav>

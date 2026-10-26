@@ -93,11 +93,14 @@
       if (rows.has(symbol)) return rows.get(symbol);
       const tr = document.createElement("tr");
       tr.className = "border-b border-slate-900";
+      tr.dataset.testid = "quote-row";
+      tr.dataset.symbol = symbol;
       const names = ["symbol", "bid", "ask", "mid", "spread", "last", "updated"];
       const cells = {};
       names.forEach((name, i) => {
         const td = document.createElement("td");
         td.className = i === 0 ? "py-2 pr-4 font-sans font-medium" : "py-2 pr-4 text-right";
+        td.dataset.testid = `cell-${name}`;
         tr.appendChild(td);
         cells[name] = td;
       });

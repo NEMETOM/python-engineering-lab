@@ -34,13 +34,13 @@
 
     function cardHtml(rule) {
       const badge = rule.enabled
-        ? '<span class="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-400">Active</span>'
-        : '<span class="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700 text-slate-400">Disabled</span>';
+        ? '<span data-testid="rule-badge" class="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-400">Active</span>'
+        : '<span data-testid="rule-badge" class="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700 text-slate-400">Disabled</span>';
       const overrideNote = rule.overridden
         ? '<span class="text-xs text-amber-400">manually overridden</span>'
         : '<span class="text-xs text-slate-600">using policy default</span>';
       return `
-        <div class="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-900 px-4 py-3">
+        <div data-testid="rule-card" data-rule-id="${escapeHtml(rule.rule_id)}" class="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-900 px-4 py-3">
           <div>
             <div class="font-medium flex items-center gap-1.5">
               ${escapeHtml(rule.label)}
