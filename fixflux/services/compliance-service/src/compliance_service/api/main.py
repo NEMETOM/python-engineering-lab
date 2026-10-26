@@ -10,6 +10,7 @@ from compliance_service.api.routes.admin import router as admin_router
 from compliance_service.api.routes.audit import router as audit_router
 from compliance_service.api.routes.health import router as health_router
 from compliance_service.api.routes.injector import router as injector_router
+from compliance_service.api.routes.market_data import router as market_data_router
 from compliance_service.api.routes.risk import router as risk_router
 from compliance_service.api.routes.violations import router as violations_router
 from compliance_service.infrastructure.db import Base, engine
@@ -54,6 +55,7 @@ def create_app() -> FastAPI:
     app.include_router(audit_router)
     app.include_router(admin_router)
     app.include_router(injector_router)
+    app.include_router(market_data_router)
     app.add_middleware(_MetricsMiddleware)
     app.mount("/metrics", make_asgi_app())
     app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")

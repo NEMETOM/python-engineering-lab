@@ -76,10 +76,13 @@ scaling ceiling, not an oversight to silently "fix" — see `fixflux/PERFORMANCE
 ## HTTP surfaces (not every service has one)
 
 - **compliance-service** (`compliance-api` container) — the "FixFlux Console": a unified FastAPI
-  app with two tabs sharing one Jinja2 shell template (`templates/_shell.html`) — the FIX message
-  injector at `/` (`fix_parser.py` + `injector_producer.py` + `POST /api/orders/inject`) and the
+  app with three tabs sharing one Jinja2 shell template (`templates/_shell.html`) — the FIX message
+  injector at `/` (`fix_parser.py` + `injector_producer.py` + `POST /api/orders/inject`), the
   compliance rules admin panel at `/admin/compliance` (toggle rules live via
-  `compliance_rule_overrides` in Postgres, picked up by `compliance-consumer` on a 5s poll). A
+  `compliance_rule_overrides` in Postgres, picked up by `compliance-consumer` on a 5s poll), and a
+  live market data view at `/market-data`. That last tab is a static page whose *browser* opens
+  a WebSocket straight to market-data-api (`:8006/ws/market-data`, host taken from the page URL,
+  overridable via `MARKET_DATA_WS_URL`); compliance-api itself never touches market data. A
   separate `compliance-consumer` container (same image, different `command:`) runs the actual
   rule-evaluation threads that *consume* `raw_orders`/`validated_orders` for surveillance —
   `compliance-api` only *produces* to `raw_orders` (via the injector), it never consumes either
