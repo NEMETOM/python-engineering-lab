@@ -25,7 +25,9 @@ from unittest.mock import MagicMock, patch
 
 _HERE = Path(__file__).resolve().parent
 _FIXFLUX = _HERE.parent.parent
-for _p in (_FIXFLUX, _FIXFLUX / "services" / "compliance-service" / "src"):
+# _HERE makes the page objects (tests/ui/pages) importable from step modules
+# however behave is launched.
+for _p in (_HERE, _FIXFLUX, _FIXFLUX / "services" / "compliance-service" / "src"):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 

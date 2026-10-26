@@ -65,7 +65,7 @@ jobs:
         run: |
           python -m ruff check .
           python -m black --check .
-          python -m isort --check-only --profile black .
+          python -m isort --check-only .
 
       - name: Run UI tests
         working-directory: fixflux/tests/ui

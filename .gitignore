@@ -52,3 +52,5 @@ fixflux/.env
 
 # Playwright traces from failed UI test runs (fixflux/tests/ui)
 fixflux/tests/ui/artifacts/
+# behave report files written with -o / --outfile (fixflux/tests/ui)
+fixflux/tests/ui/*.output
