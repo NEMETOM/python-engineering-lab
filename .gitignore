@@ -49,3 +49,6 @@ fixflux/replay-results/
 
 # Host-only secrets for docker compose (e.g. GRAFANA_DB_READER_PASSWORD)
 fixflux/.env
+
+# Playwright traces from failed UI test runs (fixflux/tests/ui)
+fixflux/tests/ui/artifacts/
