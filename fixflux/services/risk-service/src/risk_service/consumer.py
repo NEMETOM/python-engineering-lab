@@ -34,8 +34,8 @@ def handle_trade(value: dict, store: PositionStore, last_prices: dict) -> None:
     try:
         trade = TradeEvent(**value)
         last_prices[trade.symbol] = trade.price
-        store.fill_order(trade.buy_order_id)
-        store.fill_order(trade.sell_order_id)
+        store.fill_order(trade.buy_order_id, trade.quantity)
+        store.fill_order(trade.sell_order_id, trade.quantity)
         logger.debug(
             f"trade {trade.trade_id} filled orders "
             f"{trade.buy_order_id}/{trade.sell_order_id}"

@@ -54,14 +54,19 @@ class Producer:
         self.producer.send("trades", data)
 
     def send_exec_reports(self, trade: Trade) -> None:
-        """Emit one FIX Execution Report (ExecType=F) per side of the trade."""
-        for order_id, client_id, side, order_qty, approved_at in [
+        """Emit one FIX Execution Report (ExecType=F) per side of the trade.
+
+        OrdStatus is 2 (Filled) only when that side has nothing left open,
+        otherwise 1 (PartiallyFilled), with LeavesQty/CumQty from the engine.
+        """
+        for order_id, client_id, side, order_qty, approved_at, leaves_qty in [
             (
                 trade.buy_order_id,
                 trade.buy_client_id,
                 "BUY",
                 trade.buy_order_qty,
                 trade.buy_approved_at,
+                trade.buy_leaves_qty,
             ),
             (
                 trade.sell_order_id,
@@ -69,23 +74,27 @@ class Producer:
                 "SELL",
                 trade.sell_order_qty,
                 trade.sell_approved_at,
+                trade.sell_leaves_qty,
             ),
         ]:
+            # CumQty covers every fill so far, not just this one. Orders built
+            # without order_qty (0) can only report this fill.
+            cum_qty = order_qty - leaves_qty if order_qty else trade.quantity
             try:
                 report = ExecutionReportEvent(
                     order_id=order_id,
                     cl_ord_id=order_id,
                     client_id=client_id,
                     exec_type="F",
-                    ord_status="2",
+                    ord_status="2" if leaves_qty == 0 else "1",
                     symbol=trade.symbol,
                     side=side,
                     price=trade.price,
                     order_qty=order_qty,
                     last_px=trade.price,
                     last_qty=trade.quantity,
-                    leaves_qty=0,
-                    cum_qty=trade.quantity,
+                    leaves_qty=leaves_qty,
+                    cum_qty=cum_qty,
                 )
                 with _tracer.start_as_current_span(
                     "matching-engine.send_exec_reports"

@@ -25,11 +25,24 @@ class PositionStore:
             "quantity": quantity,
         }
 
-    def fill_order(self, order_id: str) -> None:
-        meta = self._open.pop(order_id, None)
+    def fill_order(self, order_id: str, quantity: int | None = None) -> None:
+        """Apply a fill of `quantity` (default: everything still open).
+
+        A partly filled order stays open with its remaining quantity - the
+        matching engine keeps that remainder resting in the book, so it must
+        still count towards the open-order limit, and only the filled part
+        may move the position.
+        """
+        meta = self._open.get(order_id)
         if meta is None:
             return
-        delta = meta["quantity"] if meta["side"] == "BUY" else -meta["quantity"]
+        filled = (
+            meta["quantity"] if quantity is None else min(quantity, meta["quantity"])
+        )
+        meta["quantity"] -= filled
+        if meta["quantity"] <= 0:
+            del self._open[order_id]
+        delta = filled if meta["side"] == "BUY" else -filled
         self._net[(meta["client_id"], meta["symbol"])] += delta
 
     def get_net_position(self, client_id: str, symbol: str) -> int:

@@ -89,12 +89,17 @@ class TestOrdStatusValidation:
     def test_filled_accepted(self):
         assert _make(exec_type="F", ord_status="2").ord_status == "2"
 
+    def test_partially_filled_accepted(self):
+        # matching-engine reports a fill that leaves quantity open as 1.
+        assert _make(exec_type="F", ord_status="1").ord_status == "1"
+
     def test_rejected_accepted(self):
         assert _make(exec_type="8", ord_status="8").ord_status == "8"
 
     def test_unknown_status_rejected(self):
+        # "1" (PartiallyFilled) used to be the example here; it is valid now.
         with pytest.raises(PydanticValidationError):
-            _make(ord_status="1")
+            _make(ord_status="X")
 
     def test_empty_string_rejected(self):
         with pytest.raises(PydanticValidationError):
