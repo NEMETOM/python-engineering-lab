@@ -15,7 +15,8 @@ class ExecutionReportEvent(BaseModel):
         cl_ord_id  -> Tag 11  (ClOrdID)        same as order_id (no client-assigned ref)
         client_id  -> Tag 49  (SenderCompID)   participant / firm identifier
         exec_type  -> Tag 150 (ExecType)       0=New, 8=Rejected, F=Trade/Fill
-        ord_status -> Tag 39  (OrdStatus)      0=New, 2=Filled, 8=Rejected
+        ord_status -> Tag 39  (OrdStatus)      0=New, 1=PartiallyFilled, 2=Filled,
+                                               8=Rejected
         symbol     -> Tag 55  (Symbol)
         side       -> Tag 54  (Side)           BUY / SELL
         price      -> Tag 44  (Price)          original order limit price
@@ -33,7 +34,7 @@ class ExecutionReportEvent(BaseModel):
     cl_ord_id: str
     client_id: str
     exec_type: Literal["0", "8", "F"]
-    ord_status: Literal["0", "2", "8"]
+    ord_status: Literal["0", "1", "2", "8"]
     symbol: str
     side: Literal["BUY", "SELL"]
     price: float

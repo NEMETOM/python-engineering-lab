@@ -27,3 +27,7 @@ class Trade:
     sell_order_qty: int = 0
     buy_approved_at: str = ""
     sell_approved_at: str = ""
+    # Quantity still open on each order after this trade (FIX LeavesQty).
+    # 0 means that side is now fully filled.
+    buy_leaves_qty: int = 0
+    sell_leaves_qty: int = 0

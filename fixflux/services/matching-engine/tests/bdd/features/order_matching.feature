@@ -85,3 +85,20 @@ Feature: Order Matching
       | bid_1 | qty_1 | bid_2 | qty_2 | ask_price | ask_qty | trade_count |
       | 100.0 | 5     | 99.0  | 5     | 99.0      | 10      | 2           |
       | 100.0 | 3     | 99.0  | 3     | 99.0      | 10      | 2           |
+
+  Scenario Outline: A partly filled resting order keeps its remainder at the front of the book
+    # Regression: the resting order used to be popped before matching, so its
+    # unfilled remainder silently disappeared from the book.
+    Given a resting <resting_side> order "R1" at price 100.0 for quantity <resting_qty>
+    And a resting <resting_side> order "R2" at price 100.0 for quantity 50
+    When I submit a <incoming_side> order "I1" at price 100.0 for quantity <incoming_qty>
+    Then 1 trade(s) are produced
+    And the executed trade quantity is <incoming_qty>
+    And resting order "R1" is first in the book with quantity <remainder>
+    And the trade reports <remainder> left open on the resting side and 0 on the incoming side
+
+    Examples:
+      | resting_side | resting_qty | incoming_side | incoming_qty | remainder |
+      | SELL         | 100         | BUY           | 40           | 60        |
+      | BUY          | 100         | SELL          | 30           | 70        |
+      | SELL         | 10          | BUY           | 9            | 1         |

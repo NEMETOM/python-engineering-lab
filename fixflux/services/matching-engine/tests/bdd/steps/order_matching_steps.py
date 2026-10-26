@@ -2,7 +2,6 @@ from behave import given, then, use_step_matcher, when
 
 from matching_engine.engine import MatchingEngine
 from matching_engine.models import Order
-from matching_engine.order_book import OrderBook
 
 # Use regex matching so numeric patterns don't swallow literal-text steps.
 use_step_matcher("re")
@@ -13,8 +12,10 @@ use_step_matcher("re")
 
 @given("an empty order book and matching engine")
 def given_empty_engine(context):
-    context.book = OrderBook()
-    context.engine = MatchingEngine(context.book)
+    # The engine owns one book per symbol; these steps use Order's default
+    # symbol "", so they work on that book directly.
+    context.engine = MatchingEngine()
+    context.book = context.engine.books[""]
     context.trades = []
     context.last_order = None
 
@@ -69,3 +70,27 @@ def then_incoming_order_in_book_with_quantity(context, quantity):
     side_list = context.book.buys if order.side == "BUY" else context.book.sells
     assert order in side_list
     assert order.quantity == int(quantity)
+
+
+@then(
+    r'resting order "(?P<order_id>[^"]+)" is first in the book with quantity (?P<quantity>\d+)'
+)
+def then_resting_order_first_with_quantity(context, order_id, quantity):
+    resting_side = "SELL" if context.last_order.side == "BUY" else "BUY"
+    side_list = context.book.sells if resting_side == "SELL" else context.book.buys
+    assert side_list, "resting side is empty - the remainder was lost"
+    assert side_list[0].order_id == order_id, [o.order_id for o in side_list]
+    assert side_list[0].quantity == int(quantity)
+
+
+@then(
+    r"the trade reports (?P<resting>\d+) left open on the resting side and "
+    r"(?P<incoming>\d+) on the incoming side"
+)
+def then_trade_leaves(context, resting, incoming):
+    trade = context.trades[0]
+    if context.last_order.side == "BUY":
+        incoming_leaves, resting_leaves = trade.buy_leaves_qty, trade.sell_leaves_qty
+    else:
+        incoming_leaves, resting_leaves = trade.sell_leaves_qty, trade.buy_leaves_qty
+    assert (resting_leaves, incoming_leaves) == (int(resting), int(incoming))

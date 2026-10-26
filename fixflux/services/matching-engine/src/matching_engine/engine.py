@@ -15,9 +15,16 @@ class MatchingEngine:
 
         if order.side == "BUY":
             while book.sells and order.price >= book.best_ask().price:
-                best_sell = book.sells.pop(0)
+                # Peek, don't pop: a resting order that is only partly filled
+                # must keep its remainder at the front of its price level
+                # (time priority). Popping first silently discarded it.
+                best_sell = book.sells[0]
 
                 trade_qty = min(order.quantity, best_sell.quantity)
+                order.quantity -= trade_qty
+                best_sell.quantity -= trade_qty
+                if best_sell.quantity == 0:
+                    book.sells.pop(0)
 
                 trades.append(
                     Trade(
@@ -33,19 +40,23 @@ class MatchingEngine:
                         sell_order_qty=best_sell.order_qty,
                         buy_approved_at=order.approved_at,
                         sell_approved_at=best_sell.approved_at,
+                        buy_leaves_qty=order.quantity,
+                        sell_leaves_qty=best_sell.quantity,
                     )
                 )
-
-                order.quantity -= trade_qty
 
                 if order.quantity == 0:
                     break
 
         else:
             while book.buys and order.price <= book.best_bid().price:
-                best_buy = book.buys.pop(0)
+                best_buy = book.buys[0]  # peek - see the BUY branch
 
                 trade_qty = min(order.quantity, best_buy.quantity)
+                order.quantity -= trade_qty
+                best_buy.quantity -= trade_qty
+                if best_buy.quantity == 0:
+                    book.buys.pop(0)
 
                 trades.append(
                     Trade(
@@ -61,10 +72,10 @@ class MatchingEngine:
                         sell_order_qty=order.order_qty,
                         buy_approved_at=best_buy.approved_at,
                         sell_approved_at=order.approved_at,
+                        buy_leaves_qty=best_buy.quantity,
+                        sell_leaves_qty=order.quantity,
                     )
                 )
-
-                order.quantity -= trade_qty
 
                 if order.quantity == 0:
                     break
