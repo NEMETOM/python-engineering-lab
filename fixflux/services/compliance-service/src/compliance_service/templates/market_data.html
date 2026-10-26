@@ -1,0 +1,158 @@
+{% extends "_shell.html" %}
+{% block title %}Market Data{% endblock %}
+{% block content %}
+  <header class="px-6 py-4 border-b border-slate-800 flex items-start justify-between gap-4">
+    <div>
+      <h1 class="text-lg font-semibold">Live Market Data</h1>
+      <p class="text-sm text-slate-400">
+        Snapshots streamed from <code class="text-emerald-400">market-data-api</code> over
+        <code class="text-emerald-400" id="ws-url"></code>. One row per symbol, updated in place.
+      </p>
+    </div>
+    <div class="flex items-center gap-3 text-sm shrink-0">
+      <span id="msg-count" class="text-slate-500">0 updates</span>
+      <span id="status" class="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700 text-slate-300">connecting</span>
+    </div>
+  </header>
+
+  <main class="p-6 max-w-5xl mx-auto w-full">
+    <div id="empty" class="rounded-lg border border-dashed border-slate-700 p-8 text-center text-slate-400">
+      <p class="font-medium text-slate-300">Waiting for market data</p>
+      <p class="text-sm mt-2">
+        market-data-service publishes only when a symbol's best bid, best ask or last trade changes,
+        and the stream has no history - so this table fills as quotes change.
+      </p>
+      <p class="text-sm mt-2">
+        To see it move: open the <a href="/" target="_blank" class="text-emerald-400 underline">Fix Msg Injector</a>
+        in another browser tab and inject a few orders.
+      </p>
+    </div>
+
+    <table id="quotes" class="hidden w-full text-sm">
+      <thead class="text-left text-xs uppercase tracking-wide text-slate-400 border-b border-slate-800">
+        <tr>
+          <th class="py-2 pr-4">Symbol</th>
+          <th class="py-2 pr-4 text-right">Bid</th>
+          <th class="py-2 pr-4 text-right">Ask</th>
+          <th class="py-2 pr-4 text-right">Mid</th>
+          <th class="py-2 pr-4 text-right">Spread</th>
+          <th class="py-2 pr-4 text-right">Last trade</th>
+          <th class="py-2 text-right">Updated</th>
+        </tr>
+      </thead>
+      <tbody id="quote-rows" class="font-mono"></tbody>
+    </table>
+  </main>
+
+  <script id="ws-config" type="application/json">{{ {"url": ws_url, "port": ws_port, "path": ws_path} | tojson }}</script>
+  <script>
+    const cfg = JSON.parse(document.getElementById("ws-config").textContent);
+    const wsUrl = cfg.url ||
+      `${location.protocol === "https:" ? "wss" : "ws"}://${location.hostname}:${cfg.port}${cfg.path}`;
+    document.getElementById("ws-url").textContent = wsUrl;
+
+    const rows = new Map(); // symbol -> { tr, cells, last }
+    let updates = 0;
+    let retryMs = 1000;
+
+    const statusEl = document.getElementById("status");
+    const STATUS_STYLES = {
+      live: "bg-emerald-500/20 text-emerald-400",
+      connecting: "bg-slate-700 text-slate-300",
+      reconnecting: "bg-amber-500/20 text-amber-400",
+    };
+    function setStatus(state, detail) {
+      statusEl.textContent = detail ? `${state} - ${detail}` : state;
+      statusEl.className = `px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLES[state]}`;
+    }
+
+    // Values arrive over the network: write them with textContent only, never
+    // as markup (a test enforces this for the whole script).
+    function fmt(value, digits) {
+      if (value === null || value === undefined) return "-";
+      const n = Number(value);
+      return Number.isFinite(n) ? n.toFixed(digits) : "-";
+    }
+
+    // One precision per row, from the instrument's price level: FX-style 5
+    // decimals below 10, otherwise 2. Deciding per value would show an
+    // equity's 0.5 spread as "0.50000".
+    function digitsFor(...prices) {
+      const p = prices.find((x) => x !== null && x !== undefined);
+      return p !== undefined && Math.abs(Number(p)) < 10 ? 5 : 2;
+    }
+
+    function flash(cell, direction) {
+      cell.classList.remove("text-emerald-400", "text-rose-400");
+      if (direction === 0) return;
+      cell.classList.add(direction > 0 ? "text-emerald-400" : "text-rose-400");
+      setTimeout(() => cell.classList.remove("text-emerald-400", "text-rose-400"), 1500);
+    }
+
+    function rowFor(symbol) {
+      if (rows.has(symbol)) return rows.get(symbol);
+      const tr = document.createElement("tr");
+      tr.className = "border-b border-slate-900";
+      const names = ["symbol", "bid", "ask", "mid", "spread", "last", "updated"];
+      const cells = {};
+      names.forEach((name, i) => {
+        const td = document.createElement("td");
+        td.className = i === 0 ? "py-2 pr-4 font-sans font-medium" : "py-2 pr-4 text-right";
+        tr.appendChild(td);
+        cells[name] = td;
+      });
+      cells.symbol.textContent = symbol;
+      // Keep rows sorted by symbol.
+      const tbody = document.getElementById("quote-rows");
+      const after = [...rows.keys()].sort().find((s) => s > symbol);
+      tbody.insertBefore(tr, after ? rows.get(after).tr : null);
+      const entry = { tr, cells, last: null };
+      rows.set(symbol, entry);
+      return entry;
+    }
+
+    function apply(snapshot) {
+      if (!snapshot || typeof snapshot.symbol !== "string") return;
+      document.getElementById("empty").classList.add("hidden");
+      document.getElementById("quotes").classList.remove("hidden");
+
+      const row = rowFor(snapshot.symbol);
+      const { bid, ask } = { bid: snapshot.best_bid, ask: snapshot.best_ask };
+      const spread = bid != null && ask != null ? ask - bid : null;
+
+      const d = digitsFor(bid, ask, snapshot.last_trade_price);
+      row.cells.bid.textContent = fmt(bid, d);
+      row.cells.ask.textContent = fmt(ask, d);
+      row.cells.mid.textContent = fmt(snapshot.mid_price, d);
+      row.cells.spread.textContent = fmt(spread, d);
+      row.cells.last.textContent = fmt(snapshot.last_trade_price, d);
+      const ts = snapshot.timestamp ? new Date(snapshot.timestamp) : null;
+      row.cells.updated.textContent = ts && !isNaN(ts) ? ts.toLocaleTimeString() : "-";
+
+      const last = snapshot.last_trade_price;
+      if (last != null && row.last != null) flash(row.cells.last, Math.sign(last - row.last));
+      if (last != null) row.last = last;
+
+      updates += 1;
+      document.getElementById("msg-count").textContent =
+        `${updates} update${updates === 1 ? "" : "s"}`;
+    }
+
+    function connect() {
+      setStatus("connecting");
+      const ws = new WebSocket(wsUrl);
+      ws.onopen = () => { retryMs = 1000; setStatus("live"); };
+      ws.onmessage = (event) => {
+        try { apply(JSON.parse(event.data)); } catch (_) { /* ignore malformed frame */ }
+      };
+      ws.onclose = () => {
+        setStatus("reconnecting", `retry in ${Math.round(retryMs / 1000)}s`);
+        setTimeout(connect, retryMs);
+        retryMs = Math.min(retryMs * 2, 30000);
+      };
+      ws.onerror = () => ws.close();
+    }
+
+    connect();
+  </script>
+{% endblock %}
