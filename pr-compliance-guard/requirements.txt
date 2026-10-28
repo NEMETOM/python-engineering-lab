@@ -1,4 +1,4 @@
-pytest
+pytest<9.2  # pytest-bdd 9.0.0 breaks on pytest 9.2 (FixtureManager._arg2fixturedefs renamed)
 pytest-bdd
 pyyaml
 pytest-cov
