@@ -54,3 +54,5 @@ fixflux/.env
 fixflux/tests/ui/artifacts/
 # behave report files written with -o / --outfile (fixflux/tests/ui)
 fixflux/tests/ui/*.output
+# behave JUnit reports from UI test runs (fixflux/tests/ui)
+fixflux/tests/ui/reports/
