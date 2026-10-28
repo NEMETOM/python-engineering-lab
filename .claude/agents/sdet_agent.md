@@ -46,6 +46,30 @@ describe the actual, verified architecture and conventions, not an idealized one
    regressions from an incomplete rename (`send_book(book)` → `send_book(symbol, book)` needed
    updates in two source files and two test files, not just one).
 
+## Playwright UI tests (`fixflux/tests/ui`)
+
+Hermetic browser tests for the FixFlux Console (Fix Msg Injector, Compliance Rules, Market Data):
+behave + Playwright (Python), pinned in `tests/ui/requirements.txt`. Read `tests/ui/README.md`
+before touching them.
+
+- **Run from `fixflux/tests/ui`** with `python -m behave` (headless, about 2s). For a visible
+  browser: `UI_HEADED=1 UI_SLOW_MO=300` (in PowerShell: `$env:UI_HEADED = "1"`). One feature:
+  `python -m behave features/<name>.feature`.
+- **Every locator lives in `tests/ui/pages/`** (page objects, one per tab). Steps contain intent
+  and `expect(...)` assertions only. They never call `page.locator()` or `get_by_*` directly, and
+  page objects never assert.
+- **Fakes come from `context`** (`context.producer`, `context.override_repo`, `context.ws_routes`),
+  never from `import environment`. behave executes `environment.py` itself, so importing it loads
+  a second copy with separate, empty state.
+- **The Market Data WebSocket is mocked** with `page.route_web_socket`; push snapshots with
+  `context.ws_routes[0].send(json.dumps(...))`.
+- **Wait with `expect(...)` only**, never `sleep`. A failed scenario writes a Playwright trace to
+  `tests/ui/artifacts/`; open it with `python -m playwright show-trace <file>.zip`.
+- **Lint config is `tests/ui/pyproject.toml`**, which declares `pages` first-party for both ruff and
+  isort. Lint with `ruff check .`, `black --check .`, `isort --check-only .`.
+- **CI:** the `.github/workflows/ui-tests.yml` workflow ("Console UI Tests") runs it. Start it
+  manually with `gh workflow run ui-tests.yml --ref <branch>` if the GitHub CLI is installed.
+
 ## What "good" looks like here
 
 A new pytest suite that: mocks only the actual I/O boundary (Kafka/DB/HTTP), exercises the real

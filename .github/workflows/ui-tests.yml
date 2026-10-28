@@ -22,6 +22,7 @@ on:
 
 permissions:
   contents: read
+  checks: write   # dorny/test-reporter publishes the results as a check run
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -69,7 +70,23 @@ jobs:
 
       - name: Run UI tests
         working-directory: fixflux/tests/ui
-        run: python -m behave
+        # JUnit XML (one file per feature) feeds the test report below; the
+        # pretty console output from behave.ini is kept alongside it.
+        run: python -m behave --junit --junit-directory reports/
+
+      # Same reporter as the e2e workflow, but pinned to the v1.9.1 release
+      # commit: the floating v1 tag tracks unreleased commits on main.
+      - name: Publish UI test report
+        if: success() || failure()
+        uses: dorny/test-reporter@31a54ee7ebcacc03a09ea97a7e5465a47b84aea5  # v1.9.1
+        with:
+          name: Console UI Tests (Playwright + behave)
+          path: fixflux/tests/ui/reports/*.xml
+          reporter: java-junit
+          # The run step already fails the job on a failed scenario; and if
+          # linting failed first there are no reports, which isn't an error.
+          fail-on-error: false
+          fail-on-empty: false
 
       - name: Upload Playwright traces of failed scenarios
         if: failure()

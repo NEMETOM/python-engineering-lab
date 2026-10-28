@@ -13,7 +13,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=8.0",
+    # <9.2: pytest 9.2.0 renamed FixtureManager._arg2fixturedefs, which
+    # pytest-bdd 9.0.0 (latest) still uses -> AttributeError in every BDD test.
+    # Lift the cap once a pytest-bdd release supports pytest 9.2.
+    "pytest>=8.0,<9.2",
     "pytest-bdd>=8.0",
     "pytest-cov>=4.0",
     "ruff>=0.0.300",

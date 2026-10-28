@@ -127,6 +127,40 @@ Shows: the persona enforcing its own non-negotiables on code that was written wi
 /sdet-agent audit every .feature file in fixflux. List any plain Scenario that hard-codes values instead of using a Scenario Outline with at least 2 Examples rows, and any feature with no step definitions behind it.
 ```
 
+### `/sdet-agent`: Playwright UI tests (fixflux/tests/ui, no droplet)
+
+The Console UI suite runs hermetically: a real compliance-api plus a real Chromium, with Kafka,
+Postgres and the market data WebSocket faked. That makes it safe to record anywhere. One-time setup
+is in `fixflux/tests/ui/README.md` (`pip install -r requirements.txt`,
+`python -m playwright install chromium`).
+
+**8. Run the UI scenarios and report per tab** (read-only, ~2 min)
+```
+/sdet-agent run the Playwright UI suite in fixflux/tests/ui with python -m behave. Give me one table: feature (Console tab), scenarios passed/failed, and what each scenario proves. If anything fails, open the Playwright trace in tests/ui/artifacts and tell me which step failed and why.
+```
+Shows: real browser tests for all three tabs in about 2 seconds, explained in plain terms.
+
+**9. Watch the browser** (read-only, ~2 min, the best visual for this segment)
+```
+/sdet-agent run the Market Data and Fix Msg Injector UI features headed and slowed down (UI_HEADED=1, UI_SLOW_MO=500) so I can record the browser, then summarise what each scenario did on screen.
+```
+Shows: Chromium visibly typing FIX orders, toggling, and Market Data rows appearing as snapshots
+are pushed through the mocked WebSocket. Set up screen capture before sending the prompt.
+
+**10. Add a scenario the page-object way** (local edits, ~5 min)
+```
+/sdet-agent add a happy-path UI scenario for the Market Data tab: a one-sided book (bid only, then ask only) shows "-" for the missing side, mid and spread. Use a Scenario Outline with at least 2 Examples rows, put any new locator in tests/ui/pages, keep assertions in the steps, run the suite, then break the page on purpose to prove the new scenario catches it, and restore it.
+```
+Shows: the persona following the suite's conventions (page objects own locators, BDD outlines,
+mutation check) instead of just writing a test that passes.
+
+**11. Run the UI tests on GitHub Actions** (changes state: starts a CI run, ~4 min)
+```
+/sdet-agent start the Console UI Tests workflow on the fix-flux branch with the GitHub CLI, watch it to completion, and report the result. If a scenario fails, download the playwright-traces artifact and explain the failure.
+```
+Needs the GitHub CLI installed and logged in (see `fixflux/tests/ui/GITHUB_CLI_SETUP.md`). Without
+it, the agent should say so and point you to the Actions tab.
+
 ### `/sre-agent`: the live droplet (read-only first, state changes last)
 
 **1. Morning health check** (read-only, ~2 min, a good opener)
