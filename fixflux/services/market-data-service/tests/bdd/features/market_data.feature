@@ -1,100 +1,138 @@
-Feature: Market data cache behaviour
+Feature: Market data cache and publisher
+  market-data-service keeps the latest best bid, best ask and last trade price
+  per symbol, from order_book_updates and trades. It publishes a snapshot to the
+  market_data topic only when a symbol's quote actually changes.
 
-  Scenario: initial snapshot has all none values
+  Scenario Outline: A symbol with no market data has no snapshot
     Given a fresh market cache
-    Then last trade price is absent
-    And best bid is absent
-    And best ask is absent
-
-  Scenario Outline: trade updates last price
-    Given a fresh market cache
-    When trade price <price> is received
-    Then last trade price is <price>
+    Then there is no snapshot for "<symbol>"
 
     Examples:
-      | price |
-      | 100   |
-      | 0     |
-      | 99.99 |
-      | 0.001 |
+      | symbol |
+      | AAPL   |
+      | EURUSD |
 
-  Scenario Outline: second trade overwrites first trade price
+  Scenario Outline: A trade sets the symbol's last trade price
     Given a fresh market cache
-    When trade price <first_price> is received
-    And trade price <second_price> is received
-    Then last trade price is <second_price>
+    When a trade for "<symbol>" at <price> is received
+    Then the last trade price for "<symbol>" is <price>
 
     Examples:
-      | first_price | second_price |
-      | 50.00       | 75.00        |
-      | 100.00      | 25.00        |
+      | symbol | price   |
+      | AAPL   | 175.00  |
+      | EURUSD | 1.09    |
+      | BTCUSD | 50010.0 |
 
-  Scenario Outline: order book update stores best bid and ask
+  Scenario Outline: A later trade overwrites the earlier price
     Given a fresh market cache
-    When order book update with bid <bid> and ask <ask> is received
-    Then best bid is <bid>
-    And best ask is <ask>
+    When a trade for "<symbol>" at <first_price> is received
+    And a trade for "<symbol>" at <second_price> is received
+    Then the last trade price for "<symbol>" is <second_price>
 
     Examples:
-      | bid   | ask    |
-      | 99.50 | 100.50 |
-      | 50.00 | 50.10  |
+      | symbol | first_price | second_price |
+      | AAPL   | 175.00      | 176.50       |
+      | EURUSD | 1.0901      | 1.0899       |
 
-  Scenario Outline: second order book update overwrites first
+  Scenario Outline: An order book update sets the best bid and ask
     Given a fresh market cache
-    When order book update with bid <first_bid> and ask <first_ask> is received
-    And order book update with bid <second_bid> and ask <second_ask> is received
-    Then best bid is <second_bid>
-    And best ask is <second_ask>
+    When an order book update for "<symbol>" with bid <bid> and ask <ask> is received
+    Then the best bid for "<symbol>" is <bid>
+    And the best ask for "<symbol>" is <ask>
 
     Examples:
-      | first_bid | first_ask | second_bid | second_ask |
-      | 90.00     | 91.00     | 92.00      | 93.00      |
-      | 10.00     | 11.00     | 20.00      | 21.00      |
+      | symbol | bid    | ask    |
+      | AAPL   | 174.90 | 175.10 |
+      | EURUSD | 1.0899 | 1.0901 |
 
-  Scenario Outline: mid price is computed from best bid and ask
+  Scenario Outline: A later order book update overwrites the earlier one
     Given a fresh market cache
-    When order book update with bid <bid> and ask <ask> is received
-    Then mid price is <mid>
+    When an order book update for "<symbol>" with bid <first_bid> and ask <first_ask> is received
+    And an order book update for "<symbol>" with bid <second_bid> and ask <second_ask> is received
+    Then the best bid for "<symbol>" is <second_bid>
+    And the best ask for "<symbol>" is <second_ask>
 
     Examples:
-      | bid    | ask    | mid    |
-      | 100.00 | 102.00 | 101.00 |
-      | 50.00  | 60.00  | 55.00  |
+      | symbol | first_bid | first_ask | second_bid | second_ask |
+      | MSFT   | 414.80    | 415.20    | 414.90     | 415.10     |
+      | GBPUSD | 1.2699    | 1.2701    | 1.2700     | 1.2702     |
 
-  Scenario Outline: full snapshot reflects trade and order book together
+  Scenario Outline: The mid price is the midpoint of a two-sided book
     Given a fresh market cache
-    When trade price <price> is received
-    And order book update with bid <bid> and ask <ask> is received
-    Then last trade price is <price>
-    And best bid is <bid>
-    And best ask is <ask>
+    When an order book update for "<symbol>" with bid <bid> and ask <ask> is received
+    Then the mid price for "<symbol>" is <mid>
 
     Examples:
-      | price  | bid    | ask    |
-      | 150.00 | 149.50 | 150.50 |
-      | 75.00  | 74.00  | 76.00  |
+      | symbol | bid    | ask    | mid    |
+      | AAPL   | 174.90 | 175.10 | 175.00 |
+      | ETHUSD | 2999.0 | 3001.0 | 3000.0 |
 
-  Scenario Outline: mid price is absent before any order book update
+  Scenario Outline: A one-sided book has no mid price
+    # matching-engine sends null for the side of the book that is empty.
     Given a fresh market cache
-    When trade price <price> is received
-    Then mid price is absent
+    When an order book update for "<symbol>" with bid <bid> and ask <ask> is received
+    Then the best bid for "<symbol>" is <bid>
+    And the best ask for "<symbol>" is <ask>
+    And the mid price for "<symbol>" is absent
 
     Examples:
-      | price  |
-      | 100.00 |
-      | 50.00  |
+      | symbol | bid    | ask    |
+      | EURUSD | 1.0915 | none   |
+      | AAPL   | none   | 175.10 |
 
-  Scenario Outline: publisher exposes the cache snapshot
+  Scenario Outline: A trade before any order book update has no mid price
     Given a fresh market cache
-    When trade price <price> is received
-    And order book update with bid <bid> and ask <ask> is received
+    When a trade for "<symbol>" at <price> is received
+    Then the mid price for "<symbol>" is absent
+    And the best bid for "<symbol>" is none
+
+    Examples:
+      | symbol | price  |
+      | AAPL   | 175.00 |
+      | MSFT   | 415.00 |
+
+  Scenario Outline: Symbols are tracked independently
+    # The reason the cache is keyed by symbol: one instrument's prices must
+    # never leak into another's snapshot.
+    Given a fresh market cache
+    When a trade for "<traded>" at <price> is received
+    And an order book update for "<quoted>" with bid <bid> and ask <ask> is received
+    Then the last trade price for "<traded>" is <price>
+    And the best bid for "<traded>" is none
+    And the last trade price for "<quoted>" is none
+    And the best bid for "<quoted>" is <bid>
+
+    Examples:
+      | traded | price  | quoted | bid    | ask    |
+      | AAPL   | 175.00 | EURUSD | 1.0899 | 1.0901 |
+      | BTCUSD | 50010  | MSFT   | 414.80 | 415.20 |
+
+  Scenario Outline: The publisher sends each symbol's snapshot to market_data
+    Given a fresh market cache
+    And a market data publisher
+    When a trade for "<symbol>" at <price> is received
+    And an order book update for "<symbol>" with bid <bid> and ask <ask> is received
     And the publisher publishes
-    Then the published snapshot contains last trade price <price>
-    And the published snapshot contains best bid <bid>
-    And the published snapshot contains best ask <ask>
+    Then 1 snapshot is sent to the "market_data" topic
+    And the sent snapshot for "<symbol>" has bid <bid>, ask <ask> and last trade price <price>
 
     Examples:
-      | price  | bid    | ask    |
-      | 200.00 | 199.00 | 201.00 |
-      | 50.00  | 49.00  | 51.00  |
+      | symbol | price  | bid    | ask    |
+      | AAPL   | 175.00 | 174.90 | 175.10 |
+      | EURUSD | 1.09   | 1.0899 | 1.0901 |
+
+  Scenario Outline: A snapshot is only re-sent when the quote changes
+    # The Market Data tab relies on this: a repeated trade at the same price
+    # with an unchanged book produces no new message.
+    Given a fresh market cache
+    And a market data publisher
+    When a trade for "AAPL" at 175.00 is received
+    And the publisher publishes
+    And a trade for "AAPL" at <second_price> is received
+    And the publisher publishes
+    Then <sent> snapshot(s) are sent to the "market_data" topic
+
+    Examples:
+      | second_price | sent |
+      | 175.00       | 1    |
+      | 176.00       | 2    |

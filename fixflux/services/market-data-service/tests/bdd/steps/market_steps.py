@@ -1,12 +1,28 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from behave import given, then, use_step_matcher, when
 
 from market_data_service.market_cache import MarketCache
 from market_data_service.publisher import MarketPublisher
 
-# Use regex matching so numeric patterns don't swallow "absent" steps.
+# Regex matching so numeric patterns don't swallow "absent"/"none" steps.
 use_step_matcher("re")
+
+_PRICE = r"[\d.]+|none"
+
+
+def _price(text: str) -> float | None:
+    return None if text == "none" else float(text)
+
+
+def _snapshot(context, symbol: str) -> dict:
+    snapshots = context.cache.snapshot()
+    assert symbol in snapshots, f"no snapshot for {symbol}: {list(snapshots)}"
+    return snapshots[symbol]
+
+
+def _sent_snapshots(context) -> list[tuple[str, dict]]:
+    return [c.args for c in context.producer.send.call_args_list]
 
 
 # ── Givens ───────────────────────────────────────────────────────────────────
@@ -17,82 +33,89 @@ def a_fresh_market_cache(context):
     context.cache = MarketCache()
 
 
+@given("a market data publisher")
+def a_market_data_publisher(context):
+    # The repo's single Kafka patch target: the shared factory's KafkaProducer.
+    # The publisher keeps the mocked producer after the patch exits.
+    with patch("shared.infrastructure.kafka_client.KafkaProducer") as producer_cls:
+        context.publisher = MarketPublisher(context.cache)
+    context.producer = producer_cls.return_value
+
+
 # ── Whens ────────────────────────────────────────────────────────────────────
 
 
-@when(r"trade price (?P<price>[\d.]+) is received")
-def receive_trade(context, price):
-    context.cache.update_trade({"price": float(price)})
+@when(rf'a trade for "(?P<symbol>[A-Z]+)" at (?P<price>{_PRICE}) is received')
+def receive_trade(context, symbol, price):
+    context.cache.update_trade({"symbol": symbol, "price": float(price)})
 
 
-@when(r"order book update with bid (?P<bid>[\d.]+) and ask (?P<ask>[\d.]+) is received")
-def receive_order_book(context, bid, ask):
-    context.cache.update_order_book({"best_bid": float(bid), "best_ask": float(ask)})
+@when(
+    rf'an order book update for "(?P<symbol>[A-Z]+)" with bid (?P<bid>{_PRICE}) '
+    rf"and ask (?P<ask>{_PRICE}) is received"
+)
+def receive_order_book(context, symbol, bid, ask):
+    context.cache.update_order_book(
+        {"symbol": symbol, "best_bid": _price(bid), "best_ask": _price(ask)}
+    )
 
 
 @when("the publisher publishes")
 def publisher_publishes(context):
-    with patch(
-        "market_data_service.publisher.create_producer", return_value=MagicMock()
-    ):
-        publisher = MarketPublisher(context.cache)
-        publisher.publish()
-    context.published_snapshot = context.cache.snapshot()
+    context.publisher.publish()
 
 
 # ── Thens ────────────────────────────────────────────────────────────────────
 
 
-@then(r"last trade price is (?P<price>[\d.]+)")
-def check_last_trade_price(context, price):
-    assert context.cache.snapshot()["last_trade_price"] == float(price)
+@then(r'there is no snapshot for "(?P<symbol>[A-Z]+)"')
+def check_no_snapshot(context, symbol):
+    assert symbol not in context.cache.snapshot()
 
 
-@then("last trade price is absent")
-def check_last_trade_price_absent(context):
-    assert context.cache.snapshot()["last_trade_price"] is None
+@then(rf'the last trade price for "(?P<symbol>[A-Z]+)" is (?P<price>{_PRICE})')
+def check_last_trade_price(context, symbol, price):
+    assert _snapshot(context, symbol)["last_trade_price"] == _price(price)
 
 
-@then(r"best bid is (?P<bid>[\d.]+)")
-def check_best_bid(context, bid):
-    assert context.cache.snapshot()["best_bid"] == float(bid)
+@then(rf'the best bid for "(?P<symbol>[A-Z]+)" is (?P<bid>{_PRICE})')
+def check_best_bid(context, symbol, bid):
+    assert _snapshot(context, symbol)["best_bid"] == _price(bid)
 
 
-@then("best bid is absent")
-def check_best_bid_absent(context):
-    assert context.cache.snapshot()["best_bid"] is None
+@then(rf'the best ask for "(?P<symbol>[A-Z]+)" is (?P<ask>{_PRICE})')
+def check_best_ask(context, symbol, ask):
+    assert _snapshot(context, symbol)["best_ask"] == _price(ask)
 
 
-@then(r"best ask is (?P<ask>[\d.]+)")
-def check_best_ask(context, ask):
-    assert context.cache.snapshot()["best_ask"] == float(ask)
+@then(r'the mid price for "(?P<symbol>[A-Z]+)" is (?P<mid>[\d.]+)')
+def check_mid_price(context, symbol, mid):
+    actual = _snapshot(context, symbol)["mid_price"]
+    assert actual is not None and abs(actual - float(mid)) < 1e-9, actual
 
 
-@then("best ask is absent")
-def check_best_ask_absent(context):
-    assert context.cache.snapshot()["best_ask"] is None
+@then(r'the mid price for "(?P<symbol>[A-Z]+)" is absent')
+def check_mid_price_absent(context, symbol):
+    assert _snapshot(context, symbol)["mid_price"] is None
 
 
-@then(r"mid price is (?P<mid>[\d.]+)")
-def check_mid_price(context, mid):
-    assert context.cache.snapshot()["mid_price"] == float(mid)
+@then(
+    r'(?P<count>\d+) snapshot(?:\(s\) are|s are| is) sent to the "(?P<topic>[a-z_]+)" topic'
+)
+def check_sent_count(context, count, topic):
+    sent = _sent_snapshots(context)
+    assert len(sent) == int(count), sent
+    assert all(t == topic for t, _ in sent), sent
 
 
-@then("mid price is absent")
-def check_mid_price_absent(context):
-    assert context.cache.snapshot()["mid_price"] is None
-
-
-@then(r"the published snapshot contains last trade price (?P<price>[\d.]+)")
-def check_published_last_trade(context, price):
-    assert context.published_snapshot["last_trade_price"] == float(price)
-
-
-@then(r"the published snapshot contains best bid (?P<bid>[\d.]+)")
-def check_published_best_bid(context, bid):
-    assert context.published_snapshot["best_bid"] == float(bid)
-
-
-@then(r"the published snapshot contains best ask (?P<ask>[\d.]+)")
-def check_published_best_ask(context, ask):
-    assert context.published_snapshot["best_ask"] == float(ask)
+@then(
+    rf'the sent snapshot for "(?P<symbol>[A-Z]+)" has bid (?P<bid>{_PRICE}), '
+    rf"ask (?P<ask>{_PRICE}) and last trade price (?P<price>{_PRICE})"
+)
+def check_sent_snapshot(context, symbol, bid, ask, price):
+    payloads = [p for _, p in _sent_snapshots(context) if p["symbol"] == symbol]
+    assert payloads, f"nothing sent for {symbol}"
+    sent = payloads[-1]
+    assert sent["best_bid"] == _price(bid), sent
+    assert sent["best_ask"] == _price(ask), sent
+    assert sent["last_trade_price"] == _price(price), sent
