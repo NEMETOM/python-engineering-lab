@@ -145,7 +145,8 @@ class TestSetupErrors:
         pipeline.producer.assert_not_called()
 
     def test_kafka_error_mid_send_exits_4_and_closes_consumer(self, fix_file, pipeline):
-        # Real kafka-python error: proves KafkaError is caught as RuntimeError.
+        # Real kafka-python error, not a RuntimeError stand-in: KafkaError
+        # stopped subclassing RuntimeError in kafka-python 3.x.
         pipeline.producer.return_value.flush.side_effect = KafkaTimeoutError("flush")
         assert _run(fix_file) == cli.EXIT_ERROR
         pipeline.tail.return_value.close.assert_called_once()
