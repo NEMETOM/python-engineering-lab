@@ -56,6 +56,7 @@ and validate a file without sending anything.
 | 1         | Executions differ from `--baseline`; the diff is printed to stdout  |
 | 2         | Not every order was acked within `--timeout`                        |
 | 3         | Pre-flight refused: resting orders already on a replayed symbol     |
+| 4         | Could not run: bad arguments, unreadable input or baseline, no valid orders, or Kafka unavailable |
 
 ## What the baseline compares
 

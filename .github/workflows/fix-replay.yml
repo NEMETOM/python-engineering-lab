@@ -61,7 +61,7 @@ jobs:
         working-directory: fixflux/clients/fix-replay
         run: |
           pip install -e .
-          pip install pytest pytest-cov ruff==0.17.2 black isort mypy
+          pip install behave pytest pytest-cov ruff==0.17.2 black isort mypy
 
       # ── 5. Unit tests with coverage ───────────────────────────────────────────
       - name: Run pytest with coverage
@@ -74,7 +74,12 @@ jobs:
             --cov-fail-under=85 \
             -v
 
-      # ── 5b. Lint ──────────────────────────────────────────────────────────────
+      # ── 5b. BDD tests ─────────────────────────────────────────────────────────
+      - name: Run BDD tests
+        working-directory: fixflux/clients/fix-replay
+        run: python -m behave tests/bdd/features/
+
+      # ── 5c. Lint ──────────────────────────────────────────────────────────────
       - name: Lint (ruff, black, isort, mypy)
         working-directory: fixflux/clients/fix-replay
         run: |
