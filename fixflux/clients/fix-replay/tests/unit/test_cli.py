@@ -2,6 +2,7 @@ import json
 from unittest.mock import MagicMock, patch
 
 import pytest
+from kafka.errors import KafkaTimeoutError
 
 from fix_replay import cli
 from fix_replay.collector import CollectResult
@@ -110,3 +111,48 @@ class TestPreflight:
     def test_unreachable_metrics_proceeds(self, fix_file, pipeline):
         pipeline.metrics.side_effect = OSError("refused")
         assert _run(fix_file) == cli.EXIT_OK
+
+
+class TestSetupErrors:
+    """A run that couldn't happen must exit 4, never 1 (regression) or
+    2 (incomplete), which an uncaught exception or argparse used to return."""
+
+    def test_missing_input_file_exits_4_not_regression(self, tmp_path, pipeline):
+        assert _run(tmp_path / "nope.txt") == cli.EXIT_ERROR
+        pipeline.tail.assert_not_called()
+
+    @pytest.mark.parametrize("extra", [(), ("--dry-run",)])
+    def test_file_without_valid_orders_exits_4(self, tmp_path, pipeline, extra):
+        # Zero orders would otherwise pass, even against an empty baseline.
+        path = tmp_path / "bad.txt"
+        path.write_text("8=FIX.4.2|35=A|49=B|\n8=FIX.4.2|35=D|49=B|54=3|\n")
+        assert _run(path, *extra) == cli.EXIT_ERROR
+        pipeline.producer.assert_not_called()
+
+    @pytest.mark.parametrize("content", [None, "{not json"])
+    def test_unreadable_baseline_fails_before_any_order_is_sent(
+        self, fix_file, pipeline, tmp_path, content
+    ):
+        base = tmp_path / "base.json"
+        if content is not None:
+            base.write_text(content)
+        assert _run(fix_file, "--baseline", str(base)) == cli.EXIT_ERROR
+        pipeline.producer.assert_not_called()
+
+    def test_missing_reports_topic_exits_4(self, fix_file, pipeline):
+        pipeline.tail.side_effect = RuntimeError("topic does not exist")
+        assert _run(fix_file) == cli.EXIT_ERROR
+        pipeline.producer.assert_not_called()
+
+    def test_kafka_error_mid_send_exits_4_and_closes_consumer(self, fix_file, pipeline):
+        # Real kafka-python error, not a RuntimeError stand-in: KafkaError
+        # stopped subclassing RuntimeError in kafka-python 3.x.
+        pipeline.producer.return_value.flush.side_effect = KafkaTimeoutError("flush")
+        assert _run(fix_file) == cli.EXIT_ERROR
+        pipeline.tail.return_value.close.assert_called_once()
+
+    def test_bad_argument_exits_4_not_incomplete(self, capsys):
+        with pytest.raises(SystemExit) as exc:
+            cli.main(["--rate", "fast", "x.txt"])
+        assert exc.value.code == cli.EXIT_ERROR
+        assert "invalid float value" in capsys.readouterr().err
