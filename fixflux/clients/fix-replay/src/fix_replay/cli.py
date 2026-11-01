@@ -5,6 +5,8 @@ import uuid
 from pathlib import Path
 from typing import Any, NoReturn
 
+from kafka.errors import KafkaError
+
 from fix_replay import config
 from fix_replay.collector import collect
 from fix_replay.parser import load_files
@@ -141,8 +143,9 @@ def main(argv: list[str] | None = None) -> int:
     if not _preflight(args.metrics_url, symbols, args.allow_resting):
         return EXIT_PREFLIGHT
 
-    # RuntimeError covers the shared factory's missing-topic error and
-    # kafka-python's KafkaError (NoBrokersAvailable, KafkaTimeoutError, ...).
+    # RuntimeError: the shared factory's missing-topic error. KafkaError
+    # (NoBrokersAvailable, KafkaTimeoutError, ...) is listed explicitly: it
+    # subclassed RuntimeError in kafka-python 2.x but not in 3.x.
     try:
         # Tail consumer first: it must be positioned before the first send.
         consumer = create_tail_consumer(config.REPORTS_TOPIC)
@@ -153,7 +156,7 @@ def main(argv: list[str] | None = None) -> int:
             )
         finally:
             consumer.close()
-    except RuntimeError as exc:
+    except (RuntimeError, KafkaError) as exc:
         logger.error(f"kafka unavailable: {exc}")
         return EXIT_ERROR
 
