@@ -902,7 +902,7 @@ docker compose --profile full up -d
 
 # Install test dependencies (once)
 pip install -e shared && pip install -e services/fix-gateway && pip install -e services/trade-store
-pip install behave kafka-python httpx sqlalchemy psycopg2-binary
+pip install behave kafka-python==3.0.12 httpx sqlalchemy psycopg2-binary
 
 # Run the full E2E suite (pretty output + step timings configured in behave.ini)
 cd tests/integration
