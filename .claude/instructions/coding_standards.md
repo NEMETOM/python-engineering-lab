@@ -162,3 +162,17 @@ tree. When a CI failure "reappears" after a local fix, check `git status` and
 to commit, list every file to stage, with the exact `git add` paths. A fix that came in a
 follow-up turn is easy to miss: in 2026-11 a fix-replay commit included the test-comment change
 but not the `cli.py` fix, and CI failed the same test again.
+
+**`.githooks/pre-push` catches that case but is not installed.** It blocks a push when tracked
+files are still modified in the same area (first three directory levels) as the pushed commits,
+ignoring `.pyc`. `git config fixflux.prepushStrict false` makes it warn only; `--no-verify` skips
+it once. The owner's global `~/.gitconfig` sets `core.hooksPath`, and git then reads hooks only
+from that directory, not `.git/hooks` or `.githooks`
+([git-config: core.hooksPath](https://git-scm.com/docs/git-config)). So enabling it means
+either a repo-local `git config core.hooksPath .githooks` (the global hooks then stop running in
+this repo) or a global hook that calls the repo's script.
+
+**The `pre-commit` hooks don't run today, for the same reason.** `.git/hooks/pre-commit` is
+installed but ignored under the global `core.hooksPath`. `.pre-commit-config.yaml` also pins
+ruff `v0.4.4`, not CI's `0.17.2`, so bump that rev before re-enabling it, or it will "fix" code
+into a state CI rejects. Left as is deliberately (2026-11); don't assume commits were linted.

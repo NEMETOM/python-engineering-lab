@@ -1,0 +1,66 @@
+#!/bin/sh
+# Catch a half-committed fix: tracked files still modified in the same area as
+# the commits being pushed. CI tests the pushed commit, not the working tree.
+# 2026-11: a fix-replay push had the test change but not the cli.py fix, and CI
+# failed the same test again.
+#
+# Blocks the push by default (a warning is easy to miss in an IDE's Git log).
+# To only warn instead:
+#   git config fixflux.prepushStrict false
+# Skip once with: git push --no-verify
+#
+# Not installed automatically. The global ~/.gitconfig sets core.hooksPath, so
+# git reads hooks only from there; see .claude/instructions/coding_standards.md.
+
+zero=0000000000000000000000000000000000000000
+changed=""
+
+# stdin, per git docs: <local-ref> <local-sha> <remote-ref> <remote-sha>
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+  [ "$local_sha" = "$zero" ] && continue # branch deletion
+  if [ "$remote_sha" = "$zero" ]; then
+    # New remote branch: compare against where it forked from main.
+    base=$(git merge-base "$local_sha" origin/main 2>/dev/null) || continue
+  else
+    base=$remote_sha
+  fi
+  files=$(git diff --name-only "$base" "$local_sha" 2>/dev/null) || continue
+  changed="$changed
+$files"
+done
+
+# Areas = the first three directory levels of each pushed file, e.g.
+# fixflux/clients/fix-replay, .github/workflows. "." = repo-root files only.
+areas=$(printf '%s\n' "$changed" | awk 'NF {
+  n = split($0, p, "/"); m = (n - 1 < 3) ? n - 1 : 3; d = ""
+  for (i = 1; i <= m; i++) d = d p[i] "/"
+  print (d == "" ? "." : d)
+}' | sort -u)
+[ -z "$(printf '%s' "$changed" | tr -d '[:space:]')" ] && exit 0
+
+# Tracked files with uncommitted changes (staged or not); renames keep the new path.
+dirty=$(git status --porcelain --untracked-files=no | cut -c4- | sed 's/.* -> //')
+
+leftover=$(printf '%s\n' "$dirty" | AREAS="$areas" awk '
+  BEGIN { n = split(ENVIRON["AREAS"], a, "\n") }
+  NF && $0 !~ /\.pyc$/ {
+    for (i = 1; i <= n; i++) {
+      if (a[i] == "." ? index($0, "/") == 0 : index($0, a[i]) == 1) { print; next }
+    }
+  }')
+[ -z "$leftover" ] && exit 0
+
+{
+  echo ""
+  echo "pre-push: these tracked files are modified but not committed, in the"
+  echo "same area as what you're pushing. CI won't see them:"
+  printf '%s\n' "$leftover" | sed 's/^/    /'
+  echo ""
+} >&2
+
+if [ "$(git config --bool fixflux.prepushStrict)" = "false" ]; then
+  echo "pre-push: pushing anyway (fixflux.prepushStrict=false)." >&2
+  exit 0
+fi
+echo "pre-push: blocked. Commit them, or push with --no-verify." >&2
+exit 1
