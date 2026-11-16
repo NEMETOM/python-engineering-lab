@@ -13,6 +13,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # docker-compose.yml requires it (no admin/admin fallback). Grafana isn't
+  # started here (it's in the monitoring profile), so any value works.
+  GRAFANA_ADMIN_PASSWORD: ci-placeholder-grafana-not-started
+
 jobs:
   e2e:
     name: Full Pipeline E2E

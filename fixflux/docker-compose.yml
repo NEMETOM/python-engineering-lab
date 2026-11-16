@@ -374,9 +374,11 @@ services:
       # Seeds the admin password on a FRESH grafana_data volume only. An
       # existing install keeps its stored password: rotate it with
       #   docker compose exec grafana grafana cli admin reset-admin-password '<pw>'
-      # Set GRAFANA_ADMIN_PASSWORD in fixflux/.env (gitignored); the "admin"
-      # fallback is for local dev only.
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      # Set GRAFANA_ADMIN_PASSWORD in fixflux/.env (gitignored). There is no
+      # fallback on purpose: a ":-admin" default put admin/admin on the public
+      # droplet from 2026-11-01 until it was used to take over Grafana on
+      # 2026-11-16. For local dev, put any value in your own .env.
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in fixflux/.env}
       GF_USERS_ALLOW_SIGN_UP: "false"
       # Defaults, pinned explicitly: no anonymous access, and viewers can't
       # use Explore - only Editors/Admins can query a datasource ad hoc.
@@ -391,7 +393,8 @@ services:
       - ./infrastructure/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana_data:/var/lib/grafana
     ports:
-      - "3000:3000"
+      # Loopback only. Reach it with: ssh -L 3000:localhost:3000 root@<droplet>
+      - "127.0.0.1:3000:3000"
     logging: *default-logging
     profiles: [monitoring]
 
