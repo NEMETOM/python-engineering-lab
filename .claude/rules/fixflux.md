@@ -37,6 +37,13 @@ with. Don't regress any of these:
 - **Grafana:** no anonymous access, and Viewers can't use Explore. The admin password is set
   from `.env` on a fresh volume; rotate a running instance with
   `grafana cli admin reset-admin-password`.
+- **Grafana is loopback-only** (`127.0.0.1:3000:3000`); use `ssh -L 3000:localhost:3000`. And
+  `GF_SECURITY_ADMIN_PASSWORD` has **no fallback** (`:?`), so compose refuses to run without
+  `GRAFANA_ADMIN_PASSWORD`. Never restore `:-admin` or a public 3000. Why: the old `:-admin`
+  default left admin/admin on public :3000 from 2026-11-01. On 2026-11-16, 193.187.110.182 used
+  it to create admin `hxops_89cnx7` and delete `admin`. Evidence is in
+  `/root/incident-20261116/` on the droplet. Note that Grafana only logs non-200 requests, so
+  successful API calls (user create/delete) leave no request log.
 
 Still published on all interfaces (Redpanda 9092, compliance-api 8010, Prometheus 9090 and
 others): check the `ports:` entries in `docker-compose.yml` before assuming a port is private.
