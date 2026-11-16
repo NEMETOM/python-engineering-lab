@@ -7,7 +7,7 @@ name = "reporting-service"
 version = "0.1.0"
 
 dependencies = [
- "kafka-python",
+ "kafka-python==3.0.12",
  "pydantic",
  "sqlalchemy",
  "psycopg2-binary",

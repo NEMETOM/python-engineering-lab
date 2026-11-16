@@ -13,6 +13,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # docker-compose.yml requires it (no admin/admin fallback). Grafana isn't
+  # started here (it's in the monitoring profile), so any value works.
+  GRAFANA_ADMIN_PASSWORD: ci-placeholder-grafana-not-started
+
 jobs:
   e2e:
     name: Full Pipeline E2E
@@ -55,7 +60,7 @@ jobs:
           pip install -e ./shared
           pip install -e ./services/trade-store
           pip install -e ./services/fix-gateway
-          pip install behave allure-behave kafka-python httpx sqlalchemy psycopg2-binary
+          pip install behave allure-behave kafka-python==3.0.12 httpx sqlalchemy psycopg2-binary
 
       - name: Run E2E BDD tests
         env:
@@ -161,7 +166,7 @@ jobs:
           pip install -e ./shared
           pip install -e ./services/trade-store
           pip install -e ./services/fix-gateway
-          pip install behave kafka-python httpx sqlalchemy psycopg2-binary
+          pip install behave kafka-python==3.0.12 httpx sqlalchemy psycopg2-binary
 
       - name: Run volume BDD tests
         env:

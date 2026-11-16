@@ -56,7 +56,7 @@ The watcher imports `shared/` and `fix-gateway`, so both must be on the Python p
 Run from the `fixflux/` directory:
 
 ```bash
-pip install kafka-python pydantic  # one-time
+pip install kafka-python==3.0.12 pydantic  # one-time
 PYTHONPATH=.:services/fix-gateway/src python clients/fix-filedrop-client/watcher.py
 ```
 

@@ -85,8 +85,10 @@ logger = get_logger(__name__)
   the start on a new service — it's easy to forget and only surfaces as a confusing
   `ModuleNotFoundError` later.
 - CI enforces `--cov-fail-under=85` per service (compliance-service, fix-gateway,
-  market-data-service, matching-engine, order-service, risk-service, trade-store). Match that bar
-  in any new service's workflow rather than inventing a different number.
+  market-data-api, market-data-service, matching-engine, order-service, reporting-service,
+  risk-service, trade-store) and for `clients/fix-replay`. `shared/` has no workflow, so nothing
+  enforces it there. Match that bar in any new service's workflow rather than inventing a
+  different number.
 - FastAPI routes with an injected dependency (e.g. a Kafka producer) should use `Depends()` +
   `functools.lru_cache` so tests can swap it via `app.dependency_overrides`, never a real broker:
   ```python
@@ -100,13 +102,17 @@ logger = get_logger(__name__)
   Ruff's B008 rule flags `Depends(...)` as a mutable-default-in-signature false positive here —
   the fix is `extend-immutable-calls = ["fastapi.Depends"]` under
   `[tool.ruff.lint.flake8-bugbear]` in `pyproject.toml`, not restructuring the DI pattern away.
-- **`kafka-python` is unpinned, and CI and local resolve different major versions.** Observed
-  2026-11: CI installs 3.x (3.0.12), a typical local env has 2.x (2.2.15). In 3.x `KafkaError`
-  subclasses `Exception`, not `RuntimeError`, so `except RuntimeError` misses broker errors on CI
-  only. That's how `clients/fix-replay` passed locally and failed CI (2026-11). Catch
-  `kafka.errors.KafkaError` by name. Before calling Kafka-facing behavior verified, run the suite
-  in a throwaway venv with the version CI resolves (`pip download kafka-python --no-deps` shows
-  it). Pinning it in every `pyproject.toml` is the real fix; until then this is a known hazard.
+- **`kafka-python` is pinned to `3.0.12`** in every `pyproject.toml` that uses it (including
+  `shared/`, which imports it in `kafka_client.py`) and in the e2e workflows. Install the same
+  version locally (`pip install kafka-python==3.0.12`); a 2.x install still passes most tests but
+  behaves differently. In 3.x `KafkaError` subclasses `Exception`, not `RuntimeError` (it did in
+  2.x), so catch `kafka.errors.KafkaError` by name. Before the pin, CI resolved 3.x while local
+  envs had 2.x, and `clients/fix-replay` passed locally but failed CI (2026-11). To upgrade, change
+  the pin everywhere in one commit (`git grep -n "kafka-python=="`) and run every service's unit
+  and BDD suites on the new version first.
+- **Other runtime dependencies are still unpinned** (`fastapi`/`starlette`, `pydantic`, ...) and
+  can drift the same way: as of 2026-11 a fresh install resolves starlette 1.x, while a typical
+  local env has 0.4x. When CI fails on code that passes locally, compare `pip list` versions first.
 
 ## Lint / format
 
@@ -156,3 +162,17 @@ tree. When a CI failure "reappears" after a local fix, check `git status` and
 to commit, list every file to stage, with the exact `git add` paths. A fix that came in a
 follow-up turn is easy to miss: in 2026-11 a fix-replay commit included the test-comment change
 but not the `cli.py` fix, and CI failed the same test again.
+
+**`.githooks/pre-push` catches that case but is not installed.** It blocks a push when tracked
+files are still modified in the same area (first three directory levels) as the pushed commits,
+ignoring `.pyc`. `git config fixflux.prepushStrict false` makes it warn only; `--no-verify` skips
+it once. The owner's global `~/.gitconfig` sets `core.hooksPath`, and git then reads hooks only
+from that directory, not `.git/hooks` or `.githooks`
+([git-config: core.hooksPath](https://git-scm.com/docs/git-config)). So enabling it means
+either a repo-local `git config core.hooksPath .githooks` (the global hooks then stop running in
+this repo) or a global hook that calls the repo's script.
+
+**The `pre-commit` hooks don't run today, for the same reason.** `.git/hooks/pre-commit` is
+installed but ignored under the global `core.hooksPath`. `.pre-commit-config.yaml` also pins
+ruff `v0.4.4`, not CI's `0.17.2`, so bump that rev before re-enabling it, or it will "fix" code
+into a state CI rejects. Left as is deliberately (2026-11); don't assume commits were linted.
