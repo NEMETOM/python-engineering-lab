@@ -100,6 +100,13 @@ logger = get_logger(__name__)
   Ruff's B008 rule flags `Depends(...)` as a mutable-default-in-signature false positive here —
   the fix is `extend-immutable-calls = ["fastapi.Depends"]` under
   `[tool.ruff.lint.flake8-bugbear]` in `pyproject.toml`, not restructuring the DI pattern away.
+- **`kafka-python` is unpinned, and CI and local resolve different major versions.** Observed
+  2026-11: CI installs 3.x (3.0.12), a typical local env has 2.x (2.2.15). In 3.x `KafkaError`
+  subclasses `Exception`, not `RuntimeError`, so `except RuntimeError` misses broker errors on CI
+  only. That's how `clients/fix-replay` passed locally and failed CI (2026-11). Catch
+  `kafka.errors.KafkaError` by name. Before calling Kafka-facing behavior verified, run the suite
+  in a throwaway venv with the version CI resolves (`pip download kafka-python --no-deps` shows
+  it). Pinning it in every `pyproject.toml` is the real fix; until then this is a known hazard.
 
 ## Lint / format
 
@@ -143,6 +150,9 @@ it too. `black`, `isort` and `mypy` are still unpinned and can drift the same wa
 `ruff check --show-settings <file> | grep <code>`. A `noqa` for a disabled rule (e.g. `S310`;
 the `S` bandit rules are not enabled here) is itself an error under `RUF100`.
 
-**A lint fix isn't done until it's pushed.** CI lints the pushed commit, not the working tree.
-When a CI failure "reappears" after a local fix, check `git status` and
-`git show origin/<branch>:<path>` before changing code again.
+**A fix isn't done until it's pushed.** CI tests and lints the pushed commit, not the working
+tree. When a CI failure "reappears" after a local fix, check `git status` and
+`git show origin/<branch>:<path>` before changing code again. When handing a fix to someone else
+to commit, list every file to stage, with the exact `git add` paths. A fix that came in a
+follow-up turn is easy to miss: in 2026-11 a fix-replay commit included the test-comment change
+but not the `cli.py` fix, and CI failed the same test again.
