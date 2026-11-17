@@ -1,0 +1,54 @@
+{
+  "_comment": "Expected state of the FixFlux droplet. audit.py flags anything outside it. Update this file deliberately (with a reason) when the expected state changes, never to silence a finding you haven't explained. No IP addresses here: the repo may be public.",
+
+  "sensitive_ports": {
+    "3000": "Grafana (must be 127.0.0.1 only; 2026-11-16 incident)",
+    "5432": "Postgres (container port)",
+    "5433": "Postgres (host port, must be 127.0.0.1 only)",
+    "8012": "reporting-service metrics (not published)"
+  },
+
+  "accepted_public_ports": {
+    "22": "SSH, key-only",
+    "3100": "Loki - NO AUTH: anyone can read all container logs",
+    "3200": "Tempo - NO AUTH: anyone can read traces",
+    "4318": "Tempo OTLP ingest - NO AUTH: anyone can write traces",
+    "8000": "trade-store REST API - NO AUTH",
+    "8001": "fix-gateway metrics",
+    "8003": "matching-engine metrics",
+    "8004": "risk-service metrics",
+    "8005": "fix-filedrop-client watcher metrics (host process, fixflux-watcher.service)",
+    "8006": "market-data-api WebSocket - NO AUTH",
+    "8010": "compliance-api console - NO AUTH: anyone can inject orders",
+    "8011": "compliance-consumer metrics",
+    "9090": "Prometheus - NO AUTH",
+    "9092": "Redpanda/Kafka - NO AUTH: anyone can produce to any topic",
+    "9093": "Alertmanager - NO AUTH: anyone can silence alerts"
+  },
+
+  "host_listeners": {
+    "22": "sshd",
+    "8005": "python3 watcher.py (fixflux-watcher.service)"
+  },
+
+  "grafana_admin_logins": ["admin"],
+
+  "authorized_key_fingerprints": {
+    "SHA256:RovmTAkOp66znKzEfdgDqtSxeJSO6FPntx3R0+eu+C0": "fixflux-droplet deploy key (owner laptop + GitHub Actions secret)"
+  },
+
+  "required_env": ["GRAFANA_ADMIN_PASSWORD", "GRAFANA_DB_READER_PASSWORD"],
+
+  "recent_change_ignore": [
+    "/root/.bash_history",
+    "/root/.wget-hsts",
+    "/root/.cache/",
+    "/root/.docker/buildx/",
+    "/root/.lesshst",
+    "/root/.viminfo",
+    "/root/incident-",
+    "/root/python-engineering-lab/",
+    "/etc/ld.so.cache",
+    "/etc/systemd/system/snap"
+  ]
+}
