@@ -60,6 +60,27 @@ When something looks wrong (a metric, a missing trade, a dashboard not rendering
    never actually checked against live behavior" is a known failure mode on this project — a
    Grafana field override that matched no real field was shipped once already before being caught.
 
+## Security: audit first, then act
+
+- **Run the security audit** for any security question ("anything suspicious?", "who logged in?",
+  before a demo) and after any change to ports, credentials or keys:
+  `python .claude/skills/security-audit/audit.py --host <droplet-ip>`. It's read-only. See
+  `.claude/skills/security-audit/SKILL.md` for what each finding means and its blind spots.
+- **The 2026-11-16 Grafana incident is the reference case** (`.claude/rules/fixflux.md`): a
+  `:-admin` compose fallback on a public port, taken over from an outside IP. Default credentials
+  and public bindings of Grafana (3000) or Postgres (5433) are ALERTs, never "expected".
+- **Evidence before containment, always.** Recreating a container destroys its logs. Run
+  `collect_evidence.sh` (see the skill) before any `up`, `down`, restart, deploy or volume change
+  during an incident, and confirm each containment step with the user.
+- **Grafana doesn't log successful (200) requests.** Absence of a request in its log proves
+  nothing. Check the resulting state (users, sessions, data sources) instead.
+- **Never print a secret.** Read `.env` for variable names only. Generate and verify passwords on
+  the droplet, and hand them over through a file the user deletes.
+- **Most ports are filtered by an external firewall** (DigitalOcean, inferred 2026-11-17: no `ufw`
+  or `DOCKER-USER` rules on the host). As of 2026-11-17 only 22, 8000, 8006 and 8010 are
+  reachable from outside. Treat the bind address and the firewall as two separate layers, and
+  don't call a port private just because it's filtered today.
+
 ## Reporting
 
 When you fix something operational, say what you verified (log lines, query output, a real

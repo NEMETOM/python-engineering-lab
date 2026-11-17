@@ -47,6 +47,15 @@ Act as the sre_agent (.claude/agents/sre_agent.md) and check why trades aren't s
 /sre-agent verify the firewall allows the new service's port before I test it
 ```
 
+`/security-audit` - read-only security audit of the live droplet (runs as the SRE persona). See
+[the security playbook below](#demo-playbook-security-audit-with-sre-agent) for details:
+```
+/security-audit
+/security-audit --days 30
+/security-audit focus on ssh: who logged in this week, and from where?
+/sre-agent run the security audit and explain every WARN, verified vs inferred
+```
+
 `/legal-counsel-agent` — audit trail, regulatory mapping, forensic replay:
 ```
 /legal-counsel-agent review the audit trail for evidentiary defensibility
@@ -55,8 +64,9 @@ Act as the sre_agent (.claude/agents/sre_agent.md) and check why trades aren't s
 /legal-counsel-agent check whether Kafka retention covers replaying a given incident
 ```
 
-Each skill (`.claude/skills/sdet-agent/`, `sre-agent/`, `legal-counsel-agent/`) is a thin pointer —
-its `SKILL.md` just says "read the corresponding agent file and adopt its persona for this task."
+Each persona skill (`.claude/skills/sdet-agent/`, `sre-agent/`, `legal-counsel-agent/`) is a thin
+pointer. Its `SKILL.md` just says "read the corresponding agent file and adopt its persona for this
+task." (`security-audit/` is different: it ships its own scripts, but still runs as the SRE persona.)
 The agent `.md` files stay the single source of truth; the skills don't duplicate their content, so
 editing an agent file updates what both invocation methods do.
 
@@ -335,6 +345,47 @@ each item. Fixes are a separate, optional segment, so the audit itself never cha
 - **Evidence or it didn't happen.** Every finding needs a command output, file and line, or config
   value, and is labelled *verified* or *inferred*.
 
+### Quick start: the scripted audit (read-only, ~1 min)
+
+The repeatable part of the audit is scripted in `.claude/skills/security-audit/`, built from the
+2026-11-16 Grafana incident. Run it through the skill, or directly from the repo root on your
+laptop:
+
+```bash
+# Full audit, last 7 days (exit code: 2 = ALERT, 1 = WARN, 0 = clean)
+python .claude/skills/security-audit/audit.py --host <droplet-ip> --days 7
+
+# Keep the raw data to dig into a finding (contains IPs: keep it out of the repo)
+python .claude/skills/security-audit/audit.py --host <droplet-ip> --json-out /tmp/audit-raw.json
+
+# Re-analyse saved data offline, e.g. after changing baseline.json
+python .claude/skills/security-audit/audit.py --from-json /tmp/audit-raw.json
+```
+
+You get a Markdown report graded ALERT / WARN / INFO. Here is an excerpt from the 2026-11-17 run
+(no ALERTs):
+
+```
+**0 ALERT, 3 WARN, 6 INFO**
+## WARN
+- exposure: reachable from the internet with NO authentication: 8000 (trade-store REST API),
+  8006 (market-data-api WebSocket), 8010 (compliance-api console).
+## SSH login sources (accepted)
+- GitHub Actions: 61 login(s) from 43 IP(s)
+- this machine: 25 login(s) from 1 IP(s)
+```
+
+If it reports an ALERT, **preserve evidence before changing anything**, because a container
+recreate wipes that container's logs:
+
+```bash
+ssh -i ~/.ssh/fixflux_do root@<droplet-ip> 'bash -s' < .claude/skills/security-audit/collect_evidence.sh
+```
+
+Then follow the incident playbook in `.claude/skills/security-audit/SKILL.md`. The scripted audit
+covers the droplet. Segment A below adds the repo-wide review it doesn't do (Dockerfiles, Actions
+pinning, dangerous flags).
+
 ### Segment A: the full audit (read-only, ~10 min)
 
 ```
@@ -356,7 +407,7 @@ record, and finding that out is a good result in itself.
 | HTTP | compliance-api `8010`: FIX injector and rule-toggle admin panel with no authentication | Anyone can inject orders or switch surveillance rules off | Loopback plus SSH tunnel, or basic auth in front |
 | Monitoring | Prometheus `9090` public with `--web.enable-lifecycle` | Anyone can reload or shut down Prometheus | Drop the flag or bind to `127.0.0.1` |
 | Monitoring | Alertmanager `9093`, Loki `3100`, Tempo `3200`/`4318` public | Silence alerts, read logs, push fake traces | Bind to `127.0.0.1`; Grafana reaches them over the compose network |
-| Grafana | Public on `3000`; password strength depends on `.env` | Admin access means Explore across all datasources | Strong password (done via `.env`); optionally firewall to your IP |
+| Grafana | **Fixed 2026-11-16:** loopback-only (`127.0.0.1:3000`), and compose refuses to start without `GRAFANA_ADMIN_PASSWORD`. Before that it was public with an `admin/admin` fallback and was taken over | Admin access means Explore across all datasources | (done) The audit should report it as a passing check; `/security-audit` raises an ALERT if it regresses |
 | Secrets | `fixuser`/`fixpass` in `docker-compose.yml`, `k8s/02-secret.yaml` and docs | Anyone reading the repo has DB credentials | Move to `.env`; rotate. Postgres is already loopback-only, which limits the damage |
 | Containers | 0 of 10 FixFlux Dockerfiles set a non-root `USER` | A compromised service runs as root in its container | Add `USER` to each Dockerfile |
 | Host | Deploys SSH in as `root` | A leaked deploy key is full root on the droplet | Dedicated deploy user in the `docker` group |
@@ -364,7 +415,9 @@ record, and finding that out is a good result in itself.
 | Already hardened | Postgres on `127.0.0.1:5433`; `grafana_reader` read-only with timeouts and a 3-connection limit; `.env` gitignored | Should be reported as passing checks | (none) |
 
 A good audit also says what it **couldn't** check, e.g. the DigitalOcean cloud firewall, which
-lives in DigitalOcean's control panel rather than on the droplet.
+lives in DigitalOcean's control panel rather than on the droplet. The scripted audit only infers
+it: as of 2026-11-17, most public binds are filtered from outside, and only 22, 8000, 8006 and
+8010 are reachable.
 
 ### Segment B: fix the top finding (local edits, ~5 min)
 
