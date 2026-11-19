@@ -51,6 +51,12 @@ def is_internal(ip: str) -> bool:
     # them as private, which once made this check skip every public listener.
     if addr.is_unspecified:
         return False
+    # Tailscale (tailnet-only access to Grafana) uses 100.64.0.0/10 and
+    # fd7a:115c:a1e0::/48, which ipaddress doesn't count as private.
+    if addr in ipaddress.ip_network("100.64.0.0/10") or (
+        addr.version == 6 and addr in ipaddress.ip_network("fd7a:115c:a1e0::/48")
+    ):
+        return True
     return addr.is_loopback or addr.is_private
 
 

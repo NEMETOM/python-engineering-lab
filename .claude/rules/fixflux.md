@@ -44,6 +44,13 @@ with. Don't regress any of these:
   it to create admin `hxops_89cnx7` and delete `admin`. Evidence is in
   `/root/incident-20261116/` on the droplet. Note that Grafana only logs non-200 requests, so
   successful API calls (user create/delete) leave no request log.
+- **Remote Grafana access is tailnet-only, via Tailscale** (since 2026-11-19). From the owner's
+  devices (laptop, iPhone), browse to `http://fixflux-prod:3000`. On the droplet,
+  `tailscale serve --bg --http=3000 http://127.0.0.1:3000` forwards the tailnet to the loopback
+  port. It persists across reboots and deploys, and it's outside compose; check it with
+  `tailscale serve status`. Keep the compose binding at `127.0.0.1`. Never bind Grafana to the
+  tailnet IP in compose (Docker can start before `tailscaled` has the address) or to `0.0.0.0`.
+  The SSH tunnel still works as a fallback.
 
 Still published on all interfaces (Redpanda 9092, compliance-api 8010, Prometheus 9090 and
 others): check the `ports:` entries in `docker-compose.yml` before assuming a port is private.
