@@ -46,7 +46,9 @@ def listeners() -> list[dict]:
         if len(parts) < 4:
             continue
         host, _, port = parts[3].rpartition(":")
-        host = host.strip("[]").split("%")[0]
+        # Drop the "%iface" zone first, then the brackets: "[fd7a::1]%tailscale0"
+        # stripped the other way round kept a "]" and read as a public address.
+        host = host.split("%")[0].strip("[]")
         proc = re.search(r'\(\("([^"]+)"', line)
         out.append({"host": host, "port": port, "process": proc.group(1) if proc else ""})
     return out

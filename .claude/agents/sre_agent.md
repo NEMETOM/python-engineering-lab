@@ -76,6 +76,10 @@ When something looks wrong (a metric, a missing trade, a dashboard not rendering
   nothing. Check the resulting state (users, sessions, data sources) instead.
 - **Never print a secret.** Read `.env` for variable names only. Generate and verify passwords on
   the droplet, and hand them over through a file the user deletes.
+- **Grafana is reached over Tailscale, not the internet**: `http://fixflux-prod:3000` from the
+  owner's tailnet devices, via `tailscale serve` on the droplet (see `.claude/rules/fixflux.md`).
+  "Grafana unreachable" means checking `tailscale status` and `tailscale serve status` first.
+  Don't open port 3000.
 - **Most ports are filtered by an external firewall** (DigitalOcean, inferred 2026-11-17: no `ufw`
   or `DOCKER-USER` rules on the host). As of 2026-11-17 only 22, 8000, 8006 and 8010 are
   reachable from outside. Treat the bind address and the firewall as two separate layers, and
