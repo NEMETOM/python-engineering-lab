@@ -32,8 +32,13 @@ with. Don't regress any of these:
   `SELECT` from `regulatory_reports_public` (no LEIs or client IDs). It runs read-only
   transactions, with a 5s statement timeout and a 3-connection limit (set in
   `reporting_service/public_view.py`, re-applied on every start).
+- **reporting-api's feed uses `public_feed_reader`, never `fixuser`.** Same restrictions as
+  `grafana_reader` (view only, read-only, 5s timeout, 3 connections). It's published as
+  `127.0.0.1:8013`. The owner chose to keep it loopback-only (2026-11-22) after the Grafana
+  incident below, even though the data is public by design. Don't drop the prefix unless asked.
 - **Secrets live in `fixflux/.env` on the host** (gitignored): `GRAFANA_DB_READER_PASSWORD`,
-  `GRAFANA_ADMIN_PASSWORD`. Never commit them, and never add a default for the reader password.
+  `PUBLIC_FEED_DB_READER_PASSWORD`, `GRAFANA_ADMIN_PASSWORD`. Never commit them, and never add a
+  default for either reader password.
 - **Grafana:** no anonymous access, and Viewers can't use Explore. The admin password is set
   from `.env` on a fresh volume; rotate a running instance with
   `grafana cli admin reset-admin-password`.

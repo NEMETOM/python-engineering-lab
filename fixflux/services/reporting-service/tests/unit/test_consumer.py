@@ -108,7 +108,9 @@ class TestRun:
             patch.object(consumer, "create_consumer", return_value=[msg]) as create,
             patch.object(consumer, "ReportRepository") as repo_cls,
             patch.object(consumer, "handle") as handler,
-            patch.object(consumer, "ensure_public_view", return_value=True),
+            patch.object(
+                consumer, "ensure_public_view", return_value=["grafana_reader"]
+            ),
         ):
             consumer.run()
         metrics.assert_called_once_with(8012)
@@ -126,7 +128,7 @@ class TestRun:
             patch.object(consumer, "start_http_server"),
             patch.object(consumer, "create_consumer", return_value=[]),
             patch.object(consumer, "ReportRepository"),
-            patch.object(consumer, "ensure_public_view", return_value=False),
+            patch.object(consumer, "ensure_public_view", return_value=[]),
         ):
             consumer.run()
         for outcome in consumer.OUTCOMES:
@@ -135,13 +137,17 @@ class TestRun:
             )
             assert value is not None, f"{outcome} series not exported"
 
-    def test_public_view_is_ensured_with_the_configured_reader_password(self):
+    def test_public_view_is_ensured_with_each_configured_reader_password(self):
         with (
             patch.object(consumer, "start_http_server"),
             patch.object(consumer, "create_consumer", return_value=[]),
             patch.object(consumer, "ReportRepository"),
-            patch.object(consumer.config, "GRAFANA_READER_PASSWORD", "pw"),
-            patch.object(consumer, "ensure_public_view", return_value=True) as ensure,
+            patch.object(consumer.config, "GRAFANA_READER_PASSWORD", "g-pw"),
+            patch.object(consumer.config, "FEED_READER_PASSWORD", "f-pw"),
+            patch.object(consumer, "ensure_public_view", return_value=[]) as ensure,
         ):
             consumer.run()
-        assert ensure.call_args.args[1] == "pw"
+        assert ensure.call_args.args[1] == {
+            "grafana_reader": "g-pw",
+            "public_feed_reader": "f-pw",
+        }

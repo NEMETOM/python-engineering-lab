@@ -1,10 +1,11 @@
-"""Public, read-only view of regulatory_reports for Grafana.
+"""Public, read-only view of regulatory_reports for Grafana and the post-trade feed.
 
 The view carries only RTS 1 post-trade transparency fields (no LEIs, client
-IDs or trading capacity), and the reader role can SELECT from the view and
+IDs or trading capacity), and each reader role can SELECT from the view and
 nothing else. Grafana's Explore lets any Editor run arbitrary SQL through a
-datasource, so the database role - not the dashboard - is what limits what a
-compromised Grafana could read.
+datasource, and the feed is an unauthenticated HTTP endpoint, so the database
+role - not the dashboard or the API code - is what limits what a compromised
+reader could see.
 """
 
 from sqlalchemy import text
@@ -12,6 +13,8 @@ from sqlalchemy.engine import Engine
 
 VIEW_NAME = "regulatory_reports_public"
 READER_ROLE = "grafana_reader"
+# reporting-api's role for the public post-trade feed (api/main.py).
+FEED_READER_ROLE = "public_feed_reader"
 
 # Never add buyer_*/seller_* columns, LEIs or capacity here: RTS 1 publication
 # must not identify the counterparties.
@@ -48,10 +51,10 @@ VIEW_SQL = (
 )
 
 
-# Limits on what a stolen grafana_reader password can do even with a valid
-# login: no writes even if a grant is ever widened by mistake, no query long
-# enough to starve the 2-vCPU droplet, and no connection flood. The datasource
-# itself uses 2 connections (maxOpenConns in postgres_public.yml).
+# Limits on what a stolen reader password can do even with a valid login: no
+# writes even if a grant is ever widened by mistake, no query long enough to
+# starve the 2-vCPU droplet, and no connection flood. Grafana's datasource uses
+# 2 connections (maxOpenConns in postgres_public.yml), reporting-api's pool 2.
 READER_CONNECTION_LIMIT = 3
 READER_SETTINGS = (
     ("default_transaction_read_only", "on"),
@@ -65,30 +68,33 @@ def _quote_literal(value: str) -> str:
     return "'" + value.replace("'", "''") + "'"
 
 
-def ensure_public_view(engine: Engine, reader_password: str | None) -> bool:
-    """Create or refresh the view, and the reader role when a password is set.
+def ensure_public_view(engine: Engine, readers: dict[str, str | None]) -> list[str]:
+    """Create or refresh the view, and each reader role that has a password.
 
-    Idempotent, so it runs on every start. Returns True if the role was
-    created or updated. Without a password the role is left alone: no default
-    credential is ever created.
+    `readers` maps role name to password. Idempotent, so it runs on every
+    start. Returns the roles created or updated. A role without a password is
+    left alone: no default credential is ever created.
     """
+    ready = []
     with engine.begin() as conn:
         conn.execute(text(VIEW_SQL))
-        if not reader_password:
-            return False
-        exists = conn.execute(
-            text("SELECT 1 FROM pg_roles WHERE rolname = :name"),
-            {"name": READER_ROLE},
-        ).scalar()
-        verb = "ALTER" if exists else "CREATE"
-        conn.execute(
-            text(
-                f"{verb} ROLE {READER_ROLE} LOGIN "
-                f"CONNECTION LIMIT {READER_CONNECTION_LIMIT} "
-                f"PASSWORD {_quote_literal(reader_password)}"
+        for role, password in readers.items():
+            if not password:
+                continue
+            exists = conn.execute(
+                text("SELECT 1 FROM pg_roles WHERE rolname = :name"),
+                {"name": role},
+            ).scalar()
+            verb = "ALTER" if exists else "CREATE"
+            conn.execute(
+                text(
+                    f"{verb} ROLE {role} LOGIN "
+                    f"CONNECTION LIMIT {READER_CONNECTION_LIMIT} "
+                    f"PASSWORD {_quote_literal(password)}"
+                )
             )
-        )
-        for setting, value in READER_SETTINGS:
-            conn.execute(text(f"ALTER ROLE {READER_ROLE} SET {setting} = {value}"))
-        conn.execute(text(f"GRANT SELECT ON {VIEW_NAME} TO {READER_ROLE}"))
-    return True
+            for setting, value in READER_SETTINGS:
+                conn.execute(text(f"ALTER ROLE {role} SET {setting} = {value}"))
+            conn.execute(text(f"GRANT SELECT ON {VIEW_NAME} TO {role}"))
+            ready.append(role)
+    return ready

@@ -247,8 +247,33 @@ services:
       # Creates/rotates the read-only grafana_reader role (SELECT on
       # regulatory_reports_public only). Unset = no role. See fixflux/.env.
       GRAFANA_DB_READER_PASSWORD: ${GRAFANA_DB_READER_PASSWORD:-}
+      # Same for public_feed_reader, the role reporting-api connects as.
+      PUBLIC_FEED_DB_READER_PASSWORD: ${PUBLIC_FEED_DB_READER_PASSWORD:-}
     # /metrics on 8012 is scraped over the compose network; not published to
     # the host since nothing outside the stack needs it.
+    logging: *default-logging
+    restart: on-failure
+    profiles: [pipeline, full]
+
+  # RTS 1 public post-trade feed: GET /post-trade?symbol=&since=&format=json|csv.
+  # Same image as reporting-service. Connects as public_feed_reader (SELECT on
+  # regulatory_reports_public only), never fixuser. Without
+  # PUBLIC_FEED_DB_READER_PASSWORD in fixflux/.env it answers 503.
+  reporting-api:
+    build:
+      context: .
+      dockerfile: services/reporting-service/Dockerfile
+    command: ["uvicorn", "reporting_service.api.main:app", "--host", "0.0.0.0", "--port", "8013"]
+    depends_on:
+      reporting-service:
+        condition: service_started
+    environment:
+      PUBLIC_FEED_DATABASE_URL: postgresql+psycopg2://public_feed_reader:${PUBLIC_FEED_DB_READER_PASSWORD:-}@postgres:5432/fixdb
+      LOG_LEVEL: INFO
+    # Loopback-only, like Grafana: reach it via the tailnet or ssh -L 8013:localhost:8013.
+    # Making it public is a deliberate choice: drop the 127.0.0.1: prefix.
+    ports:
+      - "127.0.0.1:8013:8013"
     logging: *default-logging
     restart: on-failure
     profiles: [pipeline, full]

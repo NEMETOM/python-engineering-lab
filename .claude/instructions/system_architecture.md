@@ -96,6 +96,11 @@ scaling ceiling, not an oversight to silently "fix" — see `fixflux/PERFORMANCE
   every service that needs both a consumer loop and an HTTP API in this repo splits them into two
   sibling containers from the same image, not one process doing both).
 - **market-data-api** — the one WebSocket surface, described in `coding_standards.md`.
+- **reporting-service** (`reporting-api` container, `:8013`, loopback-only) — the RTS 1 public
+  post-trade feed, `GET /post-trade?symbol=&since=&limit=&format=json|csv`. Unauthenticated by
+  design; it connects as `public_feed_reader`, which can only `SELECT` from
+  `regulatory_reports_public`, and returns `REPORTABLE` rows only. Same image as the
+  `reporting-service` consumer, which creates that role on start.
 
 ## The `shared/` library
 
