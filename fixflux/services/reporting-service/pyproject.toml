@@ -13,6 +13,8 @@ dependencies = [
  "psycopg2-binary",
  "pyyaml",
  "prometheus-client>=0.20",
+ "fastapi",
+ "uvicorn",
 ]
 
 [tool.setuptools]
@@ -26,6 +28,7 @@ test = [
   "pytest",
   "pytest-cov",
   "behave",
+  "httpx",
 ]
 
 [tool.ruff]
@@ -34,6 +37,11 @@ target-version = "py311"
 
 [tool.ruff.lint.isort]
 known-first-party = ["reporting_service", "shared"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's DI pattern relies on calling Depends()/Query() as an argument
+# default; B008 doesn't special-case this the way it does for e.g. dataclasses.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
 
 [tool.black]
 line-length = 88

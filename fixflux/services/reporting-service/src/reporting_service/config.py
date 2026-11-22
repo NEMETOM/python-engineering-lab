@@ -25,6 +25,19 @@ DB_RETRY_MAX_BACKOFF_SECONDS = float(os.getenv("REPORTING_DB_RETRY_MAX_BACKOFF",
 # role is never created - there is deliberately no default credential.
 GRAFANA_READER_PASSWORD = os.getenv("GRAFANA_DB_READER_PASSWORD") or None
 
+# Password for reporting-api's read-only role (public_feed_reader), same rules:
+# unset means no role, and reporting-api then answers 503.
+FEED_READER_PASSWORD = os.getenv("PUBLIC_FEED_DB_READER_PASSWORD") or None
+
+# Public post-trade feed (reporting-api). The DSN connects as
+# public_feed_reader, never fixuser, so the feed can only read the public view.
+FEED_DATABASE_URL = os.getenv("PUBLIC_FEED_DATABASE_URL") or None
+# Rows newer than this are held back. 0 = publish as soon as stored; set e.g.
+# 900 to model a free feed that lags the real-time one.
+FEED_DELAY_SECONDS = float(os.getenv("PUBLIC_FEED_DELAY_SECONDS", "0"))
+FEED_DEFAULT_LIMIT = 100
+FEED_MAX_LIMIT = 1000
+
 # Priority order (same scheme as compliance-service's policy file):
 # 1. Explicit path argument (tests / programmatic callers)
 # 2. REPORTING_REFERENCE_DATA_PATH env var
