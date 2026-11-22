@@ -803,7 +803,7 @@
           "format": "table",
           "rawQuery": true,
           "editorMode": "code",
-          "rawSql": "SELECT reporting_timestamp AS \"Reported\", trading_timestamp AS \"Traded\", trade_id AS \"Trade ID\", symbol AS \"Symbol\", asset_class AS \"Asset class\", price AS \"Price\", price_currency AS \"Ccy\", quantity AS \"Qty\", buyer_lei AS \"Buyer LEI\", seller_lei AS \"Seller LEI\", status AS \"Status\", reason AS \"Reason\", publication_latency_ms AS \"Latency (ms)\", deadline_breached AS \"> 60s\" FROM regulatory_reports_public WHERE $__timeFilter(reporting_timestamp) ORDER BY reporting_timestamp DESC LIMIT 200",
+          "rawSql": "SELECT reporting_timestamp AS \"Reported\", trading_timestamp AS \"Traded\", trade_id AS \"Trade ID\", symbol AS \"Symbol\", asset_class AS \"Asset class\", price AS \"Price\", price_currency AS \"Ccy\", quantity AS \"Qty\", status AS \"Status\", reason AS \"Reason\", publication_latency_ms AS \"Latency (ms)\", deadline_breached AS \"> 60s\" FROM regulatory_reports_public WHERE $__timeFilter(reporting_timestamp) ORDER BY reporting_timestamp DESC LIMIT 200",
           "refId": "A"
         }
       ],
