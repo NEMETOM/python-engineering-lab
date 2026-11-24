@@ -1,0 +1,155 @@
+{
+  "id": null,
+  "uid": "fixflux-mifid-regulator",
+  "title": "FIXFlux - MiFID II Regulator View (restricted)",
+  "description": "Transaction-reporting fields per trade: buyer/seller LEI, trading capacity, CFI code. Restricted: never part of a public publication.",
+  "tags": ["fintech", "mifid-ii", "regulatory", "reporting-service", "restricted"],
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "type": "text",
+      "title": "About this dashboard",
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 0 },
+      "options": {
+        "mode": "markdown",
+        "content": "**Restricted.** The regulator's side of each trade, in the style of an RTS 22 transaction report: **buyer/seller LEI** (ISO 17442), **trading capacity** (`DEAL` / `MTCH` / `AOTC`) and **CFI code** (ISO 10962). These fields must never be published: the public dashboard (*MiFID II Post-Trade Reporting*) reads `regulatory_reports_public`, which leaves them out.\n\nData comes from `regulatory_reports_restricted` through the `grafana_regulator` role, which can read that view and nothing else. Every LEI is synthetic (`SIMX00...`). Nothing is sent to an ARM or regulator."
+      },
+      "id": 1
+    },
+    {
+      "type": "stat",
+      "title": "Reports missing an LEI (selected time range)",
+      "description": "INCOMPLETE reports whose reason names a missing buyer or seller LEI: the reference data to fix before these could be reported.",
+      "datasource": { "type": "postgres", "uid": "postgres-regulator" },
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 4 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 1 } ] }
+        },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "background", "graphMode": "none", "textMode": "value" },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres-regulator" },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT count(*) AS \"Missing LEI\" FROM regulatory_reports_restricted WHERE $__timeFilter(reporting_timestamp) AND status = 'INCOMPLETE' AND status_reason LIKE '%no LEI%'",
+          "refId": "A"
+        }
+      ],
+      "id": 2
+    },
+    {
+      "type": "stat",
+      "title": "Reportable trades (selected time range)",
+      "datasource": { "type": "postgres", "uid": "postgres-regulator" },
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 4 },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "fixed", "fixedColor": "green" } },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "background", "graphMode": "none", "textMode": "value" },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres-regulator" },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT count(*) AS \"Reportable\" FROM regulatory_reports_restricted WHERE $__timeFilter(reporting_timestamp) AND status = 'REPORTABLE'",
+          "refId": "A"
+        }
+      ],
+      "id": 3
+    },
+    {
+      "type": "stat",
+      "title": "Distinct counterparties (LEIs, selected time range)",
+      "datasource": { "type": "postgres", "uid": "postgres-regulator" },
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 4 },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "fixed", "fixedColor": "blue" } },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "background", "graphMode": "none", "textMode": "value" },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres-regulator" },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT count(DISTINCT lei) AS \"LEIs\" FROM (SELECT buyer_lei AS lei, reporting_timestamp FROM regulatory_reports_restricted UNION ALL SELECT seller_lei, reporting_timestamp FROM regulatory_reports_restricted) parties WHERE lei IS NOT NULL AND $__timeFilter(reporting_timestamp)",
+          "refId": "A"
+        }
+      ],
+      "id": 4
+    },
+    {
+      "type": "table",
+      "title": "Regulator view per trade (latest 200)",
+      "description": "From the regulatory_reports_restricted view via the read-only grafana_regulator role. Parties are identified by LEI, as in a transaction report; internal client IDs appear only inside INCOMPLETE reasons.",
+      "datasource": { "type": "postgres", "uid": "postgres-regulator" },
+      "gridPos": { "h": 14, "w": 24, "x": 0, "y": 8 },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Status" },
+            "properties": [
+              { "id": "custom.cellOptions", "value": { "type": "color-background" } },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "REPORTABLE": { "color": "green", "index": 0 },
+                      "NOT_REPORTABLE": { "color": "blue", "index": 1 },
+                      "INCOMPLETE": { "color": "orange", "index": 2 }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "> 60s" },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "true": { "text": "BREACH", "color": "red", "index": 0 },
+                      "false": { "text": "ok", "color": "green", "index": 1 }
+                    }
+                  }
+                ]
+              },
+              { "id": "custom.cellOptions", "value": { "type": "color-text" } }
+            ]
+          }
+        ]
+      },
+      "options": { "showHeader": true, "cellHeight": "sm", "footer": { "show": false } },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "postgres-regulator" },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT trading_timestamp AS \"Traded\", trade_id AS \"Trade ID\", symbol AS \"Symbol\", cfi_code AS \"CFI\", price AS \"Price\", price_currency AS \"Ccy\", quantity AS \"Qty\", buyer_lei AS \"Buyer LEI\", buyer_trading_capacity AS \"Buyer cap.\", seller_lei AS \"Seller LEI\", seller_trading_capacity AS \"Seller cap.\", status AS \"Status\", status_reason AS \"Reason\", publication_latency_ms AS \"Latency (ms)\", deadline_breached AS \"> 60s\" FROM regulatory_reports_restricted WHERE $__timeFilter(reporting_timestamp) ORDER BY reporting_timestamp DESC LIMIT 200",
+          "refId": "A"
+        }
+      ],
+      "id": 5
+    }
+  ]
+}

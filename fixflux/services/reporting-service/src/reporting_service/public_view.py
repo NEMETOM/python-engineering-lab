@@ -9,7 +9,7 @@ reader could see.
 """
 
 from sqlalchemy import text
-from sqlalchemy.engine import Engine
+from sqlalchemy.engine import Connection, Engine
 
 VIEW_NAME = "regulatory_reports_public"
 READER_ROLE = "grafana_reader"
@@ -68,6 +68,27 @@ def _quote_literal(value: str) -> str:
     return "'" + value.replace("'", "''") + "'"
 
 
+def grant_reader(conn: Connection, role: str, password: str, view: str) -> None:
+    """Create or update a login role that can SELECT `view` and nothing else,
+    hardened with READER_SETTINGS. Shared by every reader view (public and
+    restricted) so they can't drift apart."""
+    exists = conn.execute(
+        text("SELECT 1 FROM pg_roles WHERE rolname = :name"),
+        {"name": role},
+    ).scalar()
+    verb = "ALTER" if exists else "CREATE"
+    conn.execute(
+        text(
+            f"{verb} ROLE {role} LOGIN "
+            f"CONNECTION LIMIT {READER_CONNECTION_LIMIT} "
+            f"PASSWORD {_quote_literal(password)}"
+        )
+    )
+    for setting, value in READER_SETTINGS:
+        conn.execute(text(f"ALTER ROLE {role} SET {setting} = {value}"))
+    conn.execute(text(f"GRANT SELECT ON {view} TO {role}"))
+
+
 def ensure_public_view(engine: Engine, readers: dict[str, str | None]) -> list[str]:
     """Create or refresh the view, and each reader role that has a password.
 
@@ -81,20 +102,6 @@ def ensure_public_view(engine: Engine, readers: dict[str, str | None]) -> list[s
         for role, password in readers.items():
             if not password:
                 continue
-            exists = conn.execute(
-                text("SELECT 1 FROM pg_roles WHERE rolname = :name"),
-                {"name": role},
-            ).scalar()
-            verb = "ALTER" if exists else "CREATE"
-            conn.execute(
-                text(
-                    f"{verb} ROLE {role} LOGIN "
-                    f"CONNECTION LIMIT {READER_CONNECTION_LIMIT} "
-                    f"PASSWORD {_quote_literal(password)}"
-                )
-            )
-            for setting, value in READER_SETTINGS:
-                conn.execute(text(f"ALTER ROLE {role} SET {setting} = {value}"))
-            conn.execute(text(f"GRANT SELECT ON {VIEW_NAME} TO {role}"))
+            grant_reader(conn, role, password, VIEW_NAME)
             ready.append(role)
     return ready
