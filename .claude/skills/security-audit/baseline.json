@@ -37,7 +37,7 @@
     "SHA256:RovmTAkOp66znKzEfdgDqtSxeJSO6FPntx3R0+eu+C0": "fixflux-droplet deploy key (owner laptop + GitHub Actions secret)"
   },
 
-  "required_env": ["GRAFANA_ADMIN_PASSWORD", "GRAFANA_DB_READER_PASSWORD"],
+  "required_env": ["GRAFANA_ADMIN_PASSWORD", "GRAFANA_DB_READER_PASSWORD", "GRAFANA_DB_REGULATOR_PASSWORD"],
 
   "recent_change_ignore": [
     "/root/.bash_history",

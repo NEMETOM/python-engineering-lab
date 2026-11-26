@@ -14,6 +14,11 @@ from reporting_service.public_view import (
     ensure_public_view,
 )
 from reporting_service.repository import ReportRepository
+from reporting_service.restricted_view import (
+    REGULATOR_ROLE,
+    RESTRICTED_VIEW_NAME,
+    ensure_restricted_view,
+)
 from reporting_service.schemas import RegulatoryTradeReport, TradeEvent
 from reporting_service.utils.logger import configure_logging, get_logger
 from shared.infrastructure.db import Base, engine
@@ -111,6 +116,15 @@ def run() -> None:
                 f"no password set for {role}: {VIEW_NAME} created, "
                 f"{role} role not created or updated"
             )
+    if ensure_restricted_view(engine, config.REGULATOR_READER_PASSWORD):
+        logger.info(
+            f"{REGULATOR_ROLE} role ready, SELECT on {RESTRICTED_VIEW_NAME} only"
+        )
+    else:
+        logger.warning(
+            f"no password set for {REGULATOR_ROLE}: {RESTRICTED_VIEW_NAME} "
+            f"created, {REGULATOR_ROLE} role not created or updated"
+        )
     enricher = ReportEnricher(config.load_reference_data())
     repo = ReportRepository()
     consumer = create_consumer(config.INPUT_TOPIC, config.GROUP_ID)

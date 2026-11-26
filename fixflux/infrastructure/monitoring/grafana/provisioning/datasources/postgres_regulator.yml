@@ -1,0 +1,30 @@
+apiVersion: 1
+
+# Read-only access to regulatory_reports_restricted: the regulator's view, with
+# buyer/seller LEI, trading capacity and CFI code (RTS 22-style fields). The
+# grafana_regulator role can SELECT that view and nothing else (created by
+# reporting-service, see services/reporting-service/src/reporting_service/
+# restricted_view.py). Only dashboards in the "Restricted" folder use it.
+#
+# Grafana OSS has no per-datasource permissions: any Editor or Admin could query
+# this through Explore. That's acceptable only while the single Grafana account
+# is the owner's admin and Grafana is tailnet-only. Revisit before adding users.
+#
+# The password comes from GRAFANA_DB_REGULATOR_PASSWORD (fixflux/.env on the
+# host). If it is unset, this datasource fails to authenticate; nothing else
+# breaks.
+datasources:
+  - name: Postgres (regulator, restricted)
+    type: postgres
+    uid: postgres-regulator
+    url: postgres:5432
+    user: grafana_regulator
+    access: proxy
+    editable: false
+    secureJsonData:
+      password: ${GRAFANA_DB_REGULATOR_PASSWORD}
+    jsonData:
+      database: fixdb
+      sslmode: disable
+      maxOpenConns: 2
+      maxIdleConns: 2

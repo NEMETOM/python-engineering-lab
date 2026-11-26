@@ -29,6 +29,11 @@ GRAFANA_READER_PASSWORD = os.getenv("GRAFANA_DB_READER_PASSWORD") or None
 # unset means no role, and reporting-api then answers 503.
 FEED_READER_PASSWORD = os.getenv("PUBLIC_FEED_DB_READER_PASSWORD") or None
 
+# Password for the regulator dashboard's role (grafana_regulator, see
+# restricted_view.py): SELECT on the restricted view with LEIs, nothing else.
+# Same rules: unset means the role is never created.
+REGULATOR_READER_PASSWORD = os.getenv("GRAFANA_DB_REGULATOR_PASSWORD") or None
+
 # Public post-trade feed (reporting-api). The DSN connects as
 # public_feed_reader, never fixuser, so the feed can only read the public view.
 FEED_DATABASE_URL = os.getenv("PUBLIC_FEED_DATABASE_URL") or None

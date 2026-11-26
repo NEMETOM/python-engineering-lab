@@ -75,6 +75,12 @@ SELECT symbol, buyer_client_id AS buyer, seller_client_id AS seller,
 
 **Restricted view: what the regulator gets**
 
+In Grafana, open the **Restricted (regulator)** folder, then **FIXFlux - MiFID II Regulator View
+(restricted)**. Its table shows each trade's buyer and seller LEI, trading capacity and CFI code,
+read through the `grafana_regulator` role, which can only see `regulatory_reports_restricted`. To
+show the contrast on camera, put it side by side with the public dashboard: same trades, no LEIs.
+The same data from the shell:
+
 ```bash
 docker compose exec -T postgres psql -U fixuser -d fixdb -c "
 SELECT symbol, buyer_lei, seller_lei,

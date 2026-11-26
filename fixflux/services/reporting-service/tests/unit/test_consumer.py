@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
+import pytest
 from sqlalchemy.exc import OperationalError
 
 from reporting_service import consumer
@@ -101,6 +102,49 @@ class TestSaveWithRetry:
 
 
 class TestRun:
+    @pytest.fixture(autouse=True)
+    def restricted_view(self):
+        # run() also sets up the regulator's restricted view; keep it off the DB.
+        with patch.object(consumer, "ensure_restricted_view", return_value=False) as m:
+            yield m
+
+    def test_restricted_view_is_ensured_with_the_regulator_password(
+        self, restricted_view
+    ):
+        with (
+            patch.object(consumer, "start_http_server"),
+            patch.object(consumer, "create_consumer", return_value=[]),
+            patch.object(consumer, "ReportRepository"),
+            patch.object(consumer, "ensure_public_view", return_value=[]),
+            patch.object(consumer.config, "REGULATOR_READER_PASSWORD", "r-pw"),
+        ):
+            consumer.run()
+        restricted_view.assert_called_once()
+        assert restricted_view.call_args.args[1] == "r-pw"
+
+    @pytest.mark.parametrize(
+        "role_ready, level, text",
+        [
+            (True, "info", "grafana_regulator role ready"),
+            (False, "warning", "no password set for grafana_regulator"),
+        ],
+    )
+    def test_startup_log_says_whether_the_regulator_role_exists(
+        self, restricted_view, role_ready, level, text
+    ):
+        # Operators confirm the regulator dashboard's DB access from this line.
+        restricted_view.return_value = role_ready
+        with (
+            patch.object(consumer, "start_http_server"),
+            patch.object(consumer, "create_consumer", return_value=[]),
+            patch.object(consumer, "ReportRepository"),
+            patch.object(consumer, "ensure_public_view", return_value=[]),
+            patch.object(consumer, "logger") as logger,
+        ):
+            consumer.run()
+        logged = [c.args[0] for c in getattr(logger, level).call_args_list]
+        assert any(text in line for line in logged), logged
+
     def test_wires_consumer_to_handler(self):
         msg = MagicMock(value=_make_payload())
         with (

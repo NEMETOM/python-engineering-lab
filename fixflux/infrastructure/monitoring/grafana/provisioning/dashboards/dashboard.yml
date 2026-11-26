@@ -8,3 +8,15 @@ providers:
     allowUiUpdates: true
     options:
       path: /var/lib/grafana/dashboards
+
+  # Dashboards on the restricted regulator datasource (LEIs, capacity, CFI).
+  # A separate directory keeps them out of the main provider's recursive scan,
+  # so they can only ever appear in this folder.
+  - name: Restricted (regulator)
+    type: file
+    folder: Restricted (regulator)
+    disableDeletion: true
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards-restricted

@@ -249,6 +249,9 @@ services:
       GRAFANA_DB_READER_PASSWORD: ${GRAFANA_DB_READER_PASSWORD:-}
       # Same for public_feed_reader, the role reporting-api connects as.
       PUBLIC_FEED_DB_READER_PASSWORD: ${PUBLIC_FEED_DB_READER_PASSWORD:-}
+      # And for grafana_regulator: SELECT on regulatory_reports_restricted
+      # (LEIs, capacity, CFI) only. See restricted_view.py.
+      GRAFANA_DB_REGULATOR_PASSWORD: ${GRAFANA_DB_REGULATOR_PASSWORD:-}
     # /metrics on 8012 is scraped over the compose network; not published to
     # the host since nothing outside the stack needs it.
     logging: *default-logging
@@ -413,9 +416,15 @@ services:
       # Read by provisioning/datasources/postgres_public.yml. Set it in
       # fixflux/.env on the host (gitignored), never in this file.
       GRAFANA_DB_READER_PASSWORD: ${GRAFANA_DB_READER_PASSWORD:-}
+      # Read by provisioning/datasources/postgres_regulator.yml (restricted
+      # view with LEIs). Unset = that datasource fails to log in, nothing else.
+      GRAFANA_DB_REGULATOR_PASSWORD: ${GRAFANA_DB_REGULATOR_PASSWORD:-}
     volumes:
       - ./infrastructure/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./infrastructure/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      # Separate directory, so these load into the "Restricted" folder only
+      # (a subdirectory would also be picked up by the main provider).
+      - ./infrastructure/monitoring/grafana/dashboards-restricted:/var/lib/grafana/dashboards-restricted:ro
       - grafana_data:/var/lib/grafana
     ports:
       # Loopback only. Reach it with: ssh -L 3000:localhost:3000 root@<droplet>
