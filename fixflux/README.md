@@ -10,6 +10,7 @@
 [![Market Data Service CI](https://github.com/NEMETOM/python-engineering-lab/actions/workflows/market-data-service.yml/badge.svg)](https://github.com/NEMETOM/python-engineering-lab/actions/workflows/market-data-service.yml)
 [![Trade Store CI](https://github.com/NEMETOM/python-engineering-lab/actions/workflows/trade-store.yml/badge.svg)](https://github.com/NEMETOM/python-engineering-lab/actions/workflows/trade-store.yml)
 [![Compliance Service CI](https://github.com/NEMETOM/python-engineering-lab/actions/workflows/compliance-service.yml/badge.svg)](https://github.com/NEMETOM/python-engineering-lab/actions/workflows/compliance-service.yml)
+[![Reporting Service CI](https://github.com/NEMETOM/python-engineering-lab/actions/workflows/reporting-service.yml/badge.svg)](https://github.com/NEMETOM/python-engineering-lab/actions/workflows/reporting-service.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Linting: ruff](https://img.shields.io/badge/linting-ruff-orange.svg)](https://github.com/astral-sh/ruff)
@@ -24,6 +25,7 @@
 - Full pipeline: client message ingestion → order validation → **price-time priority matching** → market data publication → trade persistence
 - Parallel **RegTech compliance and surveillance module** for real-time rule evaluation and audit trail
 - **MiFID II pre-trade risk gate**: notional cap, fat-finger, and position limit checks before orders reach the matching engine
+- **MiFID II post-trade reporting**: every trade becomes one regulatory record, timed against the RTS 1 one-minute publication limit, with a public JSON/CSV feed (no counterparties) and a separate restricted regulator view (LEIs, trading capacity)
 - Built with Python microservices, Redpanda (Kafka-compatible), PostgreSQL, and Docker
 - Follows 12-Factor App principles; each service is a small, single-purpose consumer/producer over Kafka topics - not a Hexagonal/Ports-and-Adapters or formal DDD design (no domain-service layer, no repository interfaces behind ports)
 
@@ -37,6 +39,7 @@ For decision makers evaluating trading infrastructure:
 
 - **Regulatory compliance out of the box** - MiFID II pre-trade risk checks and a tamper-evident audit trail mean regulators and compliance officers have the evidence they need, without manual record-keeping
 - **Catches costly errors before they execute** - fat-finger and notional cap rules stop erroneous orders at the gate, preventing the kind of trading losses that have cost firms hundreds of millions in publicised incidents
+- **Post-trade regulatory reporting** - every trade is classified as reportable, out of scope or incomplete, timed against the one-minute publication limit, and never reported twice. The public sees prices and volumes; only the regulator view shows who traded
 - **Real-time market surveillance** - wash trading detection, rapid-fire order patterns, and off-hours activity are flagged automatically, reducing the compliance team's manual review burden
 - **No vendor lock-in** - fully open-source stack (Python, Kafka, PostgreSQL) with no per-seat or per-message licensing fees that proprietary FIX engines typically charge
 - **Cloud-ready from day one** - the same codebase runs on a laptop and deploys to Kubernetes with a single Helm command, cutting the gap between development and production
@@ -92,18 +95,21 @@ This project was built to go beyond surface-level familiarity with these concept
                            ▼                 ▼
                     trades (Kafka)  order_book_updates (Kafka)
                            │                 │
-                           ▼                 ▼
-                ┌──────────────────┐  ┌──────────────────────┐
-                │   Trade Store    │  │  Market Data Service  │
-                │                  │  │                       │
-                │  PostgreSQL      │  │  Change-detected pub  │
-                │  FastAPI :8000   │  │  to market_data topic │
-                └──────────────────┘  └──────────────────────┘
+            ┌──────────────┴──────┐          │
+            ▼                     ▼          ▼
+ ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────────┐
+ │   Trade Store    │ │ Reporting Service│ │  Market Data Service │
+ │                  │ │ MiFID II reports │ │                      │
+ │  PostgreSQL      │ │ RTS 1 + RTS 22   │ │  Change-detected pub │
+ │  FastAPI :8000   │ │ Feed API :8013   │ │  to market_data topic│
+ └──────────────────┘ └──────────────────┘ └──────────────────────┘
 ```
 
-**Message flow:** Client drops a FIX file → FIX Gateway parses and publishes to `raw_orders` → Order Service validates and enriches → Risk Service applies four MiFID II pre-trade checks → approved orders flow to Matching Engine via `risk_approved_orders` → matched trades fan out to Trade Store (persistence) and Market Data Service (real-time snapshot) in parallel. Rejected orders are published to `risk_rejected_orders`.
+**Message flow:** Client drops a FIX file → FIX Gateway parses and publishes to `raw_orders` → Order Service validates and enriches → Risk Service applies four MiFID II pre-trade checks → approved orders flow to Matching Engine via `risk_approved_orders` → matched trades fan out to Trade Store (persistence), Reporting Service (MiFID II post-trade reports) and Market Data Service (real-time snapshot) in parallel. Rejected orders are published to `risk_rejected_orders`.
 
 **Compliance observer:** The Compliance Service taps both `raw_orders` and `validated_orders` as a passive consumer. It applies configurable compliance rules and surveillance detections, persists violations and audit trail records to PostgreSQL, and exposes findings via a dedicated REST API.
+
+**Regulatory reporting:** The Reporting Service is one more consumer of `trades`, off the trading path: a reporting outage can't slow or stop a trade. It enriches each trade from reference data and writes one row to `regulatory_reports`. Two read-only database views split that record by audience: a public one (RTS 1 fields, no counterparties) behind Grafana and the public post-trade feed, and a restricted one (LEIs, trading capacity, CFI code) behind the regulator dashboard.
 
 ---
 
@@ -119,6 +125,8 @@ This project was built to go beyond surface-level familiarity with these concept
 - **Dead Letter Queue** - FIX messages that fail parsing or validation in the filedrop client are published to a `dead_letter_orders` Kafka topic with the raw line and error reason before the file moves to `rejected/`. Failures are replayable and alertable without manual log inspection.
 - **Kubernetes + Helm Deployment** - Raw manifests (`k8s/`) and a parameterised Helm chart (`helm/fixflux/`) ship alongside the Docker Compose stack. One command deploys the full pipeline to any Kubernetes cluster. The matching engine has a HorizontalPodAutoscaler; compliance policies are mounted from a ConfigMap so rules can be updated without rebuilding the image.
 - **MiFID II Pre-Trade Risk Checks** - A dedicated risk-service sits between `order-service` and `matching-engine` and enforces four checks in sequence: notional cap (`price × qty > 1M`), fat-finger guard (>10% deviation from last trade price), gross/net position limits (10,000 / 5,000 units), and max open orders per client (10). All thresholds are overridable via environment variables. Rejected orders are published to `risk_rejected_orders` with a machine-readable reason; approved orders proceed to `risk_approved_orders`.
+- **MiFID II Post-Trade Reporting** - `reporting-service` consumes `trades` and writes one regulatory record per trade, enriched from reference data (synthetic LEIs with valid ISO 7064 check digits, CFI codes, MiFID scope per instrument). Each record is `REPORTABLE`, `NOT_REPORTABLE` (out-of-scope instrument) or `INCOMPLETE` (missing reference data, flagged and never defaulted), timed against the RTS 1 one-minute publication limit, and unique on `trade_id`, so Kafka redelivery never reports a trade twice. Every reader gets its own least-privilege Postgres role that can `SELECT` one view and nothing else: `grafana_reader` and `public_feed_reader` the public view, `grafana_regulator` the restricted one.
+- **Public Post-Trade Feed** - `reporting-api` serves `GET /post-trade` as JSON or CSV: reportable trades only, public fields only, paged by publication time. Unauthenticated by design (transparency data is public); malformed input is rejected before the database, and CSV cells are neutralised against spreadsheet formula injection.
 - **Four-Layer Testing** - Unit tests (pytest), component BDD tests (behave + Gherkin), infrastructure integration tests (Kafka pipeline + PostgreSQL persistence), and end-to-end BDD tests that exercise the full flow from FIX file drop to `GET /trades`.
 - **Eight Independent CI/CD Pipelines** - Seven per-service pipelines (test, lint, Docker build) triggered on push and daily schedule, plus a dedicated E2E pipeline that starts the full Docker stack and runs the end-to-end BDD suite.
 
@@ -294,28 +302,42 @@ fixflux/
 │   ├── market-data-service/         # Change-detected snapshot publishing to the `market_data` topic
 │   ├── market-data-api/             # WebSocket broadcast of market-data snapshots at /ws/market-data - the one deliberate async service in this codebase (sync Kafka consumer thread bridged to asyncio, not aiokafka)
 │   ├── trade-store/                 # Kafka consumer + PostgreSQL + FastAPI REST
-│   └── compliance-service/          # RegTech compliance/surveillance + the FixFlux Console (FIX injector + admin UI, formerly a standalone fix-injector service)
-│       ├── src/compliance_service/
-│       │   ├── consumer.py          # Dual-topic consumer (raw_orders + validated_orders) + rule-override polling + /metrics on :8011
-│       │   ├── fix_parser.py        # FIX parsing for the Console's injector tab
-│       │   ├── injector_producer.py # Publishes parsed orders to raw_orders
-│       │   ├── models.py            # SQLAlchemy: violations, risk scores, audit trail, rule overrides
-│       │   ├── config.py            # YAML policy loader
-│       │   ├── rules/
-│       │   │   ├── base.py          # Rule ABC, Violation dataclass, Severity enum
-│       │   │   ├── catalog.py       # RULE_CATALOG - id/category/label/description per rule; backs the admin UI's tooltips
-│       │   │   ├── compliance/      # 6 compliance rules (size, symbol, hours, ...)
-│       │   │   └── surveillance/    # 4 surveillance detections (wash, rapid-fire, ...)
-│       │   ├── engine/
-│       │   │   ├── rules_engine.py  # Evaluates rules, collects violations (live rule-toggle takes effect per-call)
-│       │   │   ├── risk_scorer.py   # Weighted risk score per severity
-│       │   │   └── audit_logger.py  # SHA-256 per-record tamper-evident checksum - not a hash chain, see .claude/agents/legal_counsel_agent.md
-│       │   ├── repository/          # Violation/Audit/RuleOverride repositories
-│       │   ├── api/routes/          # FastAPI: injector, admin, violations, risk, audit, health
-│       │   ├── templates/           # Jinja2: _shell.html (shared nav), index.html (injector tab), admin_compliance.html
-│       │   └── static/              # fixflux-logo.png
-│       ├── policies/
-│       │   └── compliance_policies.yaml  # All rule thresholds - no code change needed
+│   ├── compliance-service/          # RegTech compliance/surveillance + the FixFlux Console (FIX injector + admin UI, formerly a standalone fix-injector service)
+│   │   ├── src/compliance_service/
+│   │   │   ├── consumer.py          # Dual-topic consumer (raw_orders + validated_orders) + rule-override polling + /metrics on :8011
+│   │   │   ├── fix_parser.py        # FIX parsing for the Console's injector tab
+│   │   │   ├── injector_producer.py # Publishes parsed orders to raw_orders
+│   │   │   ├── models.py            # SQLAlchemy: violations, risk scores, audit trail, rule overrides
+│   │   │   ├── config.py            # YAML policy loader
+│   │   │   ├── rules/
+│   │   │   │   ├── base.py          # Rule ABC, Violation dataclass, Severity enum
+│   │   │   │   ├── catalog.py       # RULE_CATALOG - id/category/label/description per rule; backs the admin UI's tooltips
+│   │   │   │   ├── compliance/      # 6 compliance rules (size, symbol, hours, ...)
+│   │   │   │   └── surveillance/    # 4 surveillance detections (wash, rapid-fire, ...)
+│   │   │   ├── engine/
+│   │   │   │   ├── rules_engine.py  # Evaluates rules, collects violations (live rule-toggle takes effect per-call)
+│   │   │   │   ├── risk_scorer.py   # Weighted risk score per severity
+│   │   │   │   └── audit_logger.py  # SHA-256 per-record tamper-evident checksum - not a hash chain, see .claude/agents/legal_counsel_agent.md
+│   │   │   ├── repository/          # Violation/Audit/RuleOverride repositories
+│   │   │   ├── api/routes/          # FastAPI: injector, admin, violations, risk, audit, health
+│   │   │   ├── templates/           # Jinja2: _shell.html (shared nav), index.html (injector tab), admin_compliance.html
+│   │   │   └── static/              # fixflux-logo.png
+│   │   ├── policies/
+│   │   │   └── compliance_policies.yaml  # All rule thresholds - no code change needed
+│   │   └── tests/                   # unit + BDD tests
+│   └── reporting-service/           # MiFID II post-trade reporting (consumer) + public feed (reporting-api, same image)
+│       ├── src/reporting_service/
+│       │   ├── consumer.py          # trades → enrich → regulatory_reports; creates the views + reader roles on start; /metrics on :8012
+│       │   ├── enricher.py          # REPORTABLE / NOT_REPORTABLE / INCOMPLETE decision + publication latency
+│       │   ├── lei.py               # ISO 17442 LEI check digits (ISO 7064 MOD 97-10)
+│       │   ├── schemas/             # TradeEvent in, RegulatoryTradeReport out (Pydantic v2)
+│       │   ├── models.py            # regulatory_reports table, unique on trade_id
+│       │   ├── public_view.py       # regulatory_reports_public + grafana_reader / public_feed_reader roles
+│       │   ├── restricted_view.py   # regulatory_reports_restricted (LEIs, capacity, CFI) + grafana_regulator role
+│       │   ├── feed.py              # Public feed query: REPORTABLE rows only, paged by publication time
+│       │   └── api/main.py          # reporting-api: GET /post-trade (JSON/CSV), GET /health
+│       ├── reference/
+│       │   └── reference_data.yaml  # Synthetic LEIs, trading capacity, CFI codes, MiFID scope per instrument
 │       └── tests/                   # unit + BDD tests
 ├── shared/                          # Internal platform library
 │   ├── schemas/                     # Pydantic v2 event schemas (OrderEvent, TradeEvent, BookEvent)
@@ -332,12 +354,16 @@ fixflux/
 │       ├── tempo.yaml               # Tempo distributed tracing backend
 │       └── grafana/
 │           ├── provisioning/
-│           │   ├── datasources/     # Auto-provisioned: Prometheus, Loki, Tempo, Alertmanager
+│           │   ├── datasources/     # Auto-provisioned: Prometheus, Loki, Tempo, Alertmanager, Postgres (public + regulator)
 │           │   └── dashboards/      # Dashboard provider config
-│           └── dashboards/
-│               ├── fix_simulator_overview.json  # 15-panel trading overview (4 rows)
-│               ├── tempo_traces.json            # Span tables with Trace ID + Span ID columns
-│               └── loki_logs.json
+│           ├── dashboards/
+│           │   ├── fix_simulator_overview.json  # 15-panel trading overview (4 rows)
+│           │   ├── mifid_reporting.json         # MiFID II outcomes, one-minute deadline, public report table
+│           │   ├── slo_overview.json            # trade-store SLIs, error budget, burn rates
+│           │   ├── tempo_traces.json            # Span tables with Trace ID + Span ID columns
+│           │   └── loki_logs.json
+│           └── dashboards-restricted/
+│               └── mifid_regulator.json         # Regulator view with LEIs (own folder + datasource)
 ├── clients/
 │   └── fix-filedrop-client/         # Directory watcher - drops FIX files into pipeline
 ├── data/                            # Sample + compliance/surveillance test FIX files, volume-burst demo files
@@ -388,7 +414,10 @@ fixflux/
 | **risk-service** | `validated_orders`, `trades` | `risk_approved_orders`, `risk_rejected_orders` | Four MiFID II pre-trade checks: notional cap, fat-finger, gross/net position limits, max open orders; tracks positions from `trades` topic |
 | **matching-engine** | `risk_approved_orders` | `trades`, `order_book_updates` | Price-time priority matching, partial fills, order book snapshots on each match |
 | **market-data-service** | `trades`, `order_book_updates` | `market_data` | Caches best bid/ask/last trade; publishes snapshot only on change |
+| **market-data-api** | `market_data` | WebSocket `/ws/market-data` | Broadcasts market-data snapshots to browser clients (the Console's Market Data tab) |
 | **trade-store** | `trades` | - | Persists trades to PostgreSQL; exposes REST API via FastAPI |
+| **reporting-service** | `trades` | - (DB only) | MiFID II post-trade reporting: enriches each trade from reference data, classifies it, times it against the one-minute limit; maintains the public and restricted views and their read-only roles |
+| **reporting-api** | - | HTTP `GET /post-trade` | Public RTS 1 post-trade feed (JSON/CSV) over the public view, as `public_feed_reader`. Same image as reporting-service |
 | **compliance-service** | `raw_orders`, `validated_orders` | - (DB only) | Passive observer: applies compliance rules + surveillance detections; persists violations, risk scores, and audit trail; exposes REST API |
 | **shared** | - | - | Internal library: schemas, Kafka factory, logging, DB session, exceptions |
 
@@ -415,7 +444,7 @@ Services are grouped into profiles:
 | Profile | Services |
 |---|---|
 | _(none)_ | `redpanda`, `postgres` only |
-| `pipeline` | + `fix-gateway`, `order-service`, `matching-engine`, `trade-store`, `compliance-api`, `compliance-consumer` |
+| `pipeline` | + `fix-gateway`, `order-service`, `matching-engine`, `trade-store`, `compliance-api`, `compliance-consumer`, `reporting-service`, `reporting-api` |
 | `full` | + all of the above + `market-data-service` |
 | `monitoring` | + `prometheus`, `grafana`, `tempo` (combine with pipeline or full) |
 
@@ -444,15 +473,17 @@ docker compose ps
 | Container | State | Port |
 |---|---|---|
 | redpanda | Up (healthy) | 9092 |
-| postgres | Up (healthy) | 5433 |
+| postgres | Up (healthy) | 5433 (loopback only) |
 | fix-gateway | Up | 8001 (metrics) |
 | order-service | Up | - |
 | matching-engine | Up | 8003 (metrics) |
 | trade-store | Up | 8000, 8000/metrics |
 | compliance-api | Up | 8010 |
 | compliance-consumer | Up | - |
+| reporting-service | Up | - (metrics on 8012, compose network only) |
+| reporting-api | Up | 8013 (loopback only) |
 | prometheus | Up (monitoring profile) | 9090 |
-| grafana | Up (monitoring profile) | 3000 |
+| grafana | Up (monitoring profile) | 3000 (loopback only) |
 | tempo | Up (monitoring profile) | 3200 (query), 4318 (OTLP) |
 
 ### 4. Trade Store REST API
@@ -483,7 +514,31 @@ Swagger UI: `http://localhost:8010/docs`
 
 Compliance policies (enabled/disabled rules, thresholds) are configured in `services/compliance-service/policies/compliance_policies.yaml` - no code change required.
 
-### 6. Run the file-drop watcher (separate terminal)
+### 6. Post-Trade Feed (RTS 1)
+
+Swagger UI: `http://localhost:8013/docs`
+
+`reporting-api` publishes `REPORTABLE` trades with public fields only: no LEIs, client IDs or trading capacity. There's no login, because post-trade transparency data is public. The database role is what limits it: `public_feed_reader` can only read the public view, in read-only transactions, with a 5 s statement timeout and 3 connections.
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/health` | Health check (no database) |
+| `GET` | `/post-trade` | Reportable trades, oldest first. Filters: `symbol`, `since` (ISO 8601 with timezone, on publication time), `limit` (1-1000, default 100), `format` (`json` or `csv`) |
+
+```bash
+curl "http://localhost:8013/post-trade?symbol=AAPL&limit=5"
+curl "http://localhost:8013/post-trade?format=csv"
+# Next page: pass the previous response's next_since
+curl "http://localhost:8013/post-trade?since=2026-11-22T12:00:00Z"
+```
+
+Without `since` you get the latest `limit` trades; with it, the next `limit` trades published after that time. Bad input returns `422` before the database is queried; a database problem returns a detail-free `503`.
+
+**Setup:** set `PUBLIC_FEED_DB_READER_PASSWORD` in `fixflux/.env` before starting. reporting-service creates the role from it on start; without it every call returns `503`. On the droplet the port is bound to `127.0.0.1` on purpose: reach it over Tailscale (`tailscale serve`) or `ssh -L 8013:localhost:8013`.
+
+**Try it:** inject `data/mifid_reporting_demo.txt` through the Console (`http://localhost:8010`). It produces three trades with three outcomes (AAPL reportable, EURUSD out of scope, MSFT incomplete), and only the AAPL trade appears in the feed. The full walkthrough is in `scripts/demo-mifid-reporting.md`.
+
+### 7. Run the file-drop watcher (separate terminal)
 
 ```bash
 pip install -e shared
@@ -492,7 +547,7 @@ pip install -e services/fix-gateway
 python clients/fix-filedrop-client/watcher.py
 ```
 
-### 7. Drop a FIX order file
+### 8. Drop a FIX order file
 
 ```bash
 # Create a buy order
@@ -822,6 +877,7 @@ cd services/trade-store        && python -m pytest -v
 cd services/market-data-service && python -m pytest -v
 cd services/fix-gateway        && python -m pytest -v
 cd services/compliance-service && python -m pytest -v
+cd services/reporting-service  && python -m pytest -v
 cd shared                      && python -m pytest -v
 ```
 
@@ -836,6 +892,7 @@ cd services/risk-service       && python -m behave tests/bdd/features/
 cd services/trade-store        && python -m behave tests/bdd/features/
 cd services/market-data-service && python -m behave tests/bdd/features/
 cd services/compliance-service && python -m behave tests/bdd/features/
+cd services/reporting-service  && python -m behave tests/bdd/features/
 ```
 
 The risk-service BDD suite covers three feature files:
@@ -852,6 +909,13 @@ The compliance BDD suite covers two feature files:
 |---|---|
 | `compliance_rules.feature` | Missing client ID, trade size limits, invalid symbol, duplicate detection |
 | `surveillance_detections.feature` | Wash trading, rapid-fire bursts, volume spike, repeated orders |
+
+The reporting-service BDD suite covers two feature files:
+
+| Feature | Scenarios |
+|---|---|
+| `regulatory_reporting.feature` | Reportable trades with valid LEIs, out-of-scope instruments, missing reference data flagged incomplete, one-minute deadline breaches, fix-replay client aliases, redelivered trades absorbed as duplicates |
+| `post_trade_feed.feature` | JSON and CSV output with no counterparty fields, malformed requests rejected before the database, spreadsheet formulas neutralised in CSV, database outages returned as a 503 that leaks nothing |
 
 Example scenario from the matching engine:
 
@@ -942,7 +1006,7 @@ In CI, the E2E workflow (`e2e.yml`) runs as two separate jobs:
 | Variable | Default | Used by |
 |---|---|---|
 | `KAFKA_BROKER` | `localhost:9092` | All services |
-| `DATABASE_URL` | _(reads config.yaml)_ | trade-store, compliance-service |
+| `DATABASE_URL` | _(reads config.yaml)_ | trade-store, compliance-service, reporting-service |
 | `LOG_LEVEL` | `INFO` | All services |
 | `LOG_FORMAT` | `plain` | All services (`json` for structured logs) |
 | `PUBLISH_INTERVAL` | `10` | market-data-service |
@@ -951,7 +1015,19 @@ In CI, the E2E workflow (`e2e.yml`) runs as two separate jobs:
 | `RISK_GROSS_POSITION_LIMIT` | `10000` | risk-service - max absolute position per client per symbol |
 | `RISK_NET_POSITION_LIMIT` | `5000` | risk-service - max net long or short per client per symbol |
 | `RISK_MAX_OPEN_ORDERS` | `10` | risk-service - max unmatched open orders per client |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | _(unset)_ | order-service, risk-service, matching-engine, trade-store-consumer - traces exported to Tempo when set; spans dropped silently when unset |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | _(unset)_ | order-service, risk-service, matching-engine, trade-store-consumer, reporting-service - traces exported to Tempo when set; spans dropped silently when unset |
+| `REPORTING_DEADLINE_SECONDS` | `60` | reporting-service - publication deadline behind `deadline_breached` (RTS 1 one-minute limit) |
+| `REPORTING_CLIENT_ALIAS_PATTERN` | `^RPL-[^-]+-` | reporting-service - prefix stripped from client IDs so fix-replay trades resolve to the original participant |
+| `REPORTING_DB_RETRY_MAX_BACKOFF` | `30` | reporting-service - cap in seconds on the retry backoff while Postgres is down |
+| `REPORTING_REFERENCE_DATA_PATH` | _(bundled file)_ | reporting-service - alternative `reference_data.yaml` |
+| `REPORTING_METRICS_PORT` | `8012` | reporting-service - Prometheus `/metrics` |
+| `PUBLIC_FEED_DELAY_SECONDS` | `0` | reporting-api - holds back trades newer than N seconds |
+| `GRAFANA_ADMIN_PASSWORD` | _(required)_ | grafana - compose refuses to start without it |
+| `GRAFANA_DB_READER_PASSWORD` | _(unset: no role)_ | reporting-service creates `grafana_reader` (public view) |
+| `PUBLIC_FEED_DB_READER_PASSWORD` | _(unset: no role)_ | reporting-service creates `public_feed_reader`; reporting-api logs in with it |
+| `GRAFANA_DB_REGULATOR_PASSWORD` | _(unset: no role)_ | reporting-service creates `grafana_regulator` (restricted view) |
+
+The four passwords are secrets: keep them in `fixflux/.env` (gitignored) and never commit them. None has a default, so a missing one means no role or no login, never a guessable credential.
 
 ---
 
@@ -1008,9 +1084,9 @@ docker compose --profile monitoring up
 
 | UI | URL | Credentials |
 |---|---|---|
-| Grafana | `http://localhost:3000` | admin / admin |
-| Grafana Explore (logs) | `http://localhost:3000/explore` - select **Loki** datasource | admin / admin |
-| Grafana Explore (traces) | `http://localhost:3000/explore` - select **Tempo** datasource | admin / admin |
+| Grafana | `http://localhost:3000` | `admin` / `GRAFANA_ADMIN_PASSWORD` from `fixflux/.env` |
+| Grafana Explore (logs) | `http://localhost:3000/explore` - select **Loki** datasource | same |
+| Grafana Explore (traces) | `http://localhost:3000/explore` - select **Tempo** datasource | same |
 | Prometheus | `http://localhost:9090` | - |
 | Loki | `http://localhost:3100` | - |
 | Tempo | `http://localhost:3200` | - |
@@ -1032,6 +1108,8 @@ docker compose --profile monitoring up
 | `kafka_messages_consumed_total` | Counter | `topic`, `service` | matching-engine |
 | `api_requests_total` | Counter | `endpoint`, `method`, `status_code` | trade-store |
 | `api_request_latency_seconds` | Histogram | `endpoint` | trade-store |
+| `regulatory_reports_total` | Counter | `status` (REPORTABLE, NOT_REPORTABLE, INCOMPLETE, DUPLICATE) | reporting-service |
+| `regulatory_report_latency_seconds` | Histogram | - (bucket at 60 s) | reporting-service |
 
 All metric definitions live in [`shared/observability/metrics.py`](shared/observability/metrics.py) - a single source of truth importable by any service via `PYTHONPATH`.
 
@@ -1045,6 +1123,15 @@ The pre-provisioned dashboard (`fix_simulator_overview`) has four rows, 15 panel
 | **Matching Engine** | Trades/sec by symbol, Latency P99, Latency P50, Order Book Depth (buy/sell per symbol), Cumulative Trades Matched |
 | **Trade Store API** | Request rate, API Latency P99, 5xx Error Rate, Latency percentiles p50/p95/p99 |
 | **Kafka Throughput** | Messages consumed/sec, Messages produced/sec |
+
+Two more dashboards cover regulatory reporting:
+
+| Dashboard | Datasources | Shows |
+|---|---|---|
+| **FIXFlux - MiFID II Post-Trade Reporting** (`mifid_reporting.json`) | Prometheus + Postgres as `grafana_reader` | Outcome counts, the one-minute deadline (breaches, % within, latency vs 60 s), reporting-service health and consumer lag, and the latest 200 reports with public fields only |
+| **FIXFlux - MiFID II Regulator View (restricted)** (`dashboards-restricted/mifid_regulator.json`) | Postgres as `grafana_regulator` | Reports missing an LEI, reportable count, distinct counterparty LEIs, and a per-trade table with LEIs and trading capacity. Loaded into its own **Restricted (regulator)** folder |
+
+Grafana OSS has no per-datasource permissions, so any Editor could query the regulator datasource through Explore. That's acceptable only while the single Grafana account is the owner's admin; revisit before adding users.
 
 #### Panel Descriptions
 
@@ -1100,7 +1187,8 @@ Every order flowing through the pipeline produces one distributed trace spanning
 [order-service.process]
     └─ [risk-service.validated_orders]
            └─ [matching-engine.process]
-                  └─ [trade-store.persist]
+                  ├─ [trade-store.persist]
+                  └─ [reporting-service.process]
 ```
 
 **Span attributes:**
@@ -1111,6 +1199,7 @@ Every order flowing through the pipeline produces one distributed trace spanning
 | risk-service | `risk-service.validated_orders` | `order.id`, `order.symbol`, `kafka.topic` |
 | matching-engine | `matching-engine.process` | `order.id`, `order.symbol` |
 | trade-store | `trade-store.persist` | `trade.id` |
+| reporting-service | `reporting-service.process` | `trade.id`, `regulatory.status` |
 
 **How to view traces:**
 
@@ -1226,6 +1315,7 @@ Honest coverage status - metrics defined in `shared/observability/metrics.py` bu
 | `trade-store` | Partially instrumented | API layer covered via middleware; `trades_stored_total` Counter defined but never called in the consumer |
 | `order-service` | Not instrumented | `orders_processed_total{status}` Counter defined in shared but never incremented |
 | `market-data-service` | Not instrumented | No metrics calls anywhere in the service |
+| `reporting-service` | Instrumented | Report outcomes by status, execution-to-report latency histogram |
 | `compliance-service` | Not instrumented | No custom metrics; violations/risk scores are only queryable via REST |
 | `kafka_messages_produced_total` | Defined, unused | Defined in shared with `topic`/`service` labels but no service calls `.inc()` on it |
 
@@ -1293,7 +1383,7 @@ The order-service and market-data-service follow the identical pattern:
 | ~~SLIs / SLOs~~ | ~~Medium~~ | **Done**, with two gaps still open. See `SLO.md` for the full definitions: two SLIs on `trade-store` (latency < 200ms, non-5xx availability), both targeting 99.9% over 30 days, with multiwindow multi-burn-rate alerting (`infrastructure/monitoring/prometheus_slo_rules.yml`) matching Google's SRE Workbook recommended table exactly, and a Grafana dashboard (`slo_overview.json`) showing current SLI, error budget remaining, and the burn-rate series behind each alert. Open gaps: **no real notification channel** (same gap as the other alerting work - fired alerts are visible at `:9093`, nothing pages anyone), and **compliance-api has no SLI yet** since its metrics middleware doesn't record real Counters/Histograms. Building this also surfaced and fixed two real bugs: an unbounded-cardinality metric label (`trade-store` was labeling by raw URL path instead of route template) and Prometheus's 15-day retention being shorter than the 30-day SLO window being measured. |
 | ~~OPERATIONS.md runbooks~~ | ~~Medium~~ | **Done**, with gaps still open. `OPERATIONS.md` has full runbooks (symptoms, diagnosis, remediation, rollback, exit criteria) for `KafkaConsumerLagHigh` and a new `MatchingEngineDown` alert (`up{job="matching-engine"} == 0` for 1m, added to `prometheus_alerts.yml` alongside it), each linked via a `runbook_url` annotation. Every command targets the real stack (`docker compose`, Redpanda's `rpk`, real consumer group names), not a generic Kafka/Kubernetes setup. Writing it surfaced real operational facts that are now documented rather than hidden: scaling consumers cannot reduce lag on the single-partition topics; a matching-engine restart resumes with an **empty in-memory book** (resting orders lost); a full replay regenerates every trade with new `uuid4` IDs that `trade-store` won't deduplicate; and `compliance-consumer` can silently lose its `validated_orders` thread while the container stays `Up`. Open gaps: `MatchingEngineP99LatencyHigh`, `TradeStore5xxRateHigh` and `ComplianceViolationRateSpike` have no runbook section or `runbook_url` yet; the `MiFIDRealTimeReportingBreach` section is explicitly marked not operable (it depends on the post-trade reporting service below); the `rpk group seek` procedures have not been dry-run on the droplet; and nothing pages anyone (same Alertmanager receiver gap as above). |
 | ~~FIX replay~~ | ~~Medium~~ | **Done**, with gaps still open. `clients/fix-replay/` is a CLI (and a `replay`-profile compose service: `docker compose --profile replay run --rm fix-replay /data/<file>.txt`). It publishes FIX files to `raw_orders`, collects the resulting `execution_reports`, writes a JSON run report, and with `--baseline` diffs an ID-free fingerprint of the executions and exits non-zero on regression. Each run namespaces `client_id` as `RPL-<run>-<original>`: that isolates it from earlier runs' open orders and positions while keeping each client's orders together, and it's how the run's reports are found, because `order_id` is a fresh uuid assigned downstream. It reads reports through a new groupless `create_tail_consumer()` in `shared/`, so one-off runs never leave a consumer group behind for kafka-exporter to report as lagging. A pre-flight refuses to run if matching-engine already has resting orders on a replayed symbol. Open gaps (see `clients/fix-replay/README.md`): replays share the live order book and last-trade prices with other traffic, so a reproducible baseline needs a freshly reset pipeline; original message pacing (tag 52) isn't reproduced; compliance outcomes aren't captured; no baselines are committed yet; and it has only been tested against mocked Kafka, not yet run against the live stack. |
-| ~~MiFID II post-trade transparency reporting~~ | ~~High~~ | **Done**, with gaps still open. New `services/reporting-service` consumes `trades`, enriches each from reference data (`reference/reference_data.yaml`) and writes one row per trade to `regulatory_reports`. A named unique constraint on `trade_id` plus `INSERT ... ON CONFLICT DO NOTHING` makes Kafka redelivery a counted `DUPLICATE`, not a second record. Each row is `REPORTABLE`, `NOT_REPORTABLE` (out-of-scope instrument) or `INCOMPLETE` (missing LEI, instrument data or execution time; never defaulted). Regulatory formats follow the regulations, not the draft prompt: LEIs are 20 characters with ISO 7064 check digits (validated against GLEIF's published LEI), CFI codes are 6 characters, and trading capacity is `DEAL`/`MTCH`/`AOTC` per RTS 22. The table keeps the public RTS 1 Table 3 fields apart from the restricted ones: RTS 1 publication carries no counterparty identity, and buyer/seller LEI and capacity are RTS 22 transaction-reporting fields. Publication latency is measured against RTS 1 Art. 14's one-minute limit (`deadline_breached` column, `regulatory_report_latency_seconds` histogram with a bucket at 60s). A DB outage retries with capped backoff instead of dropping the report. `matching-engine` now includes both client IDs and an execution timestamp on `trades`; the change is additive and safe for every existing consumer. Open gaps: all LEIs are synthetic and only the ~30 named demo participants have one (the 2,000 volume-test clients report `INCOMPLETE` by design); no APA publication, so nothing is actually published; no alert rule on the latency histogram yet; instrument scope and CFI codes are simulator assumptions, not a legal classification; and a matching-engine replay (OPERATIONS.md 3.4 Option B) regenerates trade IDs, which the `trade_id` constraint cannot deduplicate. |
+| ~~MiFID II post-trade transparency reporting~~ | ~~High~~ | **Done**, with gaps still open. New `services/reporting-service` consumes `trades`, enriches each from reference data (`reference/reference_data.yaml`) and writes one row per trade to `regulatory_reports`. A named unique constraint on `trade_id` plus `INSERT ... ON CONFLICT DO NOTHING` makes Kafka redelivery a counted `DUPLICATE`, not a second record. Each row is `REPORTABLE`, `NOT_REPORTABLE` (out-of-scope instrument) or `INCOMPLETE` (missing LEI, instrument data or execution time; never defaulted). Regulatory formats follow the regulations, not the draft prompt: LEIs are 20 characters with ISO 7064 check digits (validated against GLEIF's published LEI), CFI codes are 6 characters, and trading capacity is `DEAL`/`MTCH`/`AOTC` per RTS 22. The table keeps the public RTS 1 Table 3 fields apart from the restricted ones: RTS 1 publication carries no counterparty identity, and buyer/seller LEI and capacity are RTS 22 transaction-reporting fields. Publication latency is measured against RTS 1 Art. 14's one-minute limit (`deadline_breached` column, `regulatory_report_latency_seconds` histogram with a bucket at 60s). A DB outage retries with capped backoff instead of dropping the report. `matching-engine` now includes both client IDs and an execution timestamp on `trades`; the change is additive and safe for every existing consumer. Open gaps: all LEIs are synthetic and only the ~30 named demo participants have one (the 2,000 volume-test clients report `INCOMPLETE` by design); no real APA: the public feed (`reporting-api`, `GET /post-trade`) serves the data, but it isn't an approved publication arrangement; no alert rule on the latency histogram yet; instrument scope and CFI codes are simulator assumptions, not a legal classification; and a matching-engine replay (OPERATIONS.md 3.4 Option B) regenerates trade IDs, which the `trade_id` constraint cannot deduplicate. |
 | Schema registry | High | Confluent Schema Registry for Avro/Protobuf event versioning with schema evolution enforcement at the producer and consumer boundary. |
 | Async I/O (aiokafka) | High | Replace blocking Kafka consumers in order-service and market-data-service with `aiokafka` async consumers. Allows each service to handle concurrent I/O, metrics scraping, and health endpoints in a single event loop without blocking the primary consumption thread. Required groundwork before horizontal scaling removes GIL contention as the bottleneck. |
 
