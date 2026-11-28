@@ -6,6 +6,9 @@ name: FIXFlux - Reset Pipeline State
 # touched by the weekly cleanup job, which only prunes Postgres rows and
 # Kafka topics - this is the only way to get a clean book/reference prices
 # without a full redeploy.
+#
+# With wipe_data ticked it's a full fresh start for a demo: it first empties
+# every demo-data table (trades, compliance, MiFID II reports), then restarts.
 
 on:
   workflow_dispatch:
@@ -14,6 +17,11 @@ on:
         description: 'Space-separated docker compose service names to restart'
         required: false
         default: 'matching-engine risk-service'
+      wipe_data:
+        description: 'Also DELETE ALL trades, compliance data and MiFID II reports (fresh start)'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -31,6 +39,23 @@ jobs:
           echo "${{ secrets.DO_SSH_KEY }}" > ~/.ssh/fixflux_do
           chmod 600 ~/.ssh/fixflux_do
           ssh-keyscan -H ${{ secrets.DO_DROPLET_IP }} >> ~/.ssh/known_hosts
+
+      # Same tables as scripts/clear_db.py. compliance_rule_overrides is kept:
+      # it's rule configuration, not demo data. TRUNCATE leaves the views and
+      # reader roles on regulatory_reports in place.
+      - name: Wipe demo data
+        if: ${{ inputs.wipe_data }}
+        run: |
+          ssh -i ~/.ssh/fixflux_do -o ConnectTimeout=10 root@${{ secrets.DO_DROPLET_IP }} "
+            cd ~/python-engineering-lab/fixflux
+            docker compose exec -T postgres psql -U fixuser -d fixdb -v ON_ERROR_STOP=1 -c '
+              TRUNCATE TABLE trades, compliance_violations, client_risk_scores,
+                compliance_audit_trail, regulatory_reports RESTART IDENTITY CASCADE;'
+            docker compose exec -T postgres psql -U fixuser -d fixdb -t -c '
+              SELECT (SELECT count(*) FROM trades) AS trades,
+                     (SELECT count(*) FROM compliance_violations) AS violations,
+                     (SELECT count(*) FROM regulatory_reports) AS reports;'
+          "
 
       - name: Restart requested services
         run: |

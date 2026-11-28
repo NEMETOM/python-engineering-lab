@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Reclaims disk space on the DigitalOcean Droplet.
-# Deletes stale PostgreSQL records, dangling Docker images, builder cache,
-# and CI test artifacts. Safe to run against a live stack.
+# Deletes stale PostgreSQL records (trades, compliance, MiFID II regulatory
+# reports), dangling Docker images, builder cache, and CI test artifacts.
+# Safe to run against a live stack.
 #
 # Usage: RETAIN_DAYS=30 bash cleanup.sh
 #        (defaults to 30 days if RETAIN_DAYS is unset)
@@ -50,6 +51,13 @@ else
     result=$(pg "DELETE FROM compliance_audit_trail WHERE recorded_at < NOW() - INTERVAL '${RETAIN_DAYS} days';" 2>&1) \
         && log "  compliance_audit_trail: $result" \
         || warn "  compliance_audit_trail cleanup failed: $result"
+
+    # MiFID II reports, by publication time: reporting_timestamp is NOT NULL,
+    # trading_timestamp can be (INCOMPLETE reports without an execution time).
+    # The public and restricted views read this table, so they shrink with it.
+    result=$(pg "DELETE FROM regulatory_reports WHERE reporting_timestamp < NOW() - INTERVAL '${RETAIN_DAYS} days';" 2>&1) \
+        && log "  regulatory_reports: $result" \
+        || warn "  regulatory_reports cleanup failed: $result"
 
     # client_risk_scores is a stateful per-client view — do not delete by time
     log "  client_risk_scores: skipped (stateful, not time-series)"

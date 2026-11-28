@@ -12,6 +12,11 @@ Tables cleared:
     compliance_violations    - compliance rule violations
     client_risk_scores       - per-client risk scores
     compliance_audit_trail   - immutable audit trail
+    regulatory_reports       - MiFID II post-trade reports (reporting-service)
+
+compliance_rule_overrides is kept: it's rule configuration, not demo data.
+Keep this list in sync with the wipe_data step of
+.github/workflows/reset-pipeline-state.yml.
 
 PostgreSQL sequences (e.g. compliance_audit_trail.id) are reset to 1.
 """
@@ -34,6 +39,7 @@ _TABLES = [
     "compliance_violations",
     "client_risk_scores",
     "trades",
+    "regulatory_reports",
 ]
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
